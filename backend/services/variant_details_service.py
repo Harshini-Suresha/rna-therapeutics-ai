@@ -1,0 +1,166 @@
+"""Fetch top variant details (HGVS, rsID) for a gene.
+
+- HGVS name: from ClinVar (top pathogenic variant, best gold-star review)
+- rsID: from ClinVar pathogenic variants looked up in gnomAD v4 (the first
+  variant with a gold-star review that also has an rsID in gnomAD)
+
+All data comes from public APIs.  No values are fabricated.
+"""
+
+from __future__ import annotations
+
+import logging
+from typing import Any, Dict, List, Optional
+
+import requests
+
+logger = logging.getLogger(__name__)
+
+_TIMEOUT = 30
+GNOMAD_API = "https://gnomad.broadinstitute.org/api"
+NCBI_EUTILS = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
+
+
+# ---------------------------------------------------------------------------
+# ClinVar — HGVS name (via NCBI E-utilities)
+# ---------------------------------------------------------------------------
+
+def _clinvar_top_hgvs(gene_symbol: str) -> Optional[str]:
+    """Return the HGVS name of the highest-rated pathogenic ClinVar variant."""
+    try:
+        resp = requests.get(
+            f"{NCBI_EUTILS}/esearch.fcgi",
+            params={
+                "db": "clinvar",
+                "term": (
+                    f"({gene_symbol}[Gene]) AND "
+                    "(pathogenic[Clinical Significance] OR likely pathogenic[Clinical Significance])"
+                ),
+                "retmax": 10,
+                "sort": "relevance",
+                "retmode": "json",
+            },
+            timeout=_TIMEOUT,
+        )
+        ids: List[str] = resp.json().get("esearchresult", {}).get("idlist", [])
+        if not ids:
+            return None
+
+        resp2 = requests.get(
+            f"{NCBI_EUTILS}/esummary.fcgi",
+            params={"db": "clinvar", "id": ",".join(ids), "retmode": "json"},
+            timeout=_TIMEOUT,
+        )
+        result = resp2.json().get("result", {})
+        for uid in result.get("uids", []):
+            entry = result[uid]
+            for vs in entry.get("variation_set", []):
+                name = vs.get("variation_name", "")
+                if "c." in name or "p." in name:
+                    return name
+        return None
+    except Exception as exc:
+        logger.warning("ClinVar HGVS lookup failed for %s: %s", gene_symbol, exc)
+        return None
+
+
+# ---------------------------------------------------------------------------
+# gnomAD — rsID (via ClinVar pathogenic variants in gnomAD)
+# ---------------------------------------------------------------------------
+
+_PATHOGENIC_TERMS = ("Pathogenic", "Likely pathogenic")
+
+_GNOMAD_CLINVAR_Q = """
+query GnomadClinvar($geneId: String!) {
+  gene(gene_id: $geneId, reference_genome: GRCh38) {
+    clinvar_variants {
+      variant_id
+      clinical_significance
+      hgvsp
+      hgvsc
+      gold_stars
+      in_gnomad
+    }
+  }
+}
+"""
+
+_GNOMAD_VARIANT_Q = """
+query GnomadVariant($variantId: String!) {
+  variant(variantId: $variantId, dataset: gnomad_r4) {
+    variantId
+    rsid
+    exome { af }
+  }
+}
+"""
+
+
+def _gnomad_rsid_for_gene(ensembl_gene_id: str) -> Optional[str]:
+    """Find an rsID from a ClinVar pathogenic variant that exists in gnomAD."""
+    try:
+        resp = requests.post(
+            GNOMAD_API,
+            json={
+                "query": _GNOMAD_CLINVAR_Q,
+                "variables": {"geneId": ensembl_gene_id},
+            },
+            timeout=_TIMEOUT,
+        )
+        resp.raise_for_status()
+        clinvar_variants = (
+            resp.json()
+            .get("data", {})
+            .get("gene", {})
+            .get("clinvar_variants", [])
+        )
+        if not clinvar_variants:
+            return None
+
+        # Filter to pathogenic, in gnomad, with gold stars — sort best first
+        candidates = [
+            v
+            for v in clinvar_variants
+            if v.get("clinical_significance") in _PATHOGENIC_TERMS
+            and v.get("in_gnomad")
+            and (v.get("gold_stars") or 0) > 0
+        ]
+        candidates.sort(key=lambda v: -(v.get("gold_stars") or 0))
+
+        # Look up rsIDs one by one (max 5) until we find one
+        for v in candidates[:5]:
+            try:
+                vresp = requests.post(
+                    GNOMAD_API,
+                    json={
+                        "query": _GNOMAD_VARIANT_Q,
+                        "variables": {"variantId": v["variant_id"]},
+                    },
+                    timeout=10,
+                )
+                vdata = vresp.json().get("data", {}).get("variant")
+                rsid = (vdata or {}).get("rsid")
+                if rsid:
+                    return rsid
+            except Exception:
+                continue
+
+        return None
+    except Exception as exc:
+        logger.warning("gnomAD rsID lookup failed for %s: %s", ensembl_gene_id, exc)
+        return None
+
+
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
+
+def get_variant_details(
+    gene_symbol: str,
+    ensembl_gene_id: Optional[str] = None,
+    entrez_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Return top ClinVar HGVS name and a representative rsID for the gene."""
+    hgvs = _clinvar_top_hgvs(gene_symbol)
+    rsid = _gnomad_rsid_for_gene(ensembl_gene_id) if ensembl_gene_id else None
+    return {"topHgvsName": hgvs, "topRsId": rsid}

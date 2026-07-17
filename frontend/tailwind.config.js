@@ -1,0 +1,30 @@
+/** @type {import('tailwindcss').Config} */
+module.exports = {
+  content: [
+    "./app/**/*.{ts,tsx}",
+    "./components/**/*.{ts,tsx}",
+  ],
+  theme: {
+    extend: {
+      colors: {
+        navy: {
+          950: "#0A1330",
+          900: "#0D1A3F",
+          800: "#122154",
+          700: "#182B6B",
+        },
+        brand: {
+          DEFAULT: "#1B2A6B",
+          dark: "#141F52",
+        },
+      },
+      fontFamily: {
+        sans: ["Inter", "system-ui", "sans-serif"],
+      },
+      boxShadow: {
+        card: "0 1px 2px 0 rgba(16, 24, 40, 0.05)",
+      },
+    },
+  },
+  plugins: [],
+};

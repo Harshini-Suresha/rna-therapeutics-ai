@@ -1,0 +1,54 @@
+{
+  "id": "A16",
+  "enabled": true,
+  "name": "Spliceosome-Mediated RNA Trans-splicing (SMaRT)",
+  "category": "RNA Repair / Transcript Replacement",
+  "therapeuticGoalIds": [],
+  "therapeuticGoalDescription": "Replace the mutant portion of a pre-mRNA with a corrected RNA sequence through spliceosome-mediated trans-splicing, thereby restoring production of a functional transcript and protein.",
+  "molecularDefect": "Pathogenic mutations affecting coding regions where replacement of part of the transcript is preferable to transcript degradation or exon skipping.",
+  "diseaseMechanism": "An engineered RNA trans-splicing molecule binds the target pre-mRNA through a binding domain and recruits the endogenous spliceosome to perform trans-splicing, replacing the mutant RNA segment with a therapeutic sequence.",
+  "suitableVariantTypes": "Coding-region mutations; nonsense mutations; frameshift mutations; selected missense mutations; multi-exon pathogenic regions; mutations requiring replacement of large transcript segments.",
+  "typicalDiseases": "Cystic Fibrosis (CFTR); Hemophilia A (F8); Epidermolysis Bullosa (COL7A1); Retinitis Pigmentosa (RHO/RPGR experimental); Huntington disease (experimental).",
+  "rnaTargetRegion": "Target pre-mRNA intronic sequences adjacent to the intended trans-splicing site.",
+  "transcriptRequirement": "Target gene must be actively transcribed to generate sufficient endogenous pre-mRNA for trans-splicing.",
+  "asoChemistry": null,
+  "typicalLength": "Variable; typically >1 kb, substantially longer than conventional ASOs because RTMs include therapeutic coding sequences.",
+  "designRules": "Identify an efficient intronic binding site; minimize competition with endogenous cis-splicing; optimize splice donor/acceptor elements; validate corrected transcript formation by RT-PCR and sequencing; confirm restoration of protein function.",
+  "secondaryStructureRequirement": "Accessible pre-mRNA binding regions are preferred; excessive secondary structure can reduce RTM binding and trans-splicing efficiency.",
+  "offTargetConsiderations": "Off-target trans-splicing; aberrant chimeric transcripts; unintended splice junctions; competition with endogenous splicing.",
+  "advantages": "Can replace large mutant transcript regions; mutation-independent within the replaced segment; preserves endogenous gene regulation.",
+  "limitations": "Generally low trans-splicing efficiency; competition with cis-splicing; complex vector delivery; no approved clinical therapies.",
+  "fdaApprovedDrugs": "None",
+  "clinicalTrialExamples": "None identified; currently preclinical/experimental.",
+  "evidenceLevel": {
+    "rating": "Moderate (extensive preclinical evidence, no approved therapy).",
+    "note": null
+  },
+  "referencesSummary": null,
+  "references": [
+    {
+      "refId": "R1",
+      "paper": "Puttaraju M, Jamison SF, Mansfield SG, Garcia-Blanco MA, Mitchell LG. Spliceosome-mediated RNA trans-splicing as a tool for gene therapy.",
+      "doi": "PMID: 10319816",
+      "usedFor": "Foundational demonstration of spliceosome-mediated RNA trans-splicing for therapeutic RNA repair."
+    },
+    {
+      "refId": "R2",
+      "paper": "Mansfield SG et al. Repair of CFTR mRNA by spliceosome-mediated RNA trans-splicing.",
+      "doi": "PMID: Needs verification",
+      "usedFor": "Application of SMaRT to cystic fibrosis."
+    },
+    {
+      "refId": "R3",
+      "paper": "Wally V et al. RNA trans-splicing for inherited skin diseases.",
+      "doi": "PMID: Needs verification",
+      "usedFor": "Epidermolysis bullosa applications."
+    },
+    {
+      "refId": "R4",
+      "paper": "Liu X et al. Reviews on RNA trans-splicing and therapeutic applications.",
+      "doi": "Review – DOI/PMID to verify",
+      "usedFor": "Comprehensive review of SMaRT technology and disease applications."
+    }
+  ]
+}

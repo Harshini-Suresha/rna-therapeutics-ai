@@ -1,0 +1,31 @@
+{
+  "id": "A14",
+  "enabled": true,
+  "name": "RNA Toxicity Neutralization (RNA Foci Disruption)",
+  "category": "Toxic RNA neutralization",
+  "therapeuticGoalIds": [
+    "TG05"
+  ],
+  "therapeuticGoalDescription": "Restore normal RNA-binding protein function by disrupting pathogenic RNA-protein complexes without necessarily degrading the RNA.",
+  "molecularDefect": "Expanded repeat RNAs sequester essential RNA-binding proteins.",
+  "diseaseMechanism": "Toxic RNA forms nuclear foci that trap proteins such as MBNL, leading to widespread splice abnormalities.",
+  "suitableVariantTypes": null,
+  "typicalDiseases": "DM1, C9orf72 ALS/FTD, FXTAS",
+  "rnaTargetRegion": null,
+  "transcriptRequirement": null,
+  "asoChemistry": null,
+  "typicalLength": null,
+  "designRules": null,
+  "secondaryStructureRequirement": null,
+  "offTargetConsiderations": null,
+  "advantages": null,
+  "limitations": null,
+  "fdaApprovedDrugs": null,
+  "clinicalTrialExamples": null,
+  "evidenceLevel": {
+    "rating": "Moderate–High",
+    "note": null
+  },
+  "referencesSummary": null,
+  "references": []
+}
