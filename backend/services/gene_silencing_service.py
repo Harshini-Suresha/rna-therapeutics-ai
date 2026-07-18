@@ -57,15 +57,18 @@ def get_target_analysis(ensembl_gene_id: str) -> dict:
                 "biotype": canonical.get("biotype"),
             }
             exons = canonical.get("Exon", [])
+            # Sort by genomic start position — exons don't come pre-ranked
+            strand = canonical.get("strand", 1)
+            sorted_exons = sorted(exons, key=lambda e: e.get("start", 0), reverse=(strand == -1))
             result["exons"] = [
                 {
                     "id": e.get("id"),
-                    "index": e.get("rank"),
+                    "index": idx + 1,
                     "start": e.get("start"),
                     "end": e.get("end"),
                     "length": (e.get("end", 0) - e.get("start", 0) + 1),
                 }
-                for e in exons
+                for idx, e in enumerate(sorted_exons)
                 if e.get("start") and e.get("end")
             ]
 
