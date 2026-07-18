@@ -1,0 +1,135 @@
+"use client";
+
+import { CheckCircle2, XCircle, ChevronDown, ChevronUp } from "lucide-react";
+import { useState } from "react";
+import { RankedMechanism } from "@/types/mechanism";
+import { Card, Pill } from "./ui";
+
+const EVIDENCE_TONE: Record<string, "green" | "blue" | "amber" | "slate"> = {
+  "Very High": "green",
+  High: "green",
+  Moderate: "blue",
+  "Low–Moderate": "amber",
+  Low: "amber",
+};
+
+export default function MechanismCard({
+  mechanism,
+  selected,
+  onSelect,
+}: {
+  mechanism: RankedMechanism;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const rating = mechanism.evidenceLevel?.rating ?? null;
+  const tone = rating ? EVIDENCE_TONE[rating] ?? "slate" : "slate";
+
+  return (
+    <Card className={selected ? "ring-2 ring-brand" : ""}>
+      <div className="flex flex-col gap-3 p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-mono text-slate-400">{mechanism.id}</span>
+              {mechanism.eligible ? (
+                <span className="flex items-center gap-1 text-[11px] font-medium text-emerald-600">
+                  <CheckCircle2 className="h-3 w-3" />
+                  Eligible
+                </span>
+              ) : (
+                <span className="flex items-center gap-1 text-[11px] font-medium text-slate-400">
+                  <XCircle className="h-3 w-3" />
+                  Poor fit
+                </span>
+              )}
+              {rating && <Pill tone={tone}>{rating} evidence</Pill>}
+            </div>
+            <h3 className="mt-1 text-[15px] font-semibold text-slate-800">{mechanism.name}</h3>
+            {mechanism.category && (
+              <p className="text-[12.5px] text-slate-500">{mechanism.category}</p>
+            )}
+          </div>
+          <button
+            onClick={onSelect}
+            className={`shrink-0 rounded-lg px-4 py-2 text-[13px] font-medium transition-colors ${
+              selected
+                ? "bg-brand text-white"
+                : "border border-slate-300 text-slate-600 hover:bg-slate-50"
+            }`}
+          >
+            {selected ? "Selected" : "Select"}
+          </button>
+        </div>
+
+        <ul className="space-y-1">
+          {mechanism.rationale.map((r, i) => (
+            <li key={i} className="text-[12.5px] text-slate-600 leading-snug">
+              • {r}
+            </li>
+          ))}
+        </ul>
+
+        {mechanism.fdaApprovedDrugs && (
+          <div className="rounded-lg bg-slate-50 px-3 py-2">
+            <p className="text-[11px] font-medium text-slate-400">FDA-approved precedent</p>
+            <p className="mt-0.5 text-[12.5px] text-slate-700">{mechanism.fdaApprovedDrugs}</p>
+          </div>
+        )}
+
+        <button
+          onClick={() => setExpanded((e) => !e)}
+          className="flex items-center gap-1 text-[12.5px] font-medium text-brand"
+        >
+          {expanded ? "Hide details" : "Show design details"}
+          {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+        </button>
+
+        {expanded && (
+          <div className="space-y-3 border-t border-slate-100 pt-3">
+            <Detail label="Suitable variant types" value={mechanism.suitableVariantTypes} />
+            <Detail label="RNA target region" value={mechanism.rnaTargetRegion} />
+            <Detail label="ASO chemistry" value={mechanism.asoChemistry} />
+            <Detail label="Design rules" value={mechanism.designRules} />
+            <Detail label="Advantages" value={mechanism.advantages} />
+            <Detail label="Limitations" value={mechanism.limitations} />
+            <Detail label="Off-target considerations" value={mechanism.offTargetConsiderations} />
+            {mechanism.references.length > 0 && (
+              <div>
+                <p className="text-[11px] font-medium text-slate-400 mb-1">References</p>
+                <ul className="space-y-1">
+                  {mechanism.references.map((ref) => (
+                    <li key={ref.refId} className="text-[11.5px] text-slate-500">
+                      {ref.paper}
+                      {ref.doi && (
+                        <a
+                          href={`https://doi.org/${ref.doi}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="ml-1 text-brand hover:underline"
+                        >
+                          DOI
+                        </a>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+function Detail({ label, value }: { label: string; value: string | null }) {
+  if (!value) return null;
+  return (
+    <div>
+      <p className="text-[11px] font-medium text-slate-400">{label}</p>
+      <p className="mt-0.5 text-[12.5px] text-slate-700 leading-snug">{value}</p>
+    </div>
+  );
+}
