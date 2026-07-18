@@ -44,7 +44,7 @@ function StatCard({ icon: Icon, iconBg, iconColor, title, rows, sources, notConn
         </span>
         <p className="text-[12.5px] font-semibold text-slate-700">{title}</p>
       </div>
-      <div className="flex-1 space-y-1.5 px-4 pb-3">
+      <div className="flex-1 space-y-1.5 px-4 pb-3 overflow-y-auto max-h-44 card-scroll">
         {notConnected ? (
           <p className="text-[11.5px] text-slate-400">Not yet connected</p>
         ) : (
@@ -134,6 +134,7 @@ export default function StatsRow({ gene }: { gene: GeneTargetObject }) {
           { label: "Top pathway", value: gene.pathwayHighlight ?? DASH },
           { label: "KEGG", value: gene.keggCount ?? DASH },
           { label: "Reactome", value: gene.reactomeCount ?? DASH },
+          { label: "Total pathways", value: (gene.keggCount ?? 0) + (gene.reactomeCount ?? 0) || DASH },
         ]}
         sources={[
           links.kegg ? { label: "Source: KEGG", url: links.kegg } : null,
@@ -156,7 +157,7 @@ export default function StatsRow({ gene }: { gene: GeneTargetObject }) {
           { label: "Cellular Component", value: gene.goCellularComponent ?? DASH },
           { label: "Top CC term", value: gene.goCellularComponentHighlight ?? DASH },
         ]}
-        sources={[]}
+        sources={links.go ? [{ label: "Source: Gene Ontology", url: links.go }] : []}
       />
 
       {/* 6. Interactions */}
@@ -196,7 +197,10 @@ export default function StatsRow({ gene }: { gene: GeneTargetObject }) {
           { label: "Preprints", value: gene.preprintCount ?? DASH },
           { label: "Case Reports", value: gene.caseReportsCount ?? DASH },
         ]}
-        sources={[]}
+        sources={[
+          links.pubmed ? { label: "Source: PubMed", url: links.pubmed } : null,
+          links.clinicaltrials ? { label: "Source: ClinicalTrials.gov", url: links.clinicaltrials } : null,
+        ].filter(Boolean) as { label: string; url: string }[]}
       />
     </div>
   );

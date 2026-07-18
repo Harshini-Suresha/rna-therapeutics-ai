@@ -81,11 +81,14 @@ def get_safe_ensembl_url(species: str, gene_id: str) -> str:
     return f"https://www.ensembl.org/{formatted_species}/Gene/Summary?g={gene_id}"
 
 async def get_pubmed_count(session: aiohttp.ClientSession, term: str) -> int:
-    url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term={term}&retmode=json"
     try:
-        async with session.get(url, timeout=aiohttp.ClientTimeout(total=6)) as response:
-            data = await response.json()
-            return int(data["esearchresult"]["count"])
+        async with session.get(
+            "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi",
+            params={"db": "pubmed", "term": term, "retmode": "json"},
+            timeout=aiohttp.ClientTimeout(total=6),
+        ) as response:
+            data = await response.json() if response.status == 200 else {}
+            return int((data.get("esearchresult") or {}).get("count", 0))
     except Exception:
         return 0
 
@@ -117,6 +120,19 @@ async def get_dbsnp_count(session: aiohttp.ClientSession, symbol: str) -> Option
             return int(count) if count is not None else None
     except Exception:
         return None
+
+async def get_rxiv_count(session: aiohttp.ClientSession, symbol: str) -> int:
+    """Fetch preprint count from bioRxiv/medRxiv via Europe PMC."""
+    try:
+        async with session.get(
+            "https://www.ebi.ac.uk/europepmc/webservices/rest/search",
+            params={"query": f"{symbol}[title] AND SRC:PPR", "format": "json", "resultType": "lite"},
+            timeout=aiohttp.ClientTimeout(total=8),
+        ) as response:
+            data = await response.json() if response.status == 200 else {}
+            return int(data.get("hitCount", 0))
+    except Exception:
+        return 0
 
 async def fetch_expression_details(session: aiohttp.ClientSession, symbol: str, ensembl_gene_id: str, species: str) -> dict:
     expr_data = {
@@ -266,16 +282,24 @@ async def initialize_target(payload: TargetRequest):
         taxon_id = SPECIES_TAXON_IDS.get(species, 9606)
 
         async with aiohttp.ClientSession() as session:
-            pubmed_task = get_pubmed_count(session, f"{symbol_upper}%5Bgene%5D")
-            review_task = get_pubmed_count(session, f"{symbol_upper}%5Bgene%5D+AND+review%5Bpt%5D")
+            pubmed_task = get_pubmed_count(session, f"{symbol_upper}[gene]")
+            review_task = get_pubmed_count(session, f"{symbol_upper}[gene] AND review[pt]")
+            clinical_trial_task = get_pubmed_count(session, f"{symbol_upper}[gene] AND clinical trial[pt]")
+            case_report_task = get_pubmed_count(session, f"{symbol_upper}[gene] AND case reports[pt]")
+            biorxiv_task = get_rxiv_count(session, symbol_upper)
+            medrxiv_task = asyncio.sleep(0, result=0)
             disease_task = fetch_disease_associations(session, symbol_upper, gene_id, species)
             expr_task = fetch_expression_details(session, symbol_upper, gene_id, species)
             clinvar_task = get_clinvar_count(session, symbol_upper) if is_human else None
             dbsnp_task = get_dbsnp_count(session, symbol_upper) if is_human else None
 
-            pubmed_count, review_count, disease_info, expr_details, clinvar_count, dbsnp_count = await asyncio.gather(
+            pubmed_count, review_count, clinical_trial_count, case_report_count, biorxiv_count, medrxiv_count, disease_info, expr_details, clinvar_count, dbsnp_count = await asyncio.gather(
                 pubmed_task,
                 review_task,
+                clinical_trial_task,
+                case_report_task,
+                biorxiv_task,
+                medrxiv_task,
                 disease_task,
                 expr_task,
                 clinvar_task if clinvar_task else asyncio.sleep(0, result=None),
@@ -391,6 +415,7 @@ async def initialize_target(payload: TargetRequest):
             "kegg": f"https://www.genome.jp/dbget-bin/www_bget?q={symbol_upper}",
             "reactome": f"https://reactome.org/content/query?q={symbol_upper}",
             "pubmed": f"https://pubmed.ncbi.nlm.nih.gov/?term={symbol_upper}%5Bgene%5D",
+            "clinicaltrials": f"https://clinicaltrials.gov/search?cond={symbol_upper}",
             "omim": f"https://www.omim.org/search?search={symbol_upper}",
             "go": f"https://www.ebi.ac.uk/QuickGO/annotations?geneProductId=ENSEMBL%3A{gene_id}",
             "string": f"https://string-db.org/cgi/network?identifiers={symbol_upper}&species={taxon_id}",
@@ -523,6 +548,9 @@ async def initialize_target(payload: TargetRequest):
 
             "pubmedArticleCount": pubmed_count,
             "reviewCount": review_count,
+            "clinicalTrialsCount": clinical_trial_count,
+            "caseReportsCount": case_report_count,
+            "preprintCount": biorxiv_count,
         }
     except HTTPException:
         raise
