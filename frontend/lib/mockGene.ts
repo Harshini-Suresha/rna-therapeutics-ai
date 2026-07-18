@@ -154,6 +154,9 @@ export const MOCK_GENES: Record<string, GeneTargetObject> = {
     triplosensitivity: "Severe",
     activeIsoforms: 4,
     spliceSwitches: 1,
+    structuralAccessibility: "62% (Favorable)",
+    splicingMotifDensity: "38.2/kb (Moderate)",
+    preclinicalConservation: "3/3 (Excellent)",
     gQuadruplexes: "2 Blocks Found",
     cpgDensity: "Low Risk",
 

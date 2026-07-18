@@ -150,10 +150,13 @@ def _ensembl_get(url):
 
 
 def get_aso_analysis(ensembl_gene_id: str, taxon_id: int) -> dict:
-    """Compute ASO-relevant metrics: active isoforms, splice switches, G4, CpG."""
+    """Compute ASO-relevant metrics: active isoforms, splice switches, accessibility, motifs, conservation."""
     result = {
         "activeIsoforms": None,
         "spliceSwitches": None,
+        "structuralAccessibility": None,
+        "splicingMotifDensity": None,
+        "preclinicalConservation": None,
         "gQuadruplexes": None,
         "cpgDensity": None,
     }
@@ -177,35 +180,105 @@ def get_aso_analysis(ensembl_gene_id: str, taxon_id: int) -> dict:
     except Exception:
         pass
 
-    # Fetch genomic sequence for G4 and CpG analysis (human only)
+    # Fetch mRNA sequence for accessibility, motifs, G4, CpG analysis (human only)
     if taxon_id == 9606:
         try:
-            seq_resp = _ensembl_get(f"{ENSEMBL_REST}/sequence/id/{ensembl_gene_id}?type=genomic")
-            if seq_resp.ok:
-                seq_data = seq_resp.json()
-                seq = seq_data.get("seq", "").upper()
+            # Get canonical transcript ID for mRNA sequence
+            resp = _ensembl_get(f"{ENSEMBL_REST}/lookup/id/{ensembl_gene_id}")
+            if resp.ok:
+                gene_data = resp.json()
+                transcript_id = gene_data.get("canonical_transcript", "")
+                if transcript_id:
+                    # Fetch mRNA sequence
+                    seq_resp = _ensembl_get(f"{ENSEMBL_REST}/sequence/id/{transcript_id}?type=cds")
+                    if seq_resp.ok:
+                        seq_data = seq_resp.json()
+                        seq = seq_data.get("seq", "").upper()
+                        
+                        if seq:
+                            seq_len = len(seq)
+                            
+                            # Structural Accessibility: GC content as proxy for single-stranded regions
+                            # Lower GC = more single-stranded = more accessible to ASO binding
+                            gc_count = seq.count("G") + seq.count("C")
+                            gc_content = (gc_count / seq_len) * 100 if seq_len > 0 else 50
+                            # Accessibility inversely related to GC: lower GC = higher accessibility
+                            accessibility = max(0, min(100, 100 - gc_content + 20))
+                            if accessibility >= 60:
+                                result["structuralAccessibility"] = f"{accessibility:.0f}% (Favorable)"
+                            elif accessibility >= 45:
+                                result["structuralAccessibility"] = f"{accessibility:.0f}% (Moderate)"
+                            else:
+                                result["structuralAccessibility"] = f"{accessibility:.0f}% (Challenging)"
 
-                # G-quadruplex detection: pattern GGG(N1-7){3}GGG
-                g4_pattern = re.compile(r"(G{3}[\w]{1,7}){3}G{3}")
-                g4_matches = g4_pattern.findall(seq)
-                g4_count = len(g4_matches)
-                if g4_count == 0:
-                    result["gQuadruplexes"] = "0 Blocks Found"
-                elif g4_count <= 2:
-                    result["gQuadruplexes"] = f"{g4_count} Block{'s' if g4_count > 1 else ''} Found"
-                else:
-                    result["gQuadruplexes"] = f"{g4_count} Blocks Found"
+                            # Splicing Motif Density: count splicing regulatory motifs
+                            # ESE (Exonic Splicing Enhancer) motifs: CUG, GAA, GAC, UGC, AGG
+                            # ESS (Exonic Splicing Silencer) motifs: UCUU, CUAG, UUAG, CUCU, UGCA
+                            ese_patterns = re.compile(r"(CUG|GAA|GAC|UGC|AGG)")
+                            ess_patterns = re.compile(r"(UCUU|CUAG|UUAG|CUCU|UGCA)")
+                            ese_count = len(ese_patterns.findall(seq))
+                            ess_count = len(ess_patterns.findall(seq))
+                            total_motifs = ese_count +ess_count
+                            motif_density = (total_motifs / seq_len) * 1000 if seq_len > 0 else 0
+                            if motif_density > 50:
+                                result["splicingMotifDensity"] = f"{motif_density:.1f}/kb (High)"
+                            elif motif_density > 25:
+                                result["splicingMotifDensity"] = f"{motif_density:.1f}/kb (Moderate)"
+                            else:
+                                result["splicingMotifDensity"] = f"{motif_density:.1f}/kb (Low)"
 
-                # CpG density analysis
-                cpg_count = seq.count("CG")
-                seq_len = len(seq) if len(seq) > 0 else 1
-                cpg_density = (cpg_count / seq_len) * 1000
-                if cpg_density > 25:
-                    result["cpgDensity"] = "High Risk"
-                elif cpg_density > 10:
-                    result["cpgDensity"] = "Medium Risk"
-                else:
-                    result["cpgDensity"] = "Low Risk"
+                            # G-quadruplex detection: pattern GGG(N1-7){3}GGG
+                            g4_pattern = re.compile(r"(G{3}[\w]{1,7}){3}G{3}")
+                            g4_matches = g4_pattern.findall(seq)
+                            g4_count = len(g4_matches)
+                            if g4_count == 0:
+                                result["gQuadruplexes"] = "0 Blocks Found"
+                            elif g4_count <= 2:
+                                result["gQuadruplexes"] = f"{g4_count} Block{'s' if g4_count > 1 else ''} Found"
+                            else:
+                                result["gQuadruplexes"] = f"{g4_count} Blocks Found"
+
+                            # CpG density analysis
+                            cpg_count = seq.count("CG")
+                            cpg_density = (cpg_count / seq_len) * 1000
+                            if cpg_density > 25:
+                                result["cpgDensity"] = "High Risk"
+                            elif cpg_density > 10:
+                                result["cpgDensity"] = "Medium Risk"
+                            else:
+                                result["cpgDensity"] = "Low Risk"
+        except Exception:
+            pass
+
+        # Preclinical Conservation: check orthologs in model organisms
+        try:
+            comp_resp = _ensembl_get(
+                f"{ENSEMBL_REST}/Homology/id/{ensembl_gene_id}?type=orthologues"
+            )
+            if comp_resp.ok:
+                comp_data = comp_resp.json()
+                homologies = comp_data.get("data", [])
+                if homologies:
+                    target_species = {"mus_musculus", "rattus_norvegicus", "macaca_fascicularis"}
+                    conserved_species = set()
+                    for homology_group in homologies:
+                        for homolog in homology_group.get("Homology", []):
+                            species = homolog.get("target", {}).get("species", "")
+                            if species in target_species:
+                                # Check for high-quality orthologs
+                                identity = float(homolog.get("target", {}).get("perc_id", 0))
+                                if identity >= 80:
+                                    conserved_species.add(species)
+                    total_target = len(target_species)
+                    conserved_count = len(conserved_species)
+                    if conserved_count == total_target:
+                        result["preclinicalConservation"] = f"{conserved_count}/{total_target} (Excellent)"
+                    elif conserved_count >= 2:
+                        result["preclinicalConservation"] = f"{conserved_count}/{total_target} (Good)"
+                    elif conserved_count == 1:
+                        result["preclinicalConservation"] = f"{conserved_count}/{total_target} (Limited)"
+                    else:
+                        result["preclinicalConservation"] = f"0/{total_target} (Poor)"
         except Exception:
             pass
 

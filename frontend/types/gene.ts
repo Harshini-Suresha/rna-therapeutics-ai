@@ -138,6 +138,9 @@ export interface GeneTargetObject {
   triplosensitivity: string | null;
   activeIsoforms: number | null;
   spliceSwitches: number | null;
+  structuralAccessibility: string | null;
+  splicingMotifDensity: string | null;
+  preclinicalConservation: string | null;
   gQuadruplexes: string | null;
   cpgDensity: string | null;
 

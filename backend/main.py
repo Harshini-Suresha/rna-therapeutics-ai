@@ -558,6 +558,9 @@ async def initialize_target(payload: TargetRequest):
             "triplosensitivity": constraint_data.get("triplosensitivity"),
             "activeIsoforms": aso_data.get("activeIsoforms"),
             "spliceSwitches": aso_data.get("spliceSwitches"),
+            "structuralAccessibility": aso_data.get("structuralAccessibility"),
+            "splicingMotifDensity": aso_data.get("splicingMotifDensity"),
+            "preclinicalConservation": aso_data.get("preclinicalConservation"),
             "gQuadruplexes": aso_data.get("gQuadruplexes"),
             "cpgDensity": aso_data.get("cpgDensity"),
 

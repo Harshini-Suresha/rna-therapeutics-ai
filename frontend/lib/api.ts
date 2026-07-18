@@ -149,6 +149,9 @@ export async function fetchGene(
     triplosensitivity: data.triplosensitivity ?? null,
     activeIsoforms: data.activeIsoforms ?? null,
     spliceSwitches: data.spliceSwitches ?? null,
+    structuralAccessibility: data.structuralAccessibility ?? null,
+    splicingMotifDensity: data.splicingMotifDensity ?? null,
+    preclinicalConservation: data.preclinicalConservation ?? null,
     gQuadruplexes: data.gQuadruplexes ?? null,
     cpgDensity: data.cpgDensity ?? null,
 

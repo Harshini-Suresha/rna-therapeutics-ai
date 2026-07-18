@@ -102,7 +102,9 @@ export default function StatsRow({ gene }: { gene: GeneTargetObject }) {
         title="Transcript Architecture"
         rows={[
           { label: "Active Isoforms", value: gene.activeIsoforms ?? DASH },
-          { label: "Exon Configuration", value: gene.exonCount ?? DASH },
+          { label: "Structural Accessibility", value: gene.structuralAccessibility ?? DASH },
+          { label: "Splicing Motif Density", value: gene.splicingMotifDensity ?? DASH },
+          { label: "Preclinical Conservation", value: gene.preclinicalConservation ?? DASH },
           { label: "Splice Switches", value: gene.spliceSwitches ?? DASH },
         ]}
         sources={[{ label: "Source: Ensembl", url: links.ensembl ?? "#" }]}
