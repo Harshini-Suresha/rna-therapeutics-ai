@@ -24,6 +24,7 @@ try:  # ``uvicorn backend.main:app`` from the repository root
     from .services.rna_halflife_service import get_rna_halflife
     from .services.dependency_service import get_gene_dependency
     from .api.mechanisms import router as mechanisms_router
+    from .api.gene_silencing import router as gene_silencing_router
 except ImportError:  # ``uvicorn main:app`` while working in backend/
     from services.gene_service import EnsemblLookupUnavailable, clean_synonyms, get_gene_metadata, get_gene_phenotypes, ensembl_gene_url
     from services.enrichment_service import get_gene_enrichment, get_aso_analysis
@@ -36,6 +37,7 @@ except ImportError:  # ``uvicorn main:app`` while working in backend/
     from services.rna_halflife_service import get_rna_halflife
     from services.dependency_service import get_gene_dependency
     from api.mechanisms import router as mechanisms_router
+    from api.gene_silencing import router as gene_silencing_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -51,6 +53,7 @@ app.add_middleware(
 )
 
 app.include_router(mechanisms_router)
+app.include_router(gene_silencing_router)
 
 SPECIES_TAXON_IDS = {
     "homo_sapiens": 9606,
