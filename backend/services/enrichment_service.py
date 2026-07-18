@@ -189,8 +189,11 @@ def get_aso_analysis(ensembl_gene_id: str, taxon_id: int) -> dict:
                 gene_data = resp.json()
                 transcript_id = gene_data.get("canonical_transcript", "")
                 if transcript_id:
-                    # Fetch mRNA sequence
-                    seq_resp = _ensembl_get(f"{ENSEMBL_REST}/sequence/id/{transcript_id}?type=cds")
+                    # Strip version suffix (e.g. ENST00000357033.9 -> ENST00000357033)
+                    # as the sequence endpoint does not accept versioned IDs
+                    transcript_base = transcript_id.split(".")[0]
+                    # Fetch CDS sequence
+                    seq_resp = _ensembl_get(f"{ENSEMBL_REST}/sequence/id/{transcript_base}?type=cds")
                     if seq_resp.ok:
                         seq_data = seq_resp.json()
                         seq = seq_data.get("seq", "").upper()
@@ -218,7 +221,7 @@ def get_aso_analysis(ensembl_gene_id: str, taxon_id: int) -> dict:
                             ess_patterns = re.compile(r"(UCUU|CUAG|UUAG|CUCU|UGCA)")
                             ese_count = len(ese_patterns.findall(seq))
                             ess_count = len(ess_patterns.findall(seq))
-                            total_motifs = ese_count +ess_count
+                            total_motifs = ese_count + ess_count
                             motif_density = (total_motifs / seq_len) * 1000 if seq_len > 0 else 0
                             if motif_density > 50:
                                 result["splicingMotifDensity"] = f"{motif_density:.1f}/kb (High)"
@@ -253,7 +256,8 @@ def get_aso_analysis(ensembl_gene_id: str, taxon_id: int) -> dict:
         # Preclinical Conservation: check orthologs in model organisms
         try:
             comp_resp = _ensembl_get(
-                f"{ENSEMBL_REST}/Homology/id/{ensembl_gene_id}?type=orthologues"
+                f"{ENSEMBL_REST}/homology/id/homo_sapiens/{ensembl_gene_id}"
+                f"?type=orthologues;target_taxon=10090;target_taxon=10116;target_taxon=9541"
             )
             if comp_resp.ok:
                 comp_data = comp_resp.json()
@@ -262,10 +266,9 @@ def get_aso_analysis(ensembl_gene_id: str, taxon_id: int) -> dict:
                     target_species = {"mus_musculus", "rattus_norvegicus", "macaca_fascicularis"}
                     conserved_species = set()
                     for homology_group in homologies:
-                        for homolog in homology_group.get("Homology", []):
+                        for homolog in homology_group.get("homologies", []):
                             species = homolog.get("target", {}).get("species", "")
                             if species in target_species:
-                                # Check for high-quality orthologs
                                 identity = float(homolog.get("target", {}).get("perc_id", 0))
                                 if identity >= 80:
                                     conserved_species.add(species)
