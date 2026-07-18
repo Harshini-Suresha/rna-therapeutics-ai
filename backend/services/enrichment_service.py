@@ -144,9 +144,9 @@ def get_gene_enrichment(ensembl_gene_id: str, taxon_id: int) -> dict:
 ENSEMBL_REST = "https://rest.ensembl.org"
 
 
-def _ensembl_get(url):
+def _ensembl_get(url, timeout=10):
     headers = {"Content-Type": "application/json"}
-    return requests.get(url, headers=headers, timeout=10)
+    return requests.get(url, headers=headers, timeout=timeout)
 
 
 def get_aso_analysis(ensembl_gene_id: str, taxon_id: int) -> dict:
@@ -161,14 +161,16 @@ def get_aso_analysis(ensembl_gene_id: str, taxon_id: int) -> dict:
         "cpgDensity": None,
     }
 
-    # Fetch transcript count from Ensembl
+    # Fetch transcript data from Ensembl (expand=1 required to get Transcript list)
     try:
-        resp = _ensembl_get(f"{ENSEMBL_REST}/lookup/id/{ensembl_gene_id}?expand=1")
+        resp = _ensembl_get(f"{ENSEMBL_REST}/lookup/id/{ensembl_gene_id}?expand=1", timeout=20)
         if resp.ok:
             data = resp.json()
             transcripts = data.get("Transcript", [])
+
+            # Active isoforms: count protein-coding transcripts
             coding = [t for t in transcripts if t.get("biotype") == "protein_coding"]
-            result["activeIsoforms"] = len(coding) if coding else len(transcripts)
+            result["activeIsoforms"] = len(coding) if coding else (len(transcripts) or None)
 
             # Splice switches: count transcripts with different exon structures
             if len(transcripts) > 1:
