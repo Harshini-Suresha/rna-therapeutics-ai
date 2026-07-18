@@ -1,14 +1,11 @@
 import {
-  Dna as GenomicIcon,
   GitBranch,
-  Activity,
   Share2,
   Tags,
   Network,
   BookMarked,
   ExternalLink,
   Shield,
-  MapPin,
   BarChart3,
 } from "lucide-react";
 import { GeneTargetObject } from "@/types/gene";
@@ -79,48 +76,50 @@ export default function StatsRow({ gene }: { gene: GeneTargetObject }) {
 
   return (
     <div className="grid grid-cols-3 gap-4 md:grid-cols-4 lg:grid-cols-7">
-      {/* 1. Gene Constraint */}
+      {/* 1. Target Vulnerability */}
       <StatCard
         icon={Shield}
         iconBg="#FEF2F2"
         iconColor="#DC2626"
-        title="Gene Constraint"
+        title="Target Vulnerability"
         rows={[
-          { label: "pLI (LoF intol.)", value: gene.intolerantToLossScore ?? DASH },
-          { label: "pRec (LoF recessive)", value: gene.recessiveConstraintZ ?? DASH },
-          { label: "pHe (Het. exp.)", value: gene.hetExcessZ ?? DASH },
-          { label: "Constraint Index", value: gene.compositeConstraintIndex ?? DASH },
+          { label: "pHaplo Score", value: gene.haploinsufficiencyScore ?? DASH },
+          { label: "RNA Half-Life (t₁/₂)", value: gene.rnaHalflife ?? DASH },
+          { label: "DepMap Dependency", value: gene.depmapDependency ?? DASH },
         ]}
-        sources={[{ label: "Source: gnomAD v2.1.1 constraint metrics", url: `https://gnomad.broadinstitute.org/gene/${gene.geneId}?dataset=gnomad_r2_1` }]}
+        sources={[
+          { label: "Source: ClinGen", url: "https://search.clinicalgenome.org/kb/gene-dosage" },
+          { label: "Source: RNAdecayCafe", url: "https://zenodo.org/records/15785218" },
+          { label: "Source: FAVOR", url: "https://xionglab.org/favor/" },
+        ]}
       />
 
-      {/* 2. Expression Profile */}
-      <StatCard
-        icon={BarChart3}
-        iconBg="#ECFDF5"
-        iconColor="#059669"
-        title="Expression Profile"
-        rows={[
-          { label: "Top tissue", value: gene.defaultTissue ?? DASH },
-          { label: "Median TPM", value: gene.tissueTpm ?? DASH },
-          { label: "Expression level", value: gene.tissueExpressionLevel ?? DASH },
-          { label: "Tissues profiled", value: gene.topTissues.length || DASH },
-        ]}
-        sources={links.gtex && gene.gtexAvailable ? [{ label: "Source: GTEx", url: links.gtex }] : []}
-      />
-
-      {/* 3. Variant Summary */}
+      {/* 2. Transcript Architecture */}
       <StatCard
         icon={GitBranch}
+        iconBg="#ECFDF5"
+        iconColor="#059669"
+        title="Transcript Architecture"
+        rows={[
+          { label: "Active Isoforms", value: gene.activeIsoforms ?? DASH },
+          { label: "Exon Configuration", value: gene.exonCount ?? DASH },
+          { label: "Splice Switches", value: gene.spliceSwitches ?? DASH },
+        ]}
+        sources={[{ label: "Source: Ensembl", url: links.ensembl ?? "#" }]}
+      />
+
+      {/* 3. Oligo Design Barriers */}
+      <StatCard
+        icon={BarChart3}
         iconBg="#FFF7ED"
         iconColor="#EA580C"
-        title="Variant Summary"
+        title="Oligo Design Barriers"
         rows={[
-          { label: "dbSNP variants", value: gene.dbSnpCount !== null ? gene.dbSnpCount.toLocaleString() : DASH },
-          { label: "ClinVar records", value: gene.clinvarVariantCount ?? DASH },
-          { label: "gnomAD constraint", value: gene.intolerantToLossScore ?? DASH },
+          { label: "Population SNPs", value: gene.dbSnpCount !== null ? gene.dbSnpCount.toLocaleString() : DASH },
+          { label: "G-Quadruplexes", value: gene.gQuadruplexes ?? DASH },
+          { label: "CpG Density", value: gene.cpgDensity ?? DASH },
         ]}
-        sources={links.clinvar ? [{ label: "Source: ClinVar", url: links.clinvar }] : []}
+        sources={links.ncbi ? [{ label: "Source: NCBI dbSNP", url: links.ncbi }] : []}
       />
 
       {/* 4. Pathways */}

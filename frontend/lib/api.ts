@@ -143,6 +143,23 @@ export async function fetchGene(
     recessiveConstraintZ: data.recessiveConstraintZ ?? null,
     hetExcessZ: data.hetExcessZ ?? null,
     compositeConstraintIndex: data.compositeConstraintIndex ?? null,
+    haploinsufficiencyScore: data.haploinsufficiencyScore ?? null,
+
+    loeufDecile: data.loeufDecile ?? null,
+    triplosensitivity: data.triplosensitivity ?? null,
+    activeIsoforms: data.activeIsoforms ?? null,
+    spliceSwitches: data.spliceSwitches ?? null,
+    gQuadruplexes: data.gQuadruplexes ?? null,
+    cpgDensity: data.cpgDensity ?? null,
+
+    // RNA half-life and gene dependency
+    rnaHalflife: data.rnaHalflife ?? null,
+    rnaHalflifeHours: data.rnaHalflifeHours ?? null,
+    rnaHalflifeSource: data.rnaHalflifeSource ?? null,
+    depmapDependency: data.depmapDependency ?? null,
+    depmapDependencyScore: data.depmapDependencyScore ?? null,
+    essentialGene: data.essentialGene ?? null,
+    depmapSource: data.depmapSource ?? null,
 
     deepLinks: data.deepLinks ?? {},
 

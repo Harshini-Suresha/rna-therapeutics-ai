@@ -118,6 +118,8 @@ def get_human_constraint_metrics(gene_symbol: str) -> dict:
         "compositeConstraintIndex": None,
         "mutationRate": None,
         "populationFrequencyMaf": None,
+        "loeufDecile": None,
+        "triplosensitivity": None,
     }
     symbol = gene_symbol.strip().upper()
     if not symbol:
@@ -176,5 +178,28 @@ def get_human_constraint_metrics(gene_symbol: str) -> dict:
             result["populationFrequencyMaf"] = f"{af:.4e} (gnomAD)"
         except (ValueError, TypeError):
             pass
+
+    # LOEUF decile from gnomAD (0 = most constrained, 9 = least)
+    loeuf_bin = _key(constraint, "oe_lof_upper_bin")
+    if loeuf_bin is not None:
+        try:
+            bin_val = int(float(loeuf_bin))
+            result["loeufDecile"] = f"Decile {bin_val + 1}"
+        except (ValueError, TypeError):
+            pass
+
+    # Triplosensitivity from ClinGen haploinsufficiency mapping
+    hi_raw = _clingen_dosage_index().get(symbol)
+    if hi_raw is not None:
+        hi_text = str(hi_raw).strip().lower()
+        ts_map = {
+            "sufficient evidence for haploinsufficiency": "Severe",
+            "some evidence for haploinsufficiency": "Moderate",
+            "gene associated with autosomal recessive phenotype": "Low",
+            "no evidence available for haploinsufficiency": "Uncertain",
+            "no evidence for haploinsufficiency": "No Evidence",
+            "dosage sensitivity unlikely": "Unlikely",
+        }
+        result["triplosensitivity"] = ts_map.get(hi_text) or str(hi_raw).strip()
 
     return result

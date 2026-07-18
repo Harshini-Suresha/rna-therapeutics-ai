@@ -148,6 +148,23 @@ export const MOCK_GENES: Record<string, GeneTargetObject> = {
     recessiveConstraintZ: 2.84,
     hetExcessZ: -0.52,
     compositeConstraintIndex: 0.91,
+    haploinsufficiencyScore: "0.9 (sufficient evidence for haploinsufficiency)",
+
+    loeufDecile: "Decile 1",
+    triplosensitivity: "Severe",
+    activeIsoforms: 4,
+    spliceSwitches: 1,
+    gQuadruplexes: "2 Blocks Found",
+    cpgDensity: "Low Risk",
+
+    // RNA half-life and gene dependency
+    rnaHalflife: "5.2 h",
+    rnaHalflifeHours: 5.2,
+    rnaHalflifeSource: "RNAdecayCafe (Vock et al. 2025, Zenodo)",
+    depmapDependency: "0.72 (Moderate)",
+    depmapDependencyScore: 0.72,
+    essentialGene: "Non-essential",
+    depmapSource: "FAVOR (Xiong et al. 2024)",
 
     deepLinks: {
       ensembl: "https://ensembl.org/Homo_sapiens/Gene/Summary?g=ENSG00000198947",

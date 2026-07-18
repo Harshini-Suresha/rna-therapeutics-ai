@@ -131,6 +131,24 @@ export interface GeneTargetObject {
   recessiveConstraintZ?: number | null;
   hetExcessZ?: number | null;
   compositeConstraintIndex?: number | null;
+  haploinsufficiencyScore?: string | null;
+
+  // ASO-specific intelligence
+  loeufDecile: string | null;
+  triplosensitivity: string | null;
+  activeIsoforms: number | null;
+  spliceSwitches: number | null;
+  gQuadruplexes: string | null;
+  cpgDensity: string | null;
+
+  // RNA half-life and gene dependency
+  rnaHalflife: string | null;
+  rnaHalflifeHours: number | null;
+  rnaHalflifeSource: string | null;
+  depmapDependency: string | null;
+  depmapDependencyScore: number | null;
+  essentialGene: string | null;
+  depmapSource: string | null;
 
   deepLinks: DeepLinks;
 

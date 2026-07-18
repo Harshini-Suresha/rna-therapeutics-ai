@@ -14,22 +14,26 @@ from typing import Optional
 
 try:  # ``uvicorn backend.main:app`` from the repository root
     from .services.gene_service import EnsemblLookupUnavailable, clean_synonyms, get_gene_metadata, get_gene_phenotypes, ensembl_gene_url
-    from .services.enrichment_service import get_gene_enrichment
+    from .services.enrichment_service import get_gene_enrichment, get_aso_analysis
     from .services.constraint_service import get_human_constraint_metrics
     from .services.clinical_service import get_clinical_details
     from .services.protein_service import get_protein_db_ids
     from .services.variant_details_service import get_variant_details
     from .services.protein_properties_service import get_protein_properties
     from .services.single_cell_service import get_single_cell_expression
+    from .services.rna_halflife_service import get_rna_halflife
+    from .services.dependency_service import get_gene_dependency
 except ImportError:  # ``uvicorn main:app`` while working in backend/
     from services.gene_service import EnsemblLookupUnavailable, clean_synonyms, get_gene_metadata, get_gene_phenotypes, ensembl_gene_url
-    from services.enrichment_service import get_gene_enrichment
+    from services.enrichment_service import get_gene_enrichment, get_aso_analysis
     from services.constraint_service import get_human_constraint_metrics
     from services.clinical_service import get_clinical_details
     from services.protein_service import get_protein_db_ids
     from services.variant_details_service import get_variant_details
     from services.protein_properties_service import get_protein_properties
     from services.single_cell_service import get_single_cell_expression
+    from services.rna_halflife_service import get_rna_halflife
+    from services.dependency_service import get_gene_dependency
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -314,6 +318,31 @@ async def initialize_target(payload: TargetRequest):
 
         constraint_data = get_human_constraint_metrics(symbol_upper) if is_human else {}
 
+        # ASO-specific analysis (G-quadruplexes, CpG density, isoforms, splice switches)
+        try:
+            aso_data = get_aso_analysis(gene_id, taxon_id)
+        except Exception as e:
+            logger.warning(f"ASO analysis failed for {symbol_upper}: {e}")
+            aso_data = {}
+
+        # RNA half-life from RNAdecayCafe (human only)
+        rna_halflife_data = {}
+        if is_human:
+            try:
+                rna_halflife_data = get_rna_halflife(symbol_upper)
+            except Exception as e:
+                logger.warning(f"RNA half-life lookup failed for {symbol_upper}: {e}")
+                rna_halflife_data = {}
+
+        # Gene dependency from FAVOR API (human only)
+        dependency_data = {}
+        if is_human:
+            try:
+                dependency_data = get_gene_dependency(symbol_upper)
+            except Exception as e:
+                logger.warning(f"Dependency lookup failed for {symbol_upper}: {e}")
+                dependency_data = {}
+
         # Fetch top ClinVar variant details (HGVS, rsID)
         variant_details = {}
         if is_human:
@@ -524,6 +553,22 @@ async def initialize_target(payload: TargetRequest):
             "recessiveConstraintZ": constraint_data.get("recessiveConstraintZ"),
             "hetExcessZ": constraint_data.get("hetExcessZ"),
             "compositeConstraintIndex": constraint_data.get("compositeConstraintIndex"),
+
+            "loeufDecile": constraint_data.get("loeufDecile"),
+            "triplosensitivity": constraint_data.get("triplosensitivity"),
+            "activeIsoforms": aso_data.get("activeIsoforms"),
+            "spliceSwitches": aso_data.get("spliceSwitches"),
+            "gQuadruplexes": aso_data.get("gQuadruplexes"),
+            "cpgDensity": aso_data.get("cpgDensity"),
+
+            # RNA half-life and dependency
+            "rnaHalflife": rna_halflife_data.get("rnaHalflife"),
+            "rnaHalflifeHours": rna_halflife_data.get("rnaHalflifeHours"),
+            "rnaHalflifeSource": rna_halflife_data.get("rnaHalflifeSource"),
+            "depmapDependency": dependency_data.get("depmapDependency"),
+            "depmapDependencyScore": dependency_data.get("depmapDependencyScore"),
+            "essentialGene": dependency_data.get("essentialGene"),
+            "depmapSource": dependency_data.get("depmapSource"),
 
             "deepLinks": deep_links,
 

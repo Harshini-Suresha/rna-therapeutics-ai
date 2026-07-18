@@ -1,5 +1,6 @@
 """Live enrichment and interaction summaries for the target dashboard."""
 
+import re
 import requests
 
 
@@ -136,5 +137,76 @@ def get_gene_enrichment(ensembl_gene_id: str, taxon_id: int) -> dict:
             result["topInteractors"] = top_partners
     except (requests.RequestException, ValueError, TypeError):
         pass
+
+    return result
+
+
+ENSEMBL_REST = "https://rest.ensembl.org"
+
+
+def _ensembl_get(url):
+    headers = {"Content-Type": "application/json"}
+    return requests.get(url, headers=headers, timeout=10)
+
+
+def get_aso_analysis(ensembl_gene_id: str, taxon_id: int) -> dict:
+    """Compute ASO-relevant metrics: active isoforms, splice switches, G4, CpG."""
+    result = {
+        "activeIsoforms": None,
+        "spliceSwitches": None,
+        "gQuadruplexes": None,
+        "cpgDensity": None,
+    }
+
+    # Fetch transcript count from Ensembl
+    try:
+        resp = _ensembl_get(f"{ENSEMBL_REST}/lookup/id/{ensembl_gene_id}?expand=1")
+        if resp.ok:
+            data = resp.json()
+            transcripts = data.get("Transcript", [])
+            coding = [t for t in transcripts if t.get("biotype") == "protein_coding"]
+            result["activeIsoforms"] = len(coding) if coding else len(transcripts)
+
+            # Splice switches: count transcripts with different exon structures
+            if len(transcripts) > 1:
+                exon_sets = set()
+                for t in transcripts:
+                    exons = t.get("Exon", [])
+                    exon_sets.add(len(exons))
+                result["spliceSwitches"] = max(0, len(exon_sets) - 1)
+    except Exception:
+        pass
+
+    # Fetch genomic sequence for G4 and CpG analysis (human only)
+    if taxon_id == 9606:
+        try:
+            seq_resp = _ensembl_get(f"{ENSEMBL_REST}/sequence/id/{ensembl_gene_id}?type=genomic")
+            if seq_resp.ok:
+                seq_data = seq_resp.json()
+                seq = seq_data.get("seq", "").upper()
+
+                # G-quadruplex detection: pattern GGG(N1-7){3}GGG
+                g4_pattern = re.compile(r"(G{3}[\w]{1,7}){3}G{3}")
+                g4_matches = g4_pattern.findall(seq)
+                g4_count = len(g4_matches)
+                if g4_count == 0:
+                    result["gQuadruplexes"] = "0 Blocks Found"
+                elif g4_count <= 2:
+                    result["gQuadruplexes"] = f"{g4_count} Block{'s' if g4_count > 1 else ''} Found"
+                else:
+                    result["gQuadruplexes"] = f"{g4_count} Blocks Found"
+
+                # CpG density analysis
+                cpg_count = seq.count("CG")
+                seq_len = len(seq) if len(seq) > 0 else 1
+                cpg_density = (cpg_count / seq_len) * 1000
+                if cpg_density > 25:
+                    result["cpgDensity"] = "High Risk"
+                elif cpg_density > 10:
+                    result["cpgDensity"] = "Medium Risk"
+                else:
+                    result["cpgDensity"] = "Low Risk"
+        except Exception:
+            pass
 
     return result

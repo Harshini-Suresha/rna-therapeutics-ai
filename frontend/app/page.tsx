@@ -184,6 +184,19 @@ export default function NewProjectPage() {
         clinicalTrialsCount: null,
         preprintCount: null,
         caseReportsCount: null,
+        loeufDecile: null,
+        triplosensitivity: null,
+        activeIsoforms: null,
+        spliceSwitches: null,
+        gQuadruplexes: null,
+        cpgDensity: null,
+        rnaHalflife: null,
+        rnaHalflifeHours: null,
+        rnaHalflifeSource: null,
+        depmapDependency: null,
+        depmapDependencyScore: null,
+        essentialGene: null,
+        depmapSource: null,
       };
 
       setGene(viralTargetPayload);
