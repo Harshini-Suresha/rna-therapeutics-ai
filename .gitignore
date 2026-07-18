@@ -10,3 +10,4 @@ venv/
 out/
 *.log
 /tmp/
+frontend/tsconfig.tsbuildinfo
