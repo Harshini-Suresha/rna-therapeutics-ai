@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { AlertCircle } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import Topbar from "@/components/Topbar";
@@ -33,6 +34,7 @@ function formatGeneSymbol(symbol: string, organismId: string): string {
 }
 
 export default function NewProjectPage() {
+  const router = useRouter();
   const [organism, setOrganism] = useState("human");
   const [diseaseName, setDiseaseName] = useState("");
   const [geneSymbol, setGeneSymbol] = useState("");
@@ -232,9 +234,9 @@ export default function NewProjectPage() {
   }
 
   function handleConfirm() {
-    if (gene) {
-      alert(`Confirmed target: ${gene.geneSymbol} (${gene.geneName ?? "unknown name"}). Proceeding...`);
-    }
+    if (!gene) return;
+    sessionStorage.setItem("aso:confirmedTarget", JSON.stringify(gene));
+    router.push("/mechanisms");
   }
 
   return (

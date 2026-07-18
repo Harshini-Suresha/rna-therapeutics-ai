@@ -23,6 +23,7 @@ try:  # ``uvicorn backend.main:app`` from the repository root
     from .services.single_cell_service import get_single_cell_expression
     from .services.rna_halflife_service import get_rna_halflife
     from .services.dependency_service import get_gene_dependency
+    from .api.mechanisms import router as mechanisms_router
 except ImportError:  # ``uvicorn main:app`` while working in backend/
     from services.gene_service import EnsemblLookupUnavailable, clean_synonyms, get_gene_metadata, get_gene_phenotypes, ensembl_gene_url
     from services.enrichment_service import get_gene_enrichment, get_aso_analysis
@@ -34,6 +35,7 @@ except ImportError:  # ``uvicorn main:app`` while working in backend/
     from services.single_cell_service import get_single_cell_expression
     from services.rna_halflife_service import get_rna_halflife
     from services.dependency_service import get_gene_dependency
+    from api.mechanisms import router as mechanisms_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -47,6 +49,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(mechanisms_router)
 
 SPECIES_TAXON_IDS = {
     "homo_sapiens": 9606,
