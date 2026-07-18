@@ -1,4 +1,8 @@
-import { MechanismOptions, MechanismRankingResponse } from "@/types/mechanism";
+import {
+  MechanismOptions,
+  MechanismRankingResponse,
+  TherapeuticGoalId,
+} from "@/types/mechanism";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
@@ -31,4 +35,37 @@ export async function rankGeneSilencingMechanisms(params: {
     throw new Error(body.detail || "Could not rank mechanisms.");
   }
   return res.json();
+}
+
+export async function rankRnaProcessingMechanisms(params: {
+  geneSymbol: string;
+  spliceDefectType: string;
+  targetExon?: string | null;
+  deliveryContext?: string | null;
+  knownVariant?: string | null;
+}): Promise<MechanismRankingResponse> {
+  const res = await fetch(`${API_BASE}/api/mechanisms/rna-processing`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      gene_symbol: params.geneSymbol,
+      splice_defect_type: params.spliceDefectType,
+      target_exon: params.targetExon || null,
+      delivery_context: params.deliveryContext || null,
+      known_variant: params.knownVariant || null,
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail || "Could not rank mechanisms.");
+  }
+  return res.json();
+}
+
+export function getGoalLabel(goalId: TherapeuticGoalId): string {
+  const labels: Record<TherapeuticGoalId, string> = {
+    TG01: "Gene Silencing",
+    TG04: "RNA Processing Modulation",
+  };
+  return labels[goalId] ?? goalId;
 }

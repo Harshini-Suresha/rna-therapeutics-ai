@@ -11,9 +11,12 @@ import InfoGrid from "@/components/InfoGrid";
 import StatsRow from "@/components/StatsRow";
 import FooterBar from "@/components/FooterBar";
 import { GeneTargetObject } from "@/types/gene";
+import { TherapeuticGoalId } from "@/types/mechanism";
 import { fetchGene } from "@/lib/api";
 import { getOrganism } from "@/lib/organisms";
 import { findViralGene } from "@/lib/virusGenes";
+
+const SELECTED_GOAL_KEY = "aso:therapeuticGoal";
 
 /**
  * Standardizes gene symbol casing based on organism rules:
@@ -38,6 +41,7 @@ export default function NewProjectPage() {
   const [organism, setOrganism] = useState("human");
   const [diseaseName, setDiseaseName] = useState("");
   const [geneSymbol, setGeneSymbol] = useState("");
+  const [selectedGoal, setSelectedGoal] = useState<TherapeuticGoalId | null>(null);
 
   const [gene, setGene] = useState<GeneTargetObject | null>(null);
   const [loading, setLoading] = useState(false);
@@ -234,8 +238,9 @@ export default function NewProjectPage() {
   }
 
   function handleConfirm() {
-    if (!gene) return;
+    if (!gene || !selectedGoal) return;
     sessionStorage.setItem("aso:confirmedTarget", JSON.stringify(gene));
+    sessionStorage.setItem(SELECTED_GOAL_KEY, selectedGoal);
     router.push("/mechanisms");
   }
 
@@ -269,7 +274,14 @@ export default function NewProjectPage() {
             </>
           )}
         </main>
-        {gene && <FooterBar onClear={handleClearAll} onConfirm={handleConfirm} />}
+        {gene && (
+          <FooterBar
+            onClear={handleClearAll}
+            onConfirm={handleConfirm}
+            selectedGoal={selectedGoal}
+            onSelectGoal={setSelectedGoal}
+          />
+        )}
       </div>
     </div>
   );

@@ -4,8 +4,13 @@ export interface MechanismOption {
 }
 
 export interface MechanismOptions {
-  defectTypes: MechanismOption[];
-  silencingScopes: MechanismOption[];
+  geneSilencing: {
+    defectTypes: MechanismOption[];
+    silencingScopes: MechanismOption[];
+  };
+  rnaProcessing: {
+    spliceDefectTypes: MechanismOption[];
+  };
   deliveryContexts: MechanismOption[];
 }
 
@@ -40,10 +45,33 @@ export interface MechanismRankingResponse {
   geneSymbol: string;
   therapeuticGoal: string;
   inputs: {
-    defectType: string;
-    silencingScope: string;
+    defectType?: string;
+    silencingScope?: string;
+    spliceDefectType?: string;
+    targetExon?: string | null;
     deliveryContext: string | null;
     knownVariant: string | null;
   };
   results: RankedMechanism[];
 }
+
+export type TherapeuticGoalId = "TG01" | "TG04";
+
+export interface TherapeuticGoal {
+  id: TherapeuticGoalId;
+  name: string;
+  description: string;
+}
+
+export const THERAPEUTIC_GOALS: TherapeuticGoal[] = [
+  {
+    id: "TG01",
+    name: "Gene Silencing",
+    description: "Reduce expression of a pathogenic gene or transcript through transcriptional or post-transcriptional mechanisms.",
+  },
+  {
+    id: "TG04",
+    name: "RNA Processing Modulation",
+    description: "Modify RNA maturation, including splicing, polyadenylation, transcript processing, and RNA stability.",
+  },
+];
