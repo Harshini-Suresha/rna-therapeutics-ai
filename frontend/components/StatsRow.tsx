@@ -84,11 +84,14 @@ export default function StatsRow({ gene }: { gene: GeneTargetObject }) {
         title="Target Vulnerability"
         rows={[
           { label: "pHaplo Score", value: gene.haploinsufficiencyScore ?? DASH },
+          { label: "LOEUF Decile", value: gene.loeufDecile ?? DASH },
+          { label: "Triplosensitivity", value: gene.triplosensitivity ?? DASH },
           { label: "RNA Half-Life (t₁/₂)", value: gene.rnaHalflife ?? DASH },
           { label: "DepMap Dependency", value: gene.depmapDependency ?? DASH },
         ]}
         sources={[
           { label: "Source: ClinGen", url: "https://search.clinicalgenome.org/kb/gene-dosage" },
+          { label: "Source: gnomAD v2.1.1", url: `https://gnomad.broadinstitute.org/gene/${gene.geneId}?dataset=gnomad_r2_1` },
           { label: "Source: RNAdecayCafe", url: "https://zenodo.org/records/15785218" },
           { label: "Source: FAVOR", url: "https://xionglab.org/favor/" },
         ]}
