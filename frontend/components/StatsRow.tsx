@@ -123,6 +123,9 @@ export default function StatsRow({ gene }: { gene: GeneTargetObject }) {
           { label: "Population SNPs", value: gene.dbSnpCount !== null ? gene.dbSnpCount.toLocaleString() : DASH },
           { label: "G-Quadruplexes", value: gene.gQuadruplexes ?? DASH },
           { label: "CpG Density", value: gene.cpgDensity ?? DASH },
+          { label: "Self-Dimerization Risk", value: gene.selfDimerRisk ?? DASH },
+          { label: "Poly-G Tracts", value: gene.polygTracts ?? DASH },
+          { label: "Transcript Specificity", value: gene.transcriptSpecificity ?? DASH },
         ]}
         sources={links.ncbi ? [{ label: "Source: NCBI dbSNP", url: links.ncbi }] : []}
       />

@@ -154,6 +154,9 @@ export async function fetchGene(
     preclinicalConservation: data.preclinicalConservation ?? null,
     gQuadruplexes: data.gQuadruplexes ?? null,
     cpgDensity: data.cpgDensity ?? null,
+    selfDimerRisk: data.selfDimerRisk ?? null,
+    polygTracts: data.polygTracts ?? null,
+    transcriptSpecificity: data.transcriptSpecificity ?? null,
 
     // RNA half-life and gene dependency
     rnaHalflife: data.rnaHalflife ?? null,

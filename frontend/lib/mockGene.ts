@@ -159,6 +159,9 @@ export const MOCK_GENES: Record<string, GeneTargetObject> = {
     preclinicalConservation: "3/3 (Excellent)",
     gQuadruplexes: "2 Blocks Found",
     cpgDensity: "Low Risk",
+    selfDimerRisk: "12/kb (Moderate)",
+    polygTracts: "1 (Moderate)",
+    transcriptSpecificity: "40 isoforms (Low)",
 
     // RNA half-life and gene dependency
     rnaHalflife: "5.2 h",

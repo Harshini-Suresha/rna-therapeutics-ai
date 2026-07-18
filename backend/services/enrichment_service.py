@@ -159,6 +159,9 @@ def get_aso_analysis(ensembl_gene_id: str, taxon_id: int) -> dict:
         "preclinicalConservation": None,
         "gQuadruplexes": None,
         "cpgDensity": None,
+        "selfDimerRisk": None,
+        "polygTracts": None,
+        "transcriptSpecificity": None,
     }
 
     # Fetch transcript data from Ensembl (expand=1 required to get Transcript list)
@@ -179,6 +182,16 @@ def get_aso_analysis(ensembl_gene_id: str, taxon_id: int) -> dict:
                     exons = t.get("Exon", [])
                     exon_sets.add(len(exons))
                 result["spliceSwitches"] = max(0, len(exon_sets) - 1)
+
+            # Transcript base specificity: more coding isoforms = harder to target one
+            n_coding = len(coding) if coding else 0
+            if n_coding > 0:
+                if n_coding <= 2:
+                    result["transcriptSpecificity"] = f"{n_coding} isoforms (High)"
+                elif n_coding <= 5:
+                    result["transcriptSpecificity"] = f"{n_coding} isoforms (Moderate)"
+                else:
+                    result["transcriptSpecificity"] = f"{n_coding} isoforms (Low)"
     except Exception:
         pass
 
@@ -252,6 +265,33 @@ def get_aso_analysis(ensembl_gene_id: str, taxon_id: int) -> dict:
                                 result["cpgDensity"] = "Medium Risk"
                             else:
                                 result["cpgDensity"] = "Low Risk"
+
+                            # Self-dimerization risk: count palindromic k-mers (reverse-complement matches)
+                            comp_map = {"A": "T", "T": "A", "G": "C", "C": "G"}
+                            palindrome_count = 0
+                            for k in [4, 5, 6]:
+                                for i in range(seq_len - k + 1):
+                                    sub = seq[i : i + k]
+                                    rc = "".join(comp_map.get(b, "N") for b in reversed(sub))
+                                    if sub == rc:
+                                        palindrome_count += 1
+                            palindrome_density = palindrome_count / seq_len * 1000 if seq_len > 0 else 0
+                            if palindrome_density > 15:
+                                result["selfDimerRisk"] = f"{palindrome_density:.0f}/kb (High)"
+                            elif palindrome_density > 8:
+                                result["selfDimerRisk"] = f"{palindrome_density:.0f}/kb (Moderate)"
+                            else:
+                                result["selfDimerRisk"] = f"{palindrome_density:.0f}/kb (Low)"
+
+                            # Poly-G tracts: runs of 4+ consecutive G's (impair synthesis and binding)
+                            polyg_pattern = re.compile(r"G{4,}")
+                            polyg_count = len(polyg_pattern.findall(seq))
+                            if polyg_count == 0:
+                                result["polygTracts"] = "0 (Rare)"
+                            elif polyg_count <= 3:
+                                result["polygTracts"] = f"{polyg_count} (Moderate)"
+                            else:
+                                result["polygTracts"] = f"{polyg_count} (High Risk)"
         except Exception:
             pass
 

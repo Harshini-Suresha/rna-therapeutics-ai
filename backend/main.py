@@ -563,6 +563,9 @@ async def initialize_target(payload: TargetRequest):
             "preclinicalConservation": aso_data.get("preclinicalConservation"),
             "gQuadruplexes": aso_data.get("gQuadruplexes"),
             "cpgDensity": aso_data.get("cpgDensity"),
+            "selfDimerRisk": aso_data.get("selfDimerRisk"),
+            "polygTracts": aso_data.get("polygTracts"),
+            "transcriptSpecificity": aso_data.get("transcriptSpecificity"),
 
             # RNA half-life and dependency
             "rnaHalflife": rna_halflife_data.get("rnaHalflife"),

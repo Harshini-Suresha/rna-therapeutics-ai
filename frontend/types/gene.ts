@@ -143,6 +143,9 @@ export interface GeneTargetObject {
   preclinicalConservation: string | null;
   gQuadruplexes: string | null;
   cpgDensity: string | null;
+  selfDimerRisk: string | null;
+  polygTracts: string | null;
+  transcriptSpecificity: string | null;
 
   // RNA half-life and gene dependency
   rnaHalflife: string | null;
