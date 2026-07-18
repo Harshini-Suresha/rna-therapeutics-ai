@@ -19,6 +19,7 @@ export interface DesignOption {
   id: string;
   label: string;
   description?: string;
+  detail?: string;
 }
 
 export interface DesignOptions {

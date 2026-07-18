@@ -1,7 +1,89 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
-import { DesignOptions } from "@/types/geneSilencing";
+import { useState } from "react";
+import { Loader2, ChevronDown, ChevronUp, Info } from "lucide-react";
+import { DesignOptions, DesignOption } from "@/types/geneSilencing";
+
+function ExpandableOption({
+  option,
+  selected,
+  onSelect,
+  type,
+}: {
+  option: DesignOption;
+  selected: boolean;
+  onSelect: () => void;
+  type: "radio" | "checkbox";
+}) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div
+      className={`rounded-lg border transition-colors ${
+        selected
+          ? "border-brand bg-brand/5 ring-1 ring-brand"
+          : "border-slate-200 hover:border-slate-300"
+      }`}
+    >
+      <div className="flex items-start gap-2.5 px-3 py-2.5">
+        {type === "radio" ? (
+          <span
+            className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 ${
+              selected ? "border-brand" : "border-slate-300"
+            }`}
+          >
+            {selected && <span className="h-2 w-2 rounded-full bg-brand" />}
+          </span>
+        ) : (
+          <span
+            className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+              selected ? "border-brand bg-brand text-white" : "border-slate-300"
+            }`}
+          >
+            {selected && (
+              <svg className="h-3 w-3" viewBox="0 0 12 12" fill="none">
+                <path
+                  d="M2.5 6L5 8.5L9.5 3.5"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            )}
+          </span>
+        )}
+        <div className="min-w-0 flex-1">
+          <button onClick={onSelect} className="text-left w-full">
+            <p className="text-[12.5px] font-medium text-slate-700">{option.label}</p>
+            {option.description && (
+              <p className="mt-0.5 text-[11px] text-slate-400 leading-snug">
+                {option.description}
+              </p>
+            )}
+          </button>
+          {option.detail && (
+            <>
+              <button
+                onClick={() => setExpanded((e) => !e)}
+                className="mt-1 flex items-center gap-1 text-[11px] font-medium text-brand hover:text-brand-dark"
+              >
+                <Info className="h-3 w-3" />
+                {expanded ? "Hide details" : "Learn more"}
+                {expanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+              </button>
+              {expanded && (
+                <p className="mt-2 rounded-md bg-slate-50 px-3 py-2 text-[11.5px] leading-relaxed text-slate-600">
+                  {option.detail}
+                </p>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function AssoDesignForm({
   options,
@@ -33,24 +115,15 @@ export default function AssoDesignForm({
         <label className="mb-1.5 block text-[12.5px] font-medium text-slate-600">
           ASO Chemistry
         </label>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="space-y-2">
           {(options?.chemistryOptions ?? []).map((c) => (
-            <button
+            <ExpandableOption
               key={c.id}
-              onClick={() => setChemistry(c.id)}
-              className={`rounded-lg border px-3 py-2.5 text-left transition-colors ${
-                chemistry === c.id
-                  ? "border-brand bg-brand/5 ring-1 ring-brand"
-                  : "border-slate-200 hover:border-slate-300"
-              }`}
-            >
-              <p className="text-[12.5px] font-medium text-slate-700">{c.label}</p>
-              {c.description && (
-                <p className="mt-0.5 text-[11px] text-slate-400 leading-snug">
-                  {c.description}
-                </p>
-              )}
-            </button>
+              option={c}
+              selected={chemistry === c.id}
+              onSelect={() => setChemistry(c.id)}
+              type="radio"
+            />
           ))}
         </div>
       </div>
@@ -80,45 +153,16 @@ export default function AssoDesignForm({
         <label className="mb-1.5 block text-[12.5px] font-medium text-slate-600">
           Modifications
         </label>
-        <div className="space-y-1.5">
-          {(options?.modificationOptions ?? []).map((m) => {
-            const active = selectedMods.includes(m.id);
-            return (
-              <button
-                key={m.id}
-                onClick={() => onToggleMod(m.id)}
-                className={`flex w-full items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-colors ${
-                  active
-                    ? "border-brand bg-brand/5 ring-1 ring-brand"
-                    : "border-slate-200 hover:border-slate-300"
-                }`}
-              >
-                <span
-                  className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
-                    active ? "border-brand bg-brand text-white" : "border-slate-300"
-                  }`}
-                >
-                  {active && (
-                    <svg className="h-3 w-3" viewBox="0 0 12 12" fill="none">
-                      <path
-                        d="M2.5 6L5 8.5L9.5 3.5"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  )}
-                </span>
-                <div className="min-w-0">
-                  <p className="text-[12.5px] font-medium text-slate-700">{m.label}</p>
-                  {m.description && (
-                    <p className="text-[11px] text-slate-400 leading-snug">{m.description}</p>
-                  )}
-                </div>
-              </button>
-            );
-          })}
+        <div className="space-y-2">
+          {(options?.modificationOptions ?? []).map((m) => (
+            <ExpandableOption
+              key={m.id}
+              option={m}
+              selected={selectedMods.includes(m.id)}
+              onSelect={() => onToggleMod(m.id)}
+              type="checkbox"
+            />
+          ))}
         </div>
       </div>
 

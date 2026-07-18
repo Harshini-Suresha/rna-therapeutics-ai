@@ -90,18 +90,27 @@ def get_target_analysis(ensembl_gene_id: str) -> dict:
 # ---------------------------------------------------------------------------
 
 CHEMISTRY_OPTIONS = [
-    {"id": "gapmer", "label": "DNA Gapmer (2-10-2)", "description": "Standard RNase H1-recruiting backbone; most validated."},
-    {"id": "pmo", "label": "PMO (Phosphorodiamidate Morpholino)", "description": "Steric blocker; splice-switching, no RNase H."},
-    {"id": "lna_gapmer", "label": "LNA-enhanced Gapmer", "description": "Locked nucleic acid wings boost binding affinity and nuclease resistance."},
-    {"id": "2ome", "label": "2\u2032-O-Methoxyethyl (2\u2032-OMe)", "description": "Steric blocker; splicing modulation and miRNA inhibition."},
+    {"id": "gapmer", "label": "DNA Gapmer (2-10-2)", "description": "Standard RNase H1-recruiting backbone; most validated.",
+     "detail": "A chimeric oligonucleotide with a central DNA 'gap' of ~10 nucleotides flanked by 2\u2032-modified wings (typically 2\u2032-O-Me or LNA). The DNA gap recruits RNase H1 to cleave the target RNA, while the wings confer nuclease resistance and binding affinity. Gapmers are the most clinically validated ASO chemistry (e.g., nusinersen/Spinraza, eteplirsen)."},
+    {"id": "pmo", "label": "PMO (Phosphorodiamidate Morpholino)", "description": "Steric blocker; splice-switching, no RNase H.",
+     "detail": "A non-ionic backbone oligomer where each nucleoside is linked via phosphorodiamidate bonds to morpholine rings. PMOs do not recruit RNase H; instead they sterically block RNA interactions (splice junctions, ribosome binding, miRNA binding). Used in exon-skipping (e.g., eteplirsen) and translational arrest. Requires cell-penetrating peptide (CPP) conjugation for efficient uptake."},
+    {"id": "lna_gapmer", "label": "LNA-enhanced Gapmer", "description": "Locked nucleic acid wings boost binding affinity and nuclease resistance.",
+     "detail": "A DNA gapmer where the flanking wings contain Locked Nucleic Acids (LNA) \u2014 bicyclic RNA analogues with a methylene bridge locking the ribose in a C3\u2032-endo conformation. Each LNA substitution raises Tm by ~2\u2032-8\u2032C, dramatically increasing target affinity. LNA gapmers also have enhanced nuclease resistance. Used in miravirsen (anti-miR-122) and bepetamers. Higher off-target risk due to increased potency."},
+    {"id": "2ome", "label": "2\u2032-O-Methoxyethyl (2\u2032-OMe)", "description": "Steric blocker; splicing modulation and miRNA inhibition.",
+     "detail": "A ribose-modified oligonucleotide where the 2\u2032-OH is replaced with a methoxyethyl group. 2\u2032-OMe ASOs sterically block RNA interactions and are commonly used for splice-switching and miRNA inhibition. They have good nuclease resistance, low toxicity, and are often used in combination (e.g., morpholino-2\u2032-OMe mixmers). Lower binding affinity than LNA but fewer off-target effects."},
 ]
 
 MODIFICATION_OPTIONS = [
-    {"id": "phosphorothioate", "label": "Phosphorothioate (PS) backbone", "description": "Increases nuclease resistance and protein binding."},
-    {"id": "lna_wings", "label": "LNA wings (5\u2032 + 3\u2032)", "description": "Locked nucleic acids at terminal positions for higher Tm."},
-    {"id": "2omemod", "label": "2\u2032-OMe wing modifications", "description": "Ribose modification at terminal positions."},
-    {"id": "pmo_core", "label": "PMO core", "description": "Non-ionic backbone; splice-switching."},
-    {"id": "pna_clamp", "label": "PNA clamp (flanking)", "description": "Peptide nucleic acid clamps to block nuclease access."},
+    {"id": "phosphorothioate", "label": "Phosphorothioate (PS) backbone", "description": "Increases nuclease resistance and protein binding.",
+     "detail": "Replaces one non-bridging oxygen in the phosphodiester backbone with sulfur. PS linkages dramatically increase nuclease resistance and promote protein binding (e.g., to albumin), extending plasma half-life from minutes to hours. However, PS backbone can increase off-target binding to unintended RNA sequences and may activate complement pathways at high doses. Most ASO drugs incorporate full or partial PS backbones."},
+    {"id": "lna_wings", "label": "LNA wings (5\u2032 + 3\u2032)", "description": "Locked nucleic acids at terminal positions for higher Tm.",
+     "detail": "Locked Nucleic Acid (LNA) modifications placed at the 5\u2032 and 3\u2032 ends of the oligonucleotide. Each LNA substitution raises the melting temperature (Tm) by 2\u2032-8\u2032C, increasing binding affinity to the target RNA. LNA wings also provide strong nuclease resistance at terminal positions. Typically used in gapmer wings (2-3 LNA at each end). Excessive LNA use can increase off-target activity due to hyper-stabilized binding."},
+    {"id": "2omemod", "label": "2\u2032-OMe wing modifications", "description": "Ribose modification at terminal positions.",
+     "detail": "2\u2032-O-Methoxyethyl or 2\u2032-O-Methyl modifications at the 5\u2032 and 3\u2032 wings. These RNA-like modifications increase nuclease resistance, improve binding affinity (Tm increase ~1\u2032-2\u2032C per substitution), and reduce immune stimulation compared to unmodified DNA. Commonly used in gapmer wings as a lower-cost alternative to LNA. Well-tolerated clinically with a favorable safety profile."},
+    {"id": "pmo_core", "label": "PMO core", "description": "Non-ionic backbone; splice-switching.",
+     "detail": "Phosphorodiamidate Morpholino (PMO) modifications at the central region. PMOs are non-ionic, avoiding non-specific protein interactions and reducing toxicity. They work by steric blocking rather than RNase H recruitment. The PMO core is used in splice-switching ASOs (e.g., exon-skipping for DMD) where you want to block splice junctions without degrading the RNA. Requires CPP conjugation (e.g., Vivolen/PP-PMO) for cellular uptake."},
+    {"id": "pna_clamp", "label": "PNA clamp (flanking)", "description": "Peptide nucleic acid clamps to block nuclease access.",
+     "detail": "Peptide Nucleic Acid (PNA) modifications flanking the ASO. PNAs have a peptide-like backbone instead of sugar-phosphate, making them extremely resistant to nucleases and proteases. PNA clamps create a 'steric shield' around the ASO core, protecting it from exonuclease degradation. They also increase binding affinity (Tm ~1\u2032C per base). PNA synthesis is expensive and delivery is challenging \u2014 typically used in research or specialized applications."},
 ]
 
 LENGTH_RANGE = {"min": 12, "max": 30, "default": 18, "step": 1}
