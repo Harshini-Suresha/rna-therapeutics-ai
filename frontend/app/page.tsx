@@ -277,6 +277,38 @@ export default function NewProjectPage() {
               {error}
             </div>
           )}
+          {!gene && !loading && (
+            <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-card">
+              <h2 className="text-[18px] font-semibold text-slate-800 mb-2">ASO Therapeutic Target Discovery Platform</h2>
+              <p className="text-[13px] text-slate-500 mb-6 leading-relaxed max-w-3xl">
+                End-to-end platform for evaluating genes as antisense oligonucleotide (ASO) therapeutic targets.
+                Integrates multi-omics data — expression, protein properties, pathways, druggability, and ASO
+                design feasibility — across 28 organisms from human to bacteria.
+              </p>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+                <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-brand mb-1">Step 1</p>
+                  <p className="text-[13px] font-semibold text-slate-800">Select Target</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">Choose organism and gene symbol to load comprehensive multi-source data.</p>
+                </div>
+                <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-brand mb-1">Step 2</p>
+                  <p className="text-[13px] font-semibold text-slate-800">Analyze Gene</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">Review expression, protein structure, pathways, and disease associations.</p>
+                </div>
+                <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-brand mb-1">Step 3</p>
+                  <p className="text-[13px] font-semibold text-slate-800">Design ASO</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">Explore mechanism ranking, ASO candidate design, and off-target safety.</p>
+                </div>
+                <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-brand mb-1">Step 4</p>
+                  <p className="text-[13px] font-semibold text-slate-800">Validate & Export</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">Review evidence, evaluate tractability, and export findings.</p>
+                </div>
+              </div>
+            </div>
+          )}
           {gene && (
             <>
               <GeneOverviewCard gene={gene} onRefresh={handleLoadGene} />
