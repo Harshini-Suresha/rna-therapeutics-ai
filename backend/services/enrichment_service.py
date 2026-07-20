@@ -1,6 +1,8 @@
 """Live enrichment and interaction summaries for the target dashboard."""
 
 import re
+from typing import Optional
+
 import requests
 
 
@@ -48,6 +50,7 @@ def get_gene_enrichment(ensembl_gene_id: str, taxon_id: int) -> dict:
         "totalInteractors": None,
         "experimentalCount": None,
         "databaseCount": None,
+        "interactionNetworkDensity": None,
     }
 
     try:
@@ -93,10 +96,13 @@ def get_gene_enrichment(ensembl_gene_id: str, taxon_id: int) -> dict:
             medium_confidence = 0
             experimental_count = 0
             database_count = 0
+            edge_count = 0
             scored_partners = []
             
             for interaction in interactions:
                 score = float(interaction.get("score") or 0)
+                if score > 0:
+                    edge_count += 1
                 
                 # Count by confidence level
                 if score >= 0.7:
@@ -105,7 +111,6 @@ def get_gene_enrichment(ensembl_gene_id: str, taxon_id: int) -> dict:
                     medium_confidence += 1
                 
                 # Count by evidence type
-                # Check for experimental evidence (textmining, experiments, database)
                 if interaction.get("experiments") and int(interaction.get("experiments", 0)) > 0:
                     experimental_count += 1
                 if interaction.get("database") and int(interaction.get("database", 0)) > 0:
@@ -123,6 +128,16 @@ def get_gene_enrichment(ensembl_gene_id: str, taxon_id: int) -> dict:
             result["totalInteractors"] = len(partners)
             result["experimentalCount"] = experimental_count
             result["databaseCount"] = database_count
+            
+            n_nodes = len(partners) + 1
+            if n_nodes > 1 and edge_count > 0:
+                density = (2 * edge_count) / (n_nodes * (n_nodes - 1))
+                if density > 0.5:
+                    result["interactionNetworkDensity"] = f"{density:.2f} (Dense)"
+                elif density > 0.1:
+                    result["interactionNetworkDensity"] = f"{density:.2f} (Moderate)"
+                else:
+                    result["interactionNetworkDensity"] = f"{density:.2f} (Sparse)"
             
             # Top 5 interactors by score
             scored_partners.sort(key=lambda x: x[1], reverse=True)
@@ -149,6 +164,174 @@ def _ensembl_get(url, timeout=10):
     return requests.get(url, headers=headers, timeout=timeout)
 
 
+def _compute_codon_usage_bias(cds_seq: str) -> Optional[str]:
+    if not cds_seq:
+        return None
+    seq = cds_seq.upper().replace("T", "U")
+    gc3 = 0
+    total = 0
+    for i in range(0, len(seq) - 2, 3):
+        codon = seq[i : i + 3]
+        if len(codon) == 3:
+            total += 1
+            if codon[2] in ("G", "C"):
+                gc3 += 1
+    if total == 0:
+        return None
+    gc3_pct = round((gc3 / total) * 100, 1)
+    if gc3_pct > 65:
+        return f"GC3={gc3_pct}% (High, GC-rich)"
+    elif gc3_pct > 35:
+        return f"GC3={gc3_pct}% (Balanced)"
+    else:
+        return f"GC3={gc3_pct}% (Low, AT-rich)"
+
+
+def _compute_aso_metrics_from_sequence(seq: str, result: dict) -> None:
+    if not seq:
+        return
+    seq = seq.upper()
+    seq_len = len(seq)
+
+    result["codonUsageBias"] = _compute_codon_usage_bias(seq)
+
+    gc_count = seq.count("G") + seq.count("C")
+    gc_content = (gc_count / seq_len) * 100 if seq_len > 0 else 50
+    accessibility = max(0, min(100, 100 - gc_content + 20))
+    if accessibility >= 60:
+        result["structuralAccessibility"] = f"{accessibility:.0f}% (Favorable)"
+    elif accessibility >= 45:
+        result["structuralAccessibility"] = f"{accessibility:.0f}% (Moderate)"
+    else:
+        result["structuralAccessibility"] = f"{accessibility:.0f}% (Challenging)"
+
+    ese_patterns = re.compile(r"(CUG|GAA|GAC|UGC|AGG)")
+    ess_patterns = re.compile(r"(UCUU|CUAG|UUAG|CUCU|UGCA)")
+    ese_count = len(ese_patterns.findall(seq))
+    ess_count = len(ess_patterns.findall(seq))
+    total_motifs = ese_count + ess_count
+    motif_density = (total_motifs / seq_len) * 1000 if seq_len > 0 else 0
+    if motif_density > 50:
+        result["splicingMotifDensity"] = f"{motif_density:.1f}/kb (High)"
+    elif motif_density > 25:
+        result["splicingMotifDensity"] = f"{motif_density:.1f}/kb (Moderate)"
+    else:
+        result["splicingMotifDensity"] = f"{motif_density:.1f}/kb (Low)"
+
+    g4_pattern = re.compile(r"(G{3}[\w]{1,7}){3}G{3}")
+    g4_matches = g4_pattern.findall(seq)
+    g4_count = len(g4_matches)
+    if g4_count == 0:
+        result["gQuadruplexes"] = "0 Blocks Found"
+    elif g4_count <= 2:
+        result["gQuadruplexes"] = f"{g4_count} Block{'s' if g4_count > 1 else ''} Found"
+    else:
+        result["gQuadruplexes"] = f"{g4_count} Blocks Found"
+
+    cpg_count = seq.count("CG")
+    cpg_density = (cpg_count / seq_len) * 1000
+    if cpg_density > 25:
+        result["cpgDensity"] = "High Risk"
+    elif cpg_density > 10:
+        result["cpgDensity"] = "Medium Risk"
+    else:
+        result["cpgDensity"] = "Low Risk"
+
+    comp_map = {"A": "T", "T": "A", "G": "C", "C": "G"}
+    palindrome_count = 0
+    for k in [4, 5, 6]:
+        for i in range(seq_len - k + 1):
+            sub = seq[i : i + k]
+            rc = "".join(comp_map.get(b, "N") for b in reversed(sub))
+            if sub == rc:
+                palindrome_count += 1
+    palindrome_density = palindrome_count / seq_len * 1000 if seq_len > 0 else 0
+    if palindrome_density > 15:
+        result["selfDimerRisk"] = f"{palindrome_density:.0f}/kb (High)"
+    elif palindrome_density > 8:
+        result["selfDimerRisk"] = f"{palindrome_density:.0f}/kb (Moderate)"
+    else:
+        result["selfDimerRisk"] = f"{palindrome_density:.0f}/kb (Low)"
+
+    polyg_pattern = re.compile(r"G{4,}")
+    polyg_count = len(polyg_pattern.findall(seq))
+    if polyg_count == 0:
+        result["polygTracts"] = "0 (Rare)"
+    elif polyg_count <= 3:
+        result["polygTracts"] = f"{polyg_count} (Moderate)"
+    else:
+        result["polygTracts"] = f"{polyg_count} (High Risk)"
+
+
+def _fetch_ncbi_cds_sequence(ncbi_gene_id: str, taxon_id: int):
+    # Try 1: search for RefSeq mRNA and fetch CDS (eukaryotes with separate mRNA records)
+    try:
+        search_url = (
+            "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
+            f"?db=nuccore"
+            f"&term={ncbi_gene_id}[gene]+AND+txid{taxon_id}[Organism:noexp]+AND+srcdb_refseq[PROP]+AND+biomol_mrna[PROP]"
+            f"&retmax=3&retmode=json"
+        )
+        resp = requests.get(search_url, timeout=10)
+        if resp.ok:
+            data = resp.json()
+            ids = data.get("esearchresult", {}).get("idlist", [])
+            if ids:
+                fetch_url = (
+                    "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
+                    f"?db=nuccore&id={ids[0]}&rettype=fasta_cds_na&retmode=text"
+                )
+                fasta_resp = requests.get(fetch_url, timeout=15)
+                if fasta_resp.ok:
+                    fasta_text = fasta_resp.text.strip()
+                    if fasta_text:
+                        lines = fasta_text.split("\n")
+                        seq = "".join(line.strip() for line in lines if not line.startswith(">"))
+                        if seq:
+                            return seq
+    except requests.RequestException:
+        pass
+
+    # Try 2: fetch genomic region as CDS proxy (for bacteria/archaea without introns)
+    try:
+        esummary_url = (
+            "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi"
+            f"?db=gene&id={ncbi_gene_id}&retmode=json"
+        )
+        resp = requests.get(esummary_url, timeout=10)
+        if resp.ok:
+            data = resp.json()
+            result = data.get("result", {}).get(ncbi_gene_id, {})
+            genomic_info = result.get("genomicinfo", [])
+            if genomic_info:
+                gi = genomic_info[0]
+                chraccver = gi.get("chraccver", "")
+                chrstart = gi.get("chrstart")
+                chrstop = gi.get("chrstop")
+                if chraccver and chrstart is not None and chrstop is not None:
+                    seq_start = min(chrstart, chrstop)
+                    seq_stop = max(chrstart, chrstop)
+                    strand = 1 if chrstart <= chrstop else 2
+                    seq_url = (
+                        "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
+                        f"?db=nuccore&id={chraccver}"
+                        f"&seq_start={seq_start}&seq_stop={seq_stop}"
+                        f"&strand={strand}&rettype=fasta_na&retmode=text"
+                    )
+                    seq_resp = requests.get(seq_url, timeout=15)
+                    if seq_resp.ok:
+                        fasta_text = seq_resp.text.strip()
+                        if fasta_text:
+                            lines = fasta_text.split("\n")
+                            seq = "".join(line.strip() for line in lines if not line.startswith(">"))
+                            if seq:
+                                return seq
+    except requests.RequestException:
+        pass
+
+    return None
+
+
 def get_aso_analysis(ensembl_gene_id: str, taxon_id: int) -> dict:
     """Compute ASO-relevant metrics: active isoforms, splice switches, accessibility, motifs, conservation."""
     result = {
@@ -162,7 +345,10 @@ def get_aso_analysis(ensembl_gene_id: str, taxon_id: int) -> dict:
         "selfDimerRisk": None,
         "polygTracts": None,
         "transcriptSpecificity": None,
+        "codonUsageBias": None,
     }
+
+    cds_seq = None
 
     # Fetch transcript data from Ensembl (expand=1 required to get Transcript list)
     try:
@@ -171,11 +357,9 @@ def get_aso_analysis(ensembl_gene_id: str, taxon_id: int) -> dict:
             data = resp.json()
             transcripts = data.get("Transcript", [])
 
-            # Active isoforms: count protein-coding transcripts
             coding = [t for t in transcripts if t.get("biotype") == "protein_coding"]
             result["activeIsoforms"] = len(coding) if coding else (len(transcripts) or None)
 
-            # Splice switches: count transcripts with different exon structures
             if len(transcripts) > 1:
                 exon_sets = set()
                 for t in transcripts:
@@ -183,7 +367,6 @@ def get_aso_analysis(ensembl_gene_id: str, taxon_id: int) -> dict:
                     exon_sets.add(len(exons))
                 result["spliceSwitches"] = max(0, len(exon_sets) - 1)
 
-            # Transcript base specificity: more coding isoforms = harder to target one
             n_coding = len(coding) if coding else 0
             if n_coding > 0:
                 if n_coding <= 2:
@@ -195,107 +378,39 @@ def get_aso_analysis(ensembl_gene_id: str, taxon_id: int) -> dict:
     except Exception:
         pass
 
-    # Fetch mRNA sequence for accessibility, motifs, G4, CpG analysis (human only)
+    # Fetch CDS sequence from Ensembl
+    try:
+        resp = _ensembl_get(f"{ENSEMBL_REST}/lookup/id/{ensembl_gene_id}")
+        if resp.ok:
+            gene_data = resp.json()
+            transcript_id = gene_data.get("canonical_transcript", "")
+            if transcript_id:
+                tid = transcript_id.strip('.')
+                parts = tid.rsplit('.', 1)
+                transcript_base = parts[0] if len(parts) > 1 and parts[1].isdigit() else tid
+                seq_resp = _ensembl_get(f"{ENSEMBL_REST}/sequence/id/{transcript_base}?type=cds")
+                if seq_resp.ok:
+                    seq_data = seq_resp.json()
+                    cds_seq = seq_data.get("seq", "").upper()
+    except Exception:
+        pass
+
+    # Fallback: try NCBI for genes originating from NCBI Gene API (rat, plants, bacteria)
+    if not cds_seq and str(ensembl_gene_id).startswith("NCBI:"):
+        ncbi_id = ensembl_gene_id.split(":")[1]
+        cds_seq = _fetch_ncbi_cds_sequence(ncbi_id, taxon_id)
+        if cds_seq:
+            if result["activeIsoforms"] is None:
+                result["activeIsoforms"] = 1
+            if result["transcriptSpecificity"] is None:
+                result["transcriptSpecificity"] = "1 isoform (High)"
+
+    if cds_seq:
+        _compute_aso_metrics_from_sequence(cds_seq, result)
+
+    # Preclinical Conservation: check orthologs in model organisms (human gene only).
+    # Uses homo_sapiens as source, so only valid for human genes.
     if taxon_id == 9606:
-        try:
-            # Get canonical transcript ID for mRNA sequence
-            resp = _ensembl_get(f"{ENSEMBL_REST}/lookup/id/{ensembl_gene_id}")
-            if resp.ok:
-                gene_data = resp.json()
-                transcript_id = gene_data.get("canonical_transcript", "")
-                if transcript_id:
-                    # Strip version suffix (e.g. ENST00000357033.9 -> ENST00000357033)
-                    # as the sequence endpoint does not accept versioned IDs
-                    transcript_base = transcript_id.split(".")[0]
-                    # Fetch CDS sequence
-                    seq_resp = _ensembl_get(f"{ENSEMBL_REST}/sequence/id/{transcript_base}?type=cds")
-                    if seq_resp.ok:
-                        seq_data = seq_resp.json()
-                        seq = seq_data.get("seq", "").upper()
-                        
-                        if seq:
-                            seq_len = len(seq)
-                            
-                            # Structural Accessibility: GC content as proxy for single-stranded regions
-                            # Lower GC = more single-stranded = more accessible to ASO binding
-                            gc_count = seq.count("G") + seq.count("C")
-                            gc_content = (gc_count / seq_len) * 100 if seq_len > 0 else 50
-                            # Accessibility inversely related to GC: lower GC = higher accessibility
-                            accessibility = max(0, min(100, 100 - gc_content + 20))
-                            if accessibility >= 60:
-                                result["structuralAccessibility"] = f"{accessibility:.0f}% (Favorable)"
-                            elif accessibility >= 45:
-                                result["structuralAccessibility"] = f"{accessibility:.0f}% (Moderate)"
-                            else:
-                                result["structuralAccessibility"] = f"{accessibility:.0f}% (Challenging)"
-
-                            # Splicing Motif Density: count splicing regulatory motifs
-                            # ESE (Exonic Splicing Enhancer) motifs: CUG, GAA, GAC, UGC, AGG
-                            # ESS (Exonic Splicing Silencer) motifs: UCUU, CUAG, UUAG, CUCU, UGCA
-                            ese_patterns = re.compile(r"(CUG|GAA|GAC|UGC|AGG)")
-                            ess_patterns = re.compile(r"(UCUU|CUAG|UUAG|CUCU|UGCA)")
-                            ese_count = len(ese_patterns.findall(seq))
-                            ess_count = len(ess_patterns.findall(seq))
-                            total_motifs = ese_count + ess_count
-                            motif_density = (total_motifs / seq_len) * 1000 if seq_len > 0 else 0
-                            if motif_density > 50:
-                                result["splicingMotifDensity"] = f"{motif_density:.1f}/kb (High)"
-                            elif motif_density > 25:
-                                result["splicingMotifDensity"] = f"{motif_density:.1f}/kb (Moderate)"
-                            else:
-                                result["splicingMotifDensity"] = f"{motif_density:.1f}/kb (Low)"
-
-                            # G-quadruplex detection: pattern GGG(N1-7){3}GGG
-                            g4_pattern = re.compile(r"(G{3}[\w]{1,7}){3}G{3}")
-                            g4_matches = g4_pattern.findall(seq)
-                            g4_count = len(g4_matches)
-                            if g4_count == 0:
-                                result["gQuadruplexes"] = "0 Blocks Found"
-                            elif g4_count <= 2:
-                                result["gQuadruplexes"] = f"{g4_count} Block{'s' if g4_count > 1 else ''} Found"
-                            else:
-                                result["gQuadruplexes"] = f"{g4_count} Blocks Found"
-
-                            # CpG density analysis
-                            cpg_count = seq.count("CG")
-                            cpg_density = (cpg_count / seq_len) * 1000
-                            if cpg_density > 25:
-                                result["cpgDensity"] = "High Risk"
-                            elif cpg_density > 10:
-                                result["cpgDensity"] = "Medium Risk"
-                            else:
-                                result["cpgDensity"] = "Low Risk"
-
-                            # Self-dimerization risk: count palindromic k-mers (reverse-complement matches)
-                            comp_map = {"A": "T", "T": "A", "G": "C", "C": "G"}
-                            palindrome_count = 0
-                            for k in [4, 5, 6]:
-                                for i in range(seq_len - k + 1):
-                                    sub = seq[i : i + k]
-                                    rc = "".join(comp_map.get(b, "N") for b in reversed(sub))
-                                    if sub == rc:
-                                        palindrome_count += 1
-                            palindrome_density = palindrome_count / seq_len * 1000 if seq_len > 0 else 0
-                            if palindrome_density > 15:
-                                result["selfDimerRisk"] = f"{palindrome_density:.0f}/kb (High)"
-                            elif palindrome_density > 8:
-                                result["selfDimerRisk"] = f"{palindrome_density:.0f}/kb (Moderate)"
-                            else:
-                                result["selfDimerRisk"] = f"{palindrome_density:.0f}/kb (Low)"
-
-                            # Poly-G tracts: runs of 4+ consecutive G's (impair synthesis and binding)
-                            polyg_pattern = re.compile(r"G{4,}")
-                            polyg_count = len(polyg_pattern.findall(seq))
-                            if polyg_count == 0:
-                                result["polygTracts"] = "0 (Rare)"
-                            elif polyg_count <= 3:
-                                result["polygTracts"] = f"{polyg_count} (Moderate)"
-                            else:
-                                result["polygTracts"] = f"{polyg_count} (High Risk)"
-        except Exception:
-            pass
-
-        # Preclinical Conservation: check orthologs in model organisms
         try:
             comp_resp = _ensembl_get(
                 f"{ENSEMBL_REST}/homology/id/homo_sapiens/{ensembl_gene_id}"

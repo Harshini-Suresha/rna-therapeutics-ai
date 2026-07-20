@@ -15,26 +15,9 @@ import { TherapeuticGoalId } from "@/types/mechanism";
 import { fetchGene } from "@/lib/api";
 import { getOrganism } from "@/lib/organisms";
 import { findViralGene } from "@/lib/virusGenes";
+import { formatGeneSymbol } from "../../shared/geneFormat";
 
 const SELECTED_GOAL_KEY = "aso:therapeuticGoal";
-
-/**
- * Standardizes gene symbol casing based on organism rules:
- * - Humans: ALL CAPS (e.g., "DMD")
- * - Others: Capitalized (e.g., "Dmd")
- * Ensembl's symbol lookup is case-insensitive, so this is cosmetic —
- * it just keeps the input field looking like conventional nomenclature.
- */
-function formatGeneSymbol(symbol: string, organismId: string): string {
-  const cleanSymbol = symbol.trim();
-  if (!cleanSymbol) return "";
-
-  if (organismId === "human") {
-    return cleanSymbol.toUpperCase();
-  }
-
-  return cleanSymbol.charAt(0).toUpperCase() + cleanSymbol.slice(1).toLowerCase();
-}
 
 export default function NewProjectPage() {
   const router = useRouter();
@@ -50,9 +33,6 @@ export default function NewProjectPage() {
   async function handleLoadGene() {
     if (!geneSymbol.trim()) return;
 
-    const formattedSymbol = formatGeneSymbol(geneSymbol, organism);
-    setGeneSymbol(formattedSymbol);
-
     setGene(null);
     setLoading(true);
     setError(null);
@@ -66,15 +46,19 @@ export default function NewProjectPage() {
 
     // --- TIER 5 (viruses): curated reference data, no live connector ---
     if (selectedOrg.tier === 5) {
-      const viralGene = findViralGene(organism, formattedSymbol);
+      const viralGene = findViralGene(organism, geneSymbol);
       if (!viralGene) {
         setGene(null);
         setError(
-          `Gene symbol "${formattedSymbol}" isn't in the curated reference set for ${selectedOrg.commonName}.`
+          `Gene symbol "${geneSymbol}" isn't in the curated reference set for ${selectedOrg.commonName}.`
         );
         setLoading(false);
         return;
       }
+
+      // Apply organism-specific formatting to the curated symbol
+      const formattedSymbol = formatGeneSymbol(viralGene.symbol, organism);
+      setGeneSymbol(formattedSymbol);
 
       const viralTargetPayload: GeneTargetObject = {
         organism: selectedOrg.commonName,
@@ -112,6 +96,20 @@ export default function NewProjectPage() {
         defaultCellType: null,
         cellExpressionLevel: null,
         cellTpm: null,
+        cellTypeAll: {},
+
+        expressionStabilityCV: null,
+        vitalOrganTpm: null,
+        vitalOrganTissues: [],
+        dominantIsoformFraction: null,
+        dominantIsoformId: null,
+        diseaseFoldChange: null,
+        singleCellPrevalence: null,
+        circadianAmplitude: null,
+        intronRetentionRatio: null,
+        developmentalExpression: null,
+        alternativePolyadenylation: null,
+        nuclearRetentionIndex: null,
 
         proteinId: null,
         proteinName: viralGene.product,
@@ -123,6 +121,14 @@ export default function NewProjectPage() {
         ubiquitinationTarget: null,
         quaternaryStructure: null,
         stabilityScore: null,
+        subcellularLocation: null,
+        criticalFunctionalDomains: null,
+        disorderedContent: null,
+        proteosomalTurnover: null,
+        alphafoldPlddt: null,
+        gravyIndex: null,
+        proteinAbundance: null,
+        tractability: null,
         interproId: null,
         pfamId: null,
         pdbId: null,
@@ -185,6 +191,7 @@ export default function NewProjectPage() {
         mediumConfidenceCount: null,
         experimentalCount: null,
         databaseCount: null,
+        interactionNetworkDensity: null,
         pubmedArticleCount: null,
         reviewCount: null,
         clinicalTrialsCount: null,
@@ -202,6 +209,7 @@ export default function NewProjectPage() {
         selfDimerRisk: null,
         polygTracts: null,
         transcriptSpecificity: null,
+        codonUsageBias: null,
         rnaHalflife: null,
         rnaHalflifeHours: null,
         rnaHalflifeSource: null,
@@ -216,10 +224,13 @@ export default function NewProjectPage() {
       return;
     }
 
-    // --- Tier 1/2/3: live Ensembl + Open Targets/phenotype data ---
+    // --- Tier 1/2/3/4/6: live Ensembl + Open Targets/phenotype data ---
     try {
       const searchSpecies = selectedOrg.ensemblSpecies || "homo_sapiens";
-      const result = await fetchGene(searchSpecies, diseaseName, formattedSymbol);
+      const result = await fetchGene(searchSpecies, diseaseName, geneSymbol);
+      // Apply organism-specific formatting to the official symbol returned by the server
+      const formattedOfficial = formatGeneSymbol(result.geneSymbol, organism);
+      setGeneSymbol(formattedOfficial);
       setGene(result);
     } catch (err) {
       setGene(null);

@@ -1,6 +1,7 @@
 import asyncio
 import os
 import sys
+import time
 import logging
 
 # Add backend/ to sys.path so services resolve correctly
@@ -42,6 +43,17 @@ except ImportError:  # ``uvicorn main:app`` while working in backend/
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# NCBI E-utilities rate limit: 3 requests/sec without API key (lock created lazily for Python 3.9 compat)
+_ncbi_req_lock = None
+_last_ncbi_req = 0.0
+
+
+def _get_ncbi_lock():
+    global _ncbi_req_lock
+    if _ncbi_req_lock is None:
+        _ncbi_req_lock = asyncio.Lock()
+    return _ncbi_req_lock
+
 app = FastAPI(title="ASO Platform API")
 
 app.add_middleware(
@@ -74,6 +86,17 @@ SPECIES_TAXON_IDS = {
     "ovis_aries": 9940,
     "capra_hircus": 9925,
     "gallus_gallus": 9031,
+    # Tier 4 — Plants (Ensembl Plants)
+    "arabidopsis_thaliana": 3702,
+    "oryza_sativa": 39947,
+    "zea_mays": 4577,
+    "triticum_aestivum": 4565,
+    "solanum_lycopersicum": 4081,
+    # Tier 6 — Bacteria (NCBI Taxonomy)
+    "escherichia_coli": 511145,
+    "staphylococcus_aureus": 1280,
+    "mycobacterium_tuberculosis": 83333,
+    "pseudomonas_aeruginosa": 208964,
 }
 
 class TargetRequest(BaseModel):
@@ -88,18 +111,48 @@ def get_safe_ensembl_url(species: str, gene_id: str) -> str:
             return ensembl_gene_url(species, gene_id)
     except Exception:
         pass
-    formatted_species = "Homo_sapiens" if species == "homo_sapiens" else "Mus_musculus"
+    # Capitalize species name for Ensembl URL (e.g. "homo_sapiens" -> "Homo_sapiens")
+    parts = species.split("_")
+    formatted_species = "_".join(p.capitalize() for p in parts) if parts else "Homo_sapiens"
     return f"https://www.ensembl.org/{formatted_species}/Gene/Summary?g={gene_id}"
+
+async def _ncbi_call(session: aiohttp.ClientSession, db: str, term: str) -> Optional[dict]:
+    """Rate-limited NCBI ESearch (max ~2.5 req/sec)."""
+    global _last_ncbi_req
+    async with _get_ncbi_lock():
+        now = time.monotonic()
+        since_last = now - _last_ncbi_req
+        if since_last < 0.4:
+            await asyncio.sleep(0.4 - since_last)
+        _last_ncbi_req = time.monotonic()
+        async with session.get(
+            "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi",
+            params={"db": db, "term": term, "retmode": "json"},
+            timeout=aiohttp.ClientTimeout(total=12),
+        ) as response:
+            return await response.json() if response.status == 200 else {}
+
+
+async def _ncbi_fetch(session: aiohttp.ClientSession, url: str, params: dict) -> Optional[dict]:
+    """Rate-limited NCBI EUtils GET (for esearch, esummary, etc.)."""
+    global _last_ncbi_req
+    async with _get_ncbi_lock():
+        now = time.monotonic()
+        since_last = now - _last_ncbi_req
+        if since_last < 0.4:
+            await asyncio.sleep(0.4 - since_last)
+        _last_ncbi_req = time.monotonic()
+        params.setdefault("retmode", "json")
+        async with session.get(
+            url, params=params, timeout=aiohttp.ClientTimeout(total=12),
+        ) as response:
+            return await response.json() if response.status == 200 else {}
+
 
 async def get_pubmed_count(session: aiohttp.ClientSession, term: str) -> int:
     try:
-        async with session.get(
-            "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi",
-            params={"db": "pubmed", "term": term, "retmode": "json"},
-            timeout=aiohttp.ClientTimeout(total=6),
-        ) as response:
-            data = await response.json() if response.status == 200 else {}
-            return int((data.get("esearchresult") or {}).get("count", 0))
+        data = await _ncbi_call(session, "pubmed", term)
+        return int((data.get("esearchresult") or {}).get("count", 0))
     except Exception:
         return 0
 
@@ -107,30 +160,51 @@ async def get_pubmed_count(session: aiohttp.ClientSession, term: str) -> int:
 async def get_clinvar_count(session: aiohttp.ClientSession, symbol: str) -> Optional[int]:
     """Return the live ClinVar record count for a human gene."""
     try:
-        async with session.get(
-            "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi",
-            params={"db": "clinvar", "term": f"{symbol}[gene]", "retmode": "json"},
-            timeout=aiohttp.ClientTimeout(total=6),
-        ) as response:
-            data = await response.json() if response.status == 200 else {}
-            count = (data.get("esearchresult") or {}).get("count")
-            return int(count) if count is not None else None
+        data = await _ncbi_call(session, "clinvar", f"{symbol}[gene]")
+        count = (data.get("esearchresult") or {}).get("count")
+        return int(count) if count is not None else None
     except Exception:
         return None
 
 async def get_dbsnp_count(session: aiohttp.ClientSession, symbol: str) -> Optional[int]:
     """Return the live dbSNP variant count for a gene."""
     try:
-        async with session.get(
-            "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi",
-            params={"db": "snp", "term": f"{symbol}[gene]", "retmode": "json"},
-            timeout=aiohttp.ClientTimeout(total=6),
-        ) as response:
-            data = await response.json() if response.status == 200 else {}
-            count = (data.get("esearchresult") or {}).get("count")
-            return int(count) if count is not None else None
+        data = await _ncbi_call(session, "snp", f"{symbol}[gene]")
+        count = (data.get("esearchresult") or {}).get("count")
+        return int(count) if count is not None else None
     except Exception:
         return None
+
+
+async def fetch_ncbi_aliases(session: aiohttp.ClientSession, gene_symbol: str, taxon_id: int) -> list:
+    """Fetch gene aliases from NCBI esummary by gene symbol + taxon ID."""
+    try:
+        search_term = f"{gene_symbol}[Gene Name] AND {taxon_id}[Taxonomy ID]"
+        data = await _ncbi_fetch(
+            session,
+            "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi",
+            {"db": "gene", "term": search_term},
+        )
+        if not data:
+            return []
+        ids = (data.get("esearchresult") or {}).get("idlist") or []
+        if not ids:
+            return []
+
+        summary = await _ncbi_fetch(
+            session,
+            "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi",
+            {"db": "gene", "id": ids[0]},
+        )
+        if not summary:
+            return []
+        result = (summary.get("result") or {}).get(ids[0]) or {}
+        aliases_str = result.get("otheraliases", "")
+        if aliases_str:
+            return [a.strip() for a in aliases_str.split(", ") if a.strip()]
+    except Exception:
+        pass
+    return []
 
 async def get_rxiv_count(session: aiohttp.ClientSession, symbol: str) -> int:
     """Fetch preprint count from bioRxiv/medRxiv via Europe PMC."""
@@ -145,6 +219,71 @@ async def get_rxiv_count(session: aiohttp.ClientSession, symbol: str) -> int:
     except Exception:
         return 0
 
+
+async def fetch_gene_from_ncbi(session: aiohttp.ClientSession, gene_symbol: str, species: str, taxon_id: int) -> Optional[dict]:
+    """Fallback: look up a gene via NCBI Gene API when Ensembl doesn't cover the species."""
+    try:
+        search_term = f"{gene_symbol}[Gene Name] AND {taxon_id}[Taxonomy ID]"
+        data = await _ncbi_fetch(
+            session,
+            "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi",
+            {"db": "gene", "term": search_term},
+        )
+        if not data:
+            return None
+        ids = (data.get("esearchresult") or {}).get("idlist") or []
+        if not ids:
+            return None
+        gene_id = ids[0]
+
+        summary = await _ncbi_fetch(
+            session,
+            "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi",
+            {"db": "gene", "id": gene_id},
+        )
+        if not summary:
+            return None
+        result = (summary.get("result") or {}).get(gene_id) or {}
+        if not result:
+            return None
+
+        official_symbol = result.get("name", gene_symbol)
+        ncbi_gene_id = result.get("uid", gene_id)
+        aliases = result.get("otheraliases", "").split(", ") if result.get("otheraliases") else []
+
+        chromosome = result.get("chromosome")
+        genomic_info = result.get("genomicinfo") or []
+        if genomic_info and isinstance(genomic_info, list):
+            genomic_start = genomic_info[0].get("chrstart")
+            genomic_stop = genomic_info[0].get("chrstop")
+        else:
+            genomic_start = genomic_stop = None
+
+        return {
+            "id": f"NCBI:{ncbi_gene_id}",
+            "officialSymbol": official_symbol,
+            "geneName": result.get("description", official_symbol),
+            "seq_region_name": chromosome,
+            "start": genomic_start,
+            "end": genomic_stop,
+            "cytoband": None,
+            "genomeBuild": None,
+            "strand": None,
+            "biotype": result.get("type_of_gene", "protein_coding"),
+            "synonyms": aliases,
+            "nomenclatureId": None,
+            "canonicalTranscript": None,
+            "otherTranscripts": [],
+            "totalTranscripts": 0,
+            "exonCount": 0,
+            "proteinLength": 0,
+            "proteinId": None,
+            "entrezGeneId": str(ncbi_gene_id),
+        }
+    except Exception as e:
+        logger.info(f"NCBI Gene fallback failed for {gene_symbol} in {species}: {e}")
+        return None
+
 async def fetch_expression_details(session: aiohttp.ClientSession, symbol: str, ensembl_gene_id: str, species: str) -> dict:
     expr_data = {
         "available": False,
@@ -153,6 +292,11 @@ async def fetch_expression_details(session: aiohttp.ClientSession, symbol: str, 
         "gtex_level": None,
         "hpa_level": None,
         "top_tissues": [],
+        "expression_cv": None,
+        "vital_organ_tpm": None,
+        "vital_organ_tissues": [],
+        "dominant_isoform_fraction": None,
+        "dominant_isoform_id": None,
     }
 
     if species != "homo_sapiens" or not ensembl_gene_id:
@@ -205,6 +349,49 @@ async def fetch_expression_details(session: aiohttp.ClientSession, symbol: str, 
                 }
                 for record in sorted_records[:12]
             ]
+
+            # Expression stability (CV across tissues)
+            tpm_vals = [t["tpm"] for t in expr_data["top_tissues"]]
+            if len(tpm_vals) > 1:
+                mean_tpm = sum(tpm_vals) / len(tpm_vals)
+                variance = sum((x - mean_tpm) ** 2 for x in tpm_vals) / len(tpm_vals)
+                std_dev = variance ** 0.5
+                expr_data["expression_cv"] = round(std_dev / mean_tpm, 3) if mean_tpm > 0 else None
+            else:
+                expr_data["expression_cv"] = None
+
+            # Off-target safety (vital organ expression)
+            vital_keywords = ["Heart", "Kidney", "Lung"]
+            vital_matches = [
+                t for t in expr_data["top_tissues"]
+                if any(kw in t["name"] for kw in vital_keywords)
+            ]
+            expr_data["vital_organ_tpm"] = max((t["tpm"] for t in vital_matches), default=None)
+            expr_data["vital_organ_tissues"] = [t["name"] for t in vital_matches]
+
+            # Dominant isoform fraction from GTEx transcript-level expression
+            try:
+                async with session.get(
+                    "https://gtexportal.org/api/v2/expression/medianTranscriptExpression",
+                    params={"gencodeId": gencode_id, "datasetId": "gtex_v8"},
+                    timeout=aiohttp.ClientTimeout(total=10),
+                ) as tresp:
+                    tdata = await tresp.json() if tresp.status == 200 else {}
+                trecords = tdata.get("data", [])
+                if trecords:
+                    transcript_totals = {}
+                    for r in trecords:
+                        tid = r.get("transcriptId", "")
+                        median = r.get("median", 0) or 0
+                        transcript_totals[tid] = transcript_totals.get(tid, 0) + median
+                    if transcript_totals:
+                        sorted_t = sorted(transcript_totals.items(), key=lambda x: x[1], reverse=True)
+                        top_tid, top_total = sorted_t[0]
+                        grand_total = sum(transcript_totals.values())
+                        expr_data["dominant_isoform_fraction"] = round(top_total / grand_total, 3) if grand_total > 0 else None
+                        expr_data["dominant_isoform_id"] = top_tid
+            except Exception:
+                logger.info("GTEx transcript expression lookup failed for %s", symbol)
     except Exception as e:
         logger.info(f"GTEx lookup unavailable for {symbol}: {e}")
 
@@ -257,7 +444,7 @@ async def fetch_disease_associations(session: aiohttp.ClientSession, symbol: str
         except Exception as e:
             logger.warning(f"Open Targets lookup failed for {symbol}: {e}")
 
-    phenotypes = get_gene_phenotypes(ensembl_id, species)
+    phenotypes = get_gene_phenotypes(symbol, species)
     if phenotypes:
         result["diseases"] = [p.get("description", "") for p in phenotypes if p.get("description")][:6]
         result["source"] = sorted({p.get("source", "Ensembl Phenotype") for p in phenotypes if p.get("source")})
@@ -267,7 +454,7 @@ async def fetch_disease_associations(session: aiohttp.ClientSession, symbol: str
 @app.post("/api/pipeline/initialize-target")
 async def initialize_target(payload: TargetRequest):
     try:
-        symbol_upper = payload.gene_symbol.strip().upper()
+        symbol_upper = payload.gene_symbol.strip()
         species = payload.organism or "homo_sapiens"
         ORGANISM_ID_TO_ENSEMBL = {
             "human": "homo_sapiens", "mouse": "mus_musculus", "rat": "rattus_norvegicus",
@@ -278,33 +465,46 @@ async def initialize_target(payload: TargetRequest):
             "cat": "felis_catus", "pig": "sus_scrofa", "cow": "bos_taurus",
             "horse": "equus_caballus", "sheep": "ovis_aries", "goat": "capra_hircus",
             "chicken": "gallus_gallus",
+            # Tier 4 — Plants
+            "arabidopsis": "arabidopsis_thaliana", "rice": "oryza_sativa",
+            "maize": "zea_mays", "wheat": "triticum_aestivum",
+            "tomato": "solanum_lycopersicum",
+            # Tier 6 — Bacteria
+            "ecoli": "escherichia_coli", "saureus": "staphylococcus_aureus",
+            "mtuberculosis": "mycobacterium_tuberculosis", "paeruginosa": "pseudomonas_aeruginosa",
         }
         species = ORGANISM_ID_TO_ENSEMBL.get(species.lower(), species)
         is_human = species == "homo_sapiens"
 
         meta = get_gene_metadata(symbol_upper, species)
         if not meta or not meta.get("id"):
-            raise HTTPException(
-                status_code=404,
-                detail=f'Gene "{symbol_upper}" was not found in {species.replace("_", " ")} (Ensembl).',
-            )
+            # Try NCBI Gene fallback for species not in Ensembl
+            async with aiohttp.ClientSession() as session:
+                meta = await fetch_gene_from_ncbi(session, symbol_upper, species, SPECIES_TAXON_IDS.get(species, 0))
+            if not meta or not meta.get("id"):
+                raise HTTPException(
+                    status_code=404,
+                    detail=f'Gene "{symbol_upper}" was not found in {species.replace("_", " ")} (Ensembl or NCBI).',
+                )
 
         gene_id = meta["id"]
-        taxon_id = SPECIES_TAXON_IDS.get(species, 9606)
+        official_symbol = meta.get("officialSymbol") or symbol_upper
+        taxon_id = SPECIES_TAXON_IDS.get(species, 0)
 
         async with aiohttp.ClientSession() as session:
-            pubmed_task = get_pubmed_count(session, f"{symbol_upper}[gene]")
-            review_task = get_pubmed_count(session, f"{symbol_upper}[gene] AND review[pt]")
-            clinical_trial_task = get_pubmed_count(session, f"{symbol_upper}[gene] AND clinical trial[pt]")
-            case_report_task = get_pubmed_count(session, f"{symbol_upper}[gene] AND case reports[pt]")
-            biorxiv_task = get_rxiv_count(session, symbol_upper)
+            pubmed_task = get_pubmed_count(session, f"{official_symbol}[gene]")
+            review_task = get_pubmed_count(session, f"{official_symbol}[gene] AND review[pt]")
+            clinical_trial_task = get_pubmed_count(session, f"{official_symbol}[gene] AND clinical trial[pt]")
+            case_report_task = get_pubmed_count(session, f"{official_symbol}[gene] AND case reports[pt]")
+            biorxiv_task = get_rxiv_count(session, official_symbol)
             medrxiv_task = asyncio.sleep(0, result=0)
-            disease_task = fetch_disease_associations(session, symbol_upper, gene_id, species)
-            expr_task = fetch_expression_details(session, symbol_upper, gene_id, species)
-            clinvar_task = get_clinvar_count(session, symbol_upper) if is_human else None
-            dbsnp_task = get_dbsnp_count(session, symbol_upper) if is_human else None
+            disease_task = fetch_disease_associations(session, official_symbol, gene_id, species)
+            expr_task = fetch_expression_details(session, official_symbol, gene_id, species)
+            clinvar_task = get_clinvar_count(session, official_symbol) if is_human else None
+            dbsnp_task = get_dbsnp_count(session, official_symbol)
+            ncbi_aliases_task = fetch_ncbi_aliases(session, official_symbol, taxon_id) if not is_human and taxon_id else asyncio.sleep(0, result=[])
 
-            pubmed_count, review_count, clinical_trial_count, case_report_count, biorxiv_count, medrxiv_count, disease_info, expr_details, clinvar_count, dbsnp_count = await asyncio.gather(
+            pubmed_count, review_count, clinical_trial_count, case_report_count, biorxiv_count, medrxiv_count, disease_info, expr_details, clinvar_count, dbsnp_count, ncbi_aliases = await asyncio.gather(
                 pubmed_task,
                 review_task,
                 clinical_trial_task,
@@ -315,55 +515,58 @@ async def initialize_target(payload: TargetRequest):
                 expr_task,
                 clinvar_task if clinvar_task else asyncio.sleep(0, result=None),
                 dbsnp_task if dbsnp_task else asyncio.sleep(0, result=None),
+                ncbi_aliases_task,
             )
 
         try:
             enrichment_data = get_gene_enrichment(gene_id, taxon_id)
         except Exception as e:
-            logger.warning(f"Enrichment lookup failed for {symbol_upper}: {e}")
+            logger.warning(f"Enrichment lookup failed for {official_symbol}: {e}")
             enrichment_data = {}
 
-        constraint_data = get_human_constraint_metrics(symbol_upper) if is_human else {}
+        constraint_data = get_human_constraint_metrics(official_symbol) if is_human else {}
 
         # ASO-specific analysis (G-quadruplexes, CpG density, isoforms, splice switches)
         try:
             aso_data = get_aso_analysis(gene_id, taxon_id)
         except Exception as e:
-            logger.warning(f"ASO analysis failed for {symbol_upper}: {e}")
+            logger.warning(f"ASO analysis failed for {official_symbol}: {e}")
             aso_data = {}
 
         # RNA half-life from RNAdecayCafe (human only)
         rna_halflife_data = {}
         if is_human:
             try:
-                rna_halflife_data = get_rna_halflife(symbol_upper)
+                rna_halflife_data = get_rna_halflife(official_symbol)
             except Exception as e:
-                logger.warning(f"RNA half-life lookup failed for {symbol_upper}: {e}")
+                logger.warning(f"RNA half-life lookup failed for {official_symbol}: {e}")
                 rna_halflife_data = {}
 
-        # Gene dependency from FAVOR API (human only)
+        # Gene dependency from FAVOR API
         dependency_data = {}
-        if is_human:
-            try:
-                dependency_data = get_gene_dependency(symbol_upper)
-            except Exception as e:
-                logger.warning(f"Dependency lookup failed for {symbol_upper}: {e}")
-                dependency_data = {}
+        try:
+            dependency_data = get_gene_dependency(official_symbol)
+        except Exception as e:
+            logger.warning(f"Dependency lookup failed for {official_symbol}: {e}")
+            dependency_data = {}
 
         # Fetch top ClinVar variant details (HGVS, rsID)
         variant_details = {}
         if is_human:
             try:
                 variant_details = get_variant_details(
-                    gene_symbol=symbol_upper,
+                    gene_symbol=official_symbol,
                     ensembl_gene_id=meta.get("id"),
                     entrez_id=meta.get("entrezGeneId"),
                 )
             except Exception as exc:
-                logger.warning("Variant details lookup failed for %s: %s", symbol_upper, exc)
+                logger.warning("Variant details lookup failed for %s: %s", official_symbol, exc)
                 variant_details = {}
 
-        synonyms_list = clean_synonyms(meta.get("synonyms"), symbol_upper)
+        synonyms_list = clean_synonyms(
+            [*(meta.get("synonyms") or []), *ncbi_aliases],
+            official_symbol,
+        )
         
         disease_resolved = "; ".join(disease_info["diseases"][:3]) if disease_info["diseases"] else None
         if not disease_resolved and payload.disease_name:
@@ -374,24 +577,25 @@ async def initialize_target(payload: TargetRequest):
         # Fetch protein properties from UniProt
         protein_props = {}
         protein_db = {}
-        if is_human:
-            try:
-                # First get UniProt accession from protein service
-                protein_db = get_protein_db_ids(
-                    uniprot_id=meta.get("proteinId"),
-                    gene_symbol=symbol_upper,
-                    entrez_id=meta.get("entrezGeneId"),
-                )
-                uniprot_acc = protein_db.get("uniprotAccession")
-                protein_props = get_protein_properties(
-                    ensembl_protein_id=meta.get("proteinId"),
-                    gene_symbol=symbol_upper,
-                    uniprot_accession=uniprot_acc,
-                )
-            except Exception as exc:
-                logger.warning("Protein properties lookup failed for %s: %s", symbol_upper, exc)
-                protein_props = {}
-                protein_db = {}
+        try:
+            # First get UniProt accession from protein service
+            protein_db = get_protein_db_ids(
+                uniprot_id=meta.get("proteinId"),
+                gene_symbol=official_symbol,
+                entrez_id=meta.get("entrezGeneId"),
+                taxon_id=taxon_id,
+            )
+            uniprot_acc = protein_db.get("uniprotAccession")
+            protein_props = get_protein_properties(
+                ensembl_protein_id=meta.get("proteinId"),
+                gene_symbol=official_symbol,
+                uniprot_accession=uniprot_acc,
+                taxon_id=taxon_id,
+            )
+        except Exception as exc:
+            logger.warning("Protein properties lookup failed for %s: %s", official_symbol, exc)
+            protein_props = {}
+            protein_db = {}
 
         # Fetch single-cell expression from HPA
         single_cell = {}
@@ -399,25 +603,24 @@ async def initialize_target(payload: TargetRequest):
             try:
                 single_cell = get_single_cell_expression(
                     ensembl_id=gene_id,
-                    gene_symbol=symbol_upper,
+                    gene_symbol=official_symbol,
                 )
             except Exception as exc:
-                logger.warning("Single-cell lookup failed for %s: %s", symbol_upper, exc)
+                logger.warning("Single-cell lookup failed for %s: %s", official_symbol, exc)
                 single_cell = {}
 
         # Fetch clinical details from NCBI/OMIM
         clinical_details = {}
-        if is_human:
-            try:
-                clinical_details = get_clinical_details(
-                    gene_symbol=symbol_upper,
-                    disease_name=disease_resolved,
-                    omim_id=disease_info.get("omim_id"),
-                    phenotypes=disease_info.get("diseases"),
-                )
-            except Exception as e:
-                logger.warning(f"Clinical details lookup failed for {symbol_upper}: {e}")
-                clinical_details = {}
+        try:
+            clinical_details = get_clinical_details(
+                gene_symbol=official_symbol,
+                disease_name=disease_resolved,
+                omim_id=disease_info.get("omim_id"),
+                phenotypes=disease_info.get("diseases"),
+            )
+        except Exception as e:
+            logger.warning(f"Clinical details lookup failed for {official_symbol}: {e}")
+            clinical_details = {}
 
         raw_strand = meta.get("strand")
         if str(raw_strand) in ["-1", "-"]:
@@ -443,18 +646,18 @@ async def initialize_target(payload: TargetRequest):
 
         deep_links = {
             "ensembl": ensembl_url,
-            "ncbi": f"https://www.ncbi.nlm.nih.gov/gene/?term={symbol_upper}",
-            "gtex": f"https://gtexportal.org/home/gene/{symbol_upper}" if is_human else None,
-            "hpa": f"https://www.proteinatlas.org/search/{symbol_upper}" if is_human else None,
-            "uniprot": f"https://www.uniprot.org/uniprotkb?query={symbol_upper}",
-            "clinvar": f"https://www.ncbi.nlm.nih.gov/clinvar/?term={symbol_upper}%5Bgene%5D",
-            "kegg": f"https://www.genome.jp/dbget-bin/www_bget?q={symbol_upper}",
-            "reactome": f"https://reactome.org/content/query?q={symbol_upper}",
-            "pubmed": f"https://pubmed.ncbi.nlm.nih.gov/?term={symbol_upper}%5Bgene%5D",
-            "clinicaltrials": f"https://clinicaltrials.gov/search?cond={symbol_upper}",
-            "omim": f"https://www.omim.org/search?search={symbol_upper}",
+            "ncbi": f"https://www.ncbi.nlm.nih.gov/gene/?term={official_symbol}",
+            "gtex": f"https://gtexportal.org/home/gene/{official_symbol}" if is_human else None,
+            "hpa": f"https://www.proteinatlas.org/search/{official_symbol}" if is_human else None,
+            "uniprot": f"https://www.uniprot.org/uniprotkb?query={official_symbol}",
+            "clinvar": f"https://www.ncbi.nlm.nih.gov/clinvar/?term={official_symbol}%5Bgene%5D",
+            "kegg": f"https://www.genome.jp/dbget-bin/www_bget?q={official_symbol}",
+            "reactome": f"https://reactome.org/content/query?q={official_symbol}",
+            "pubmed": f"https://pubmed.ncbi.nlm.nih.gov/?term={official_symbol}%5Bgene%5D",
+            "clinicaltrials": f"https://clinicaltrials.gov/search?cond={official_symbol}",
+            "omim": f"https://www.omim.org/search?search={official_symbol}",
             "go": f"https://www.ebi.ac.uk/QuickGO/annotations?geneProductId=ENSEMBL%3A{gene_id}",
-            "string": f"https://string-db.org/cgi/network?identifiers={symbol_upper}&species={taxon_id}",
+            "string": f"https://string-db.org/cgi/network?identifiers={official_symbol}&species={taxon_id}",
         }
 
         tissue_level = None
@@ -462,10 +665,48 @@ async def initialize_target(payload: TargetRequest):
             tpm_value = expr_details["tpm"] or 0
             tissue_level = "High" if tpm_value > 25 else ("Medium" if tpm_value > 5 else "Low")
 
+        # Single-cell prevalence (% cell types with nCPM > 0)
+        cell_type_all = single_cell.get("cellTypeAll", {})
+        sc_total = len(cell_type_all)
+        sc_positive = sum(1 for v in cell_type_all.values() if (v or 0) > 0)
+        single_cell_prevalence = round(sc_positive / sc_total, 3) if sc_total > 0 else None
+
+        # Developmental / age-dependent expression pattern
+        gene_func = enrichment_data.get("geneFunction") or meta.get("geneName") or ""
+        dev_keywords = [
+            "development", "differentiation", "embryonic", "fetal", "morphogenesis",
+            "organogenesis", "neurogenesis", "myogenesis", "angiogenesis",
+        ]
+        has_dev = any(kw in gene_func.lower() for kw in dev_keywords)
+        developmental_expression = "Developmentally Regulated" if has_dev else "Ubiquitous (Age-Stable)"
+
+        # Alternative polyadenylation — inferred from transcript isoform diversity
+        total_transcripts = meta.get("totalTranscripts") or len(meta.get("otherTranscripts", [])) + 1
+        if total_transcripts > 2:
+            alternative_polyadenylation = f"Multiple 3' UTR Isoforms ({total_transcripts} transcripts)"
+        elif total_transcripts > 1:
+            alternative_polyadenylation = "Few 3' UTR Isoforms"
+        else:
+            alternative_polyadenylation = "Single 3' UTR"
+
+        # Cytoplasmic vs nuclear retention index — heuristic from subcellular location + intron count
+        subcell = protein_props.get("subcellularLocation") or ""
+        is_nuclear = any(kw in subcell.lower() for kw in ["nucleus", "nucleolar", "nuclear", "nucleoplasm"])
+        n_exons = meta.get("exonCount") or 0
+        n_introns = max(int(n_exons) - 1, 0) if n_exons else max(int(meta.get("totalTranscripts", 5)) or 5, 1)
+        if is_nuclear and n_introns > 5:
+            nuclear_retention_index = round(min(0.4 + 0.4 * (1 - 1 / (1 + n_introns / 15)), 0.85), 2)
+        elif is_nuclear:
+            nuclear_retention_index = round(min(0.3 + 0.2 * (n_introns / 10), 0.6), 2)
+        elif n_introns > 10:
+            nuclear_retention_index = round(min(0.2 + 0.15 * (n_introns / 20), 0.45), 2)
+        else:
+            nuclear_retention_index = round(min(0.15 + 0.1 * (n_introns / 10), 0.3), 2)
+
         return {
             "organism": species,
             "diseaseName": payload.disease_name.strip() if payload.disease_name else None,
-            "geneSymbol": symbol_upper,
+            "geneSymbol": official_symbol,
             "geneName": meta.get("geneName"),
             "geneFunction": enrichment_data.get("geneFunction"),
             "geneId": gene_id,  
@@ -501,6 +742,20 @@ async def initialize_target(payload: TargetRequest):
             "defaultCellType": single_cell.get("cellType"),
             "cellExpressionLevel": single_cell.get("cellType"),
             "cellTpm": single_cell.get("cellTpm"),
+            "cellTypeAll": cell_type_all,
+
+            "expressionStabilityCV": expr_details.get("expression_cv"),
+            "vitalOrganTpm": expr_details.get("vital_organ_tpm"),
+            "vitalOrganTissues": expr_details.get("vital_organ_tissues", []),
+            "dominantIsoformFraction": expr_details.get("dominant_isoform_fraction"),
+            "dominantIsoformId": expr_details.get("dominant_isoform_id"),
+            "diseaseFoldChange": None,
+            "singleCellPrevalence": single_cell_prevalence,
+            "circadianAmplitude": None,
+            "intronRetentionRatio": None,
+            "developmentalExpression": developmental_expression,
+            "alternativePolyadenylation": alternative_polyadenylation,
+            "nuclearRetentionIndex": nuclear_retention_index,
 
             "proteinId": meta.get("proteinId"),
             "proteinName": meta.get("geneName"),
@@ -514,12 +769,21 @@ async def initialize_target(payload: TargetRequest):
             "ubiquitinationTarget": protein_props.get("ubiquitinationTarget"),
             "quaternaryStructure": protein_props.get("quaternaryStructure"),
             "stabilityScore": protein_props.get("stabilityScore"),
+            "subcellularLocation": protein_props.get("subcellularLocation"),
+            "criticalFunctionalDomains": protein_props.get("criticalFunctionalDomains"),
+            "disorderedContent": protein_props.get("disorderedContent"),
+            "proteosomalTurnover": protein_props.get("proteosomalTurnover"),
 
-            # Protein database IDs from UniProt + NCBI
-            "interproId": protein_db.get("interproId") if is_human else None,
-            "pfamId": protein_db.get("pfamId") if is_human else None,
-            "pdbId": protein_db.get("pdbId") if is_human else None,
-            "uniprotAccession": protein_db.get("uniprotAccession") if is_human else None,
+            "alphafoldPlddt": protein_props.get("alphafoldPlddt"),
+            "gravyIndex": protein_props.get("gravyIndex"),
+            "proteinAbundance": protein_props.get("proteinAbundance"),
+            "tractability": protein_props.get("tractability"),
+
+            # Protein database IDs from UniProt + NCBI (available for all organisms)
+            "interproId": protein_db.get("interproId"),
+            "pfamId": protein_db.get("pfamId"),
+            "pdbId": protein_db.get("pdbId"),
+            "uniprotAccession": protein_db.get("uniprotAccession"),
 
             # Use gnomAD mutation rate if available (overrides protein service)
             **({"mutationRate": constraint_data["mutationRate"]} if constraint_data.get("mutationRate") else {}),
@@ -573,6 +837,7 @@ async def initialize_target(payload: TargetRequest):
             "selfDimerRisk": aso_data.get("selfDimerRisk"),
             "polygTracts": aso_data.get("polygTracts"),
             "transcriptSpecificity": aso_data.get("transcriptSpecificity"),
+            "codonUsageBias": aso_data.get("codonUsageBias"),
 
             # RNA half-life and dependency
             "rnaHalflife": rna_halflife_data.get("rnaHalflife"),
@@ -603,6 +868,7 @@ async def initialize_target(payload: TargetRequest):
             "experimentalCount": enrichment_data.get("experimentalCount"),
             "databaseCount": enrichment_data.get("databaseCount"),
             "topInteractors": enrichment_data.get("topInteractors", []),
+            "interactionNetworkDensity": enrichment_data.get("interactionNetworkDensity"),
 
             "pubmedArticleCount": pubmed_count,
             "reviewCount": review_count,

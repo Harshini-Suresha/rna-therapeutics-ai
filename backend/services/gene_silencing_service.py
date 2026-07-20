@@ -172,33 +172,62 @@ def generate_candidates(
     chemistry: str,
     modifications: list[str],
     mrna_sequence: str | None,
-    exon_count: int,
+    exons: list[dict],
 ) -> list[dict]:
-    """Generate candidate ASOs targeting the selected exon's splice junctions."""
+    """Generate candidate ASOs targeting the selected exon's splice junctions.
+
+    Uses real exon coordinates (start/end/length) from Ensembl rather than
+    splitting the CDS evenly, so a candidate labeled "Exon 5" actually
+    targets real exon 5.
+    """
     candidates = []
-    if not mrna_sequence or exon_count < 2:
+    if not mrna_sequence or len(exons) < 2:
         return candidates
 
-    # We approximate exon boundaries by splitting the CDS evenly (proportional to exon count)
-    # In a real system you'd use Ensembl exon coordinates. For now we use a sliding window
-    # approach around the approximate exon region.
     seq = mrna_sequence.upper()
     seq_len = len(seq)
-    approx_exon_size = seq_len // exon_count if exon_count else seq_len
 
-    # Target region: the approximate exon plus 20 nt flanking into adjacent introns
-    # (splice junction targeting)
+    # Compute CDS-relative offsets for each exon using real genomic lengths.
+    # Ensembl exon lengths include UTR regions, so we proportionally map
+    # each exon's share of the CDS based on its genomic length relative
+    # to the total genomic span of all exons.
+    total_genomic = sum(e.get("length", 0) for e in exons)
+    if total_genomic == 0:
+        return candidates
+
+    # Build cumulative CDS offset map: exon_index -> (cds_start, cds_end)
+    exon_cds_map: list[tuple[int, int]] = []
+    cursor = 0
+    for exon in exons:
+        exon_genomic_len = exon.get("length", 0)
+        # Proportional CDS contribution for this exon
+        cds_contribution = round(seq_len * exon_genomic_len / total_genomic)
+        cds_start = cursor
+        cds_end = cursor + cds_contribution
+        exon_cds_map.append((cds_start, cds_end))
+        cursor = cds_end
+
+    # Clamp the last exon's end to the actual sequence length to avoid
+    # floating-point rounding drift
+    if exon_cds_map:
+        last_start, _ = exon_cds_map[-1]
+        exon_cds_map[-1] = (last_start, seq_len)
+
+    exon_count = len(exons)
+
+    # Determine the CDS region for the target exon
     if target_exon_index is not None and 0 < target_exon_index <= exon_count:
-        exon_start = int((target_exon_index - 1) * (seq_len / exon_count))
-        exon_end = int(target_exon_index * (seq_len / exon_count))
+        exon_start, exon_end = exon_cds_map[target_exon_index - 1]
     else:
         # Default to middle of CDS
         exon_start = seq_len // 3
         exon_end = 2 * seq_len // 3
 
-    # Generate candidates with sliding window across exon + flanking region
-    search_start = max(0, exon_start - 10)
-    search_end = min(seq_len - aso_length, exon_end + 10)
+    # Generate candidates with sliding window across exon + flanking region.
+    # Flank 10 nt into adjacent exons to capture splice junctions.
+    flank = min(10, aso_length // 2)
+    search_start = max(0, exon_start - flank)
+    search_end = min(seq_len - aso_length, exon_end + flank)
 
     seen = set()
     for offset in range(search_start, search_end, max(1, aso_length // 3)):
@@ -217,12 +246,21 @@ def generate_candidates(
         sc = _self_complement_score(candidate_seq)
         pg = _polyg_score(candidate_seq)
 
-        # Composite quality score (0–100)
+        # Composite quality score (0-100)
         gc_score = max(0, 100 - abs(gc - 0.50) * 400)
         tm_score = max(0, 100 - abs(tm - 52) * 3)
         sc_penalty = sc * 200
         pg_penalty = pg * 15
         quality = max(0, min(100, gc_score * 0.35 + tm_score * 0.45 - sc_penalty - pg_penalty))
+
+        # Describe which part of the exon this candidate targets
+        relative_pos = offset - exon_start
+        if relative_pos < 0:
+            region_label = f"Exon {target_exon_index or '?'} 5' flank {relative_pos}"
+        elif relative_pos >= (exon_end - exon_start - aso_length):
+            region_label = f"Exon {target_exon_index or '?'} 3' flank +{relative_pos}"
+        else:
+            region_label = f"Exon {target_exon_index or '?'} offset +{relative_pos}"
 
         candidates.append({
             "sequence": candidate_seq,
@@ -232,7 +270,7 @@ def generate_candidates(
             "selfComplementScore": round(sc, 4),
             "polygTracts": pg,
             "qualityScore": round(quality, 1),
-            "targetRegion": f"Exon {target_exon_index or '?'} offset +{offset - exon_start}",
+            "targetRegion": region_label,
             "chemistry": chemistry,
             "modifications": modifications,
         })

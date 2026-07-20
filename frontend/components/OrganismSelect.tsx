@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, Search, Dna, Lock } from "lucide-react";
+import { ChevronDown, Search, Dna } from "lucide-react";
 import { ORGANISMS, Organism, getOrganism } from "@/lib/organisms";
 
 interface Props {
@@ -99,7 +99,6 @@ export default function OrganismSelect({ value, onChange }: Props) {
                         organism={o}
                         selected={o.id === value}
                         onSelect={() => {
-                          if (o.status === "comingSoon") return;
                           onChange(o.id);
                           setOpen(false);
                           setQuery("");
@@ -131,16 +130,12 @@ function OrganismRow({
   selected: boolean;
   onSelect: () => void;
 }) {
-  const disabled = organism.status === "comingSoon";
   return (
     <button
       type="button"
-      disabled={disabled}
       onClick={onSelect}
       className={`flex w-full items-center justify-between rounded-md px-3 py-1.5 text-left text-[13px] transition-colors ${
-        disabled
-          ? "cursor-not-allowed opacity-50"
-          : selected
+        selected
           ? "bg-black/10 font-medium text-slate-900"
           : "text-slate-700 hover:bg-black/5"
       }`}
@@ -149,9 +144,7 @@ function OrganismRow({
         {organism.commonName}{" "}
         <span className="italic text-slate-500/70 ml-1">({organism.scientificName})</span>
       </span>
-      {disabled ? (
-        <Lock className="h-3.5 w-3.5 text-slate-400" />
-      ) : organism.status === "curated" ? (
+      {organism.status === "curated" ? (
         <span className="ml-2 shrink-0 rounded-full bg-black/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-slate-700">
           Curated
         </span>

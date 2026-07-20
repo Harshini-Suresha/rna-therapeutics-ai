@@ -103,14 +103,16 @@ export function Pill({
 export function DataRow({
   label,
   value,
+  highlight,
 }: {
   label: string;
   value: React.ReactNode;
+  highlight?: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between py-1.5">
-      <span className="text-[12px] text-slate-500">{label}</span>
-      <span className="text-[12px] font-medium text-slate-700">{value}</span>
+    <div className="flex items-center justify-between py-0.5">
+      <span className="text-[11px] text-slate-500">{label}</span>
+      <span className={`text-[11px] font-medium ${highlight ? "text-emerald-600" : "text-slate-700"}`}>{value}</span>
     </div>
   );
 }
@@ -127,14 +129,14 @@ export function MiniCardHeader({
   title: string;
 }) {
   return (
-    <div className="flex items-center gap-2 px-4 pt-4">
+    <div className="flex items-center gap-2 px-4 pt-2.5">
       <span
-        className="flex h-6 w-6 items-center justify-center rounded-md"
+        className="flex h-5 w-5 items-center justify-center rounded-md"
         style={{ backgroundColor: iconBg }}
       >
-        <Icon className="h-3.5 w-3.5" style={{ color: iconColor }} />
+        <Icon className="h-3 w-3" style={{ color: iconColor }} />
       </span>
-      <p className="text-[13px] font-semibold text-slate-700">{title}</p>
+      <p className="text-[12px] font-semibold text-slate-700">{title}</p>
     </div>
   );
 }

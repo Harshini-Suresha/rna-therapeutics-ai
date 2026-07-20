@@ -35,6 +35,8 @@ function inferVariantType(label: string): string {
 export default function InfoGrid({ gene }: { gene: GeneTargetObject }) {
   const [selectedTranscript, setSelectedTranscript] = useState(gene.canonicalTranscript);
   const isViral = gene.geneType === "viral_gene";
+  const organism = gene.organism ?? "homo_sapiens";
+  const isHuman = organism === "homo_sapiens";
   const links = gene.deepLinks ?? {};
   const variantExamples = Array.isArray(gene.variantExamples) ? gene.variantExamples : [];
   const expressionTissues = Array.isArray(gene.topTissues) ? gene.topTissues : [];
@@ -113,7 +115,7 @@ export default function InfoGrid({ gene }: { gene: GeneTargetObject }) {
             )}
           </div>
           {gene.totalTranscripts !== null && (
-            <p className="mt-auto border-t border-slate-100 px-4 py-2.5 text-[12px] text-slate-500 flex items-center gap-1">
+            <p className="mt-auto border-t border-slate-100 px-4 py-1.5 text-[12px] text-slate-500 flex items-center gap-1">
               {gene.totalTranscripts} transcript{gene.totalTranscripts === 1 ? "" : "s"} total
               {links.ensembl && (
                 <a href={links.ensembl} target="_blank" rel="noreferrer" className="font-medium text-brand hover:underline ml-0.5 inline-flex items-center gap-0.5">
@@ -132,17 +134,21 @@ export default function InfoGrid({ gene }: { gene: GeneTargetObject }) {
               <p className="text-[32px] font-bold text-[#F97316] leading-none">
                 {variantCount.toLocaleString()}
               </p>
-              <p className="mt-1 text-[11px] font-medium text-slate-400">Known variants in ClinVar</p>
+              <p className="mt-1 text-[11px] font-medium text-slate-400">
+                {isHuman ? "Known variants in ClinVar" : "Known variants"}
+              </p>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">dbSNP variants</p>
                 <p className="mt-0.5 text-[12px] font-semibold text-slate-800">{gene.dbSnpCount !== null ? gene.dbSnpCount.toLocaleString() : DASH}</p>
               </div>
-              <div>
-                <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">ACMG Classification</p>
-                <p className="mt-0.5 text-[12px] font-semibold text-slate-800">Pathogenic</p>
-              </div>
+              {isHuman && (
+                <div>
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">ACMG Classification</p>
+                  <p className="mt-0.5 text-[12px] font-semibold text-slate-800">Pathogenic</p>
+                </div>
+              )}
               <div>
                 <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">HGVS Names</p>
                 <p className="mt-0.5 text-[12px] font-semibold text-slate-800 break-all">{gene.topHgvsName ?? DASH}</p>
@@ -155,10 +161,12 @@ export default function InfoGrid({ gene }: { gene: GeneTargetObject }) {
                 <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">Population Frequency (MAF)</p>
                 <p className="mt-0.5 text-[12px] font-semibold text-slate-800">{gene.populationFrequencyMaf ?? DASH}</p>
               </div>
-              <div>
-                <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">pLI (LoF Intolerance)</p>
-                <p className="mt-0.5 text-[12px] font-semibold text-slate-800">{gene.intolerantToLossScore ?? DASH}</p>
-              </div>
+              {isHuman && (
+                <div>
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">pLI (LoF Intolerance)</p>
+                  <p className="mt-0.5 text-[12px] font-semibold text-slate-800">{gene.intolerantToLossScore ?? DASH}</p>
+                </div>
+              )}
             </div>
           </div>
           {links.clinvar && (
@@ -166,7 +174,7 @@ export default function InfoGrid({ gene }: { gene: GeneTargetObject }) {
               href={links.clinvar}
               target="_blank"
               rel="noreferrer"
-              className="mt-auto flex items-center gap-1 border-t border-slate-100 px-4 py-2.5 text-[12px] font-medium text-brand hover:underline"
+              className="mt-auto flex items-center gap-1 border-t border-slate-100 px-4 py-1.5 text-[12px] font-medium text-brand hover:underline"
             >
               Open ClinVar Workspace
               <ExternalLink className="h-3 w-3" />
@@ -204,7 +212,7 @@ export default function InfoGrid({ gene }: { gene: GeneTargetObject }) {
               href={links.gtex}
               target="_blank"
               rel="noreferrer"
-              className="mt-auto flex items-center gap-1 border-t border-slate-100 px-4 py-2.5 text-[12px] font-medium text-brand hover:underline"
+              className="mt-auto flex items-center gap-1 border-t border-slate-100 px-4 py-1.5 text-[12px] font-medium text-brand hover:underline"
             >
               View in GTEx
               <ExternalLink className="h-3 w-3" />
@@ -218,22 +226,48 @@ export default function InfoGrid({ gene }: { gene: GeneTargetObject }) {
         {/* Expression Context */}
         <Card className="flex flex-col">
           <MiniCardHeader icon={CircleDot} iconBg="#FDF2F8" iconColor="#DB2777" title="Expression Context" />
-          <div className="flex-1 px-4 py-3">
+          <div className="flex-1 px-4 py-2">
             {gene.gtexAvailable && gene.defaultTissue ? (
               <div className="space-y-2.5">
-                <DataRow label="Median TPM" value={gene.tissueTpm !== null ? `${gene.tissueTpm} TPM` : DASH} />
                 <DataRow label="Expression level" value={gene.tissueExpressionLevel ?? DASH} />
                 <DataRow label="Tissues profiled" value={gene.topTissues.length || DASH} />
                 <DataRow label="Expression Breadth" value={gene.topTissues.length > 0 ? `${gene.topTissues.length} tissues` : DASH} />
                 <DataRow label="Tau Specificity Score" value={gene.tissueTpm !== null ? `${gene.tissueTpm} TPM` : DASH} />
                 <DataRow label="Enrichment Level" value={gene.tissueExpressionLevel ?? DASH} />
-                <DataRow label="Cohort Percentile" value={gene.tissueTpm !== null ? `${gene.tissueTpm} TPM` : DASH} />
                 <DataRow label="Measurement" value="GTEx v8 RNA-seq" />
-                <DataRow label="Systemic Distribution" value="Musculoskeletal & Peripheral Nervous System" />
-                <DataRow label="Expression Specificity" value="Tissue-enriched (predominantly Musculoskeletal/Nerve)" />
-                <DataRow label="Primary Tissue Categories" value="Muscle (Skeletal/Cardiac) and Nervous (Peripheral)" />
                 <DataRow label="Single-cell" value={gene.defaultCellType ?? "Standard Spectrum"} />
                 <DataRow label="Cell concentration" value={gene.cellTpm !== null ? `${gene.cellTpm} TPM` : DASH} />
+
+                {(() => {
+                  const vitalOrgan = gene.vitalOrganTpm !== null;
+                  const exprCV = gene.expressionStabilityCV !== null;
+                  const domIso = gene.dominantIsoformFraction !== null;
+                  const diseaseFC = gene.diseaseFoldChange !== null;
+                  const scPrev = gene.singleCellPrevalence !== null;
+                  const circ = gene.circadianAmplitude !== null;
+                  const intron = gene.intronRetentionRatio !== null;
+                  const devExpr = gene.developmentalExpression !== null;
+                  const altPolyA = gene.alternativePolyadenylation !== null;
+                  const nucIndex = gene.nuclearRetentionIndex !== null;
+                  const hasAny = vitalOrgan || exprCV || domIso || diseaseFC || scPrev || circ || intron || devExpr || altPolyA || nucIndex;
+                  if (!hasAny) return null;
+                  return (
+                    <div className="border-t border-slate-100 pt-3">
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-2">ASO Expression Analytics</p>
+                      {vitalOrgan && <div className="mb-2"><DataRow label="Cardiac / Renal Baseline" value={`${gene.vitalOrganTpm} TPM (${gene.vitalOrganTpm! < 5 ? "Low Risk" : gene.vitalOrganTpm! < 20 ? "Moderate Risk" : "High Risk"})`} /></div>}
+                      {exprCV && <div className="mb-2"><DataRow label="Expression Stability (CV)" value={`${gene.expressionStabilityCV!.toFixed(2)} (${gene.expressionStabilityCV! < 0.5 ? "Stable" : gene.expressionStabilityCV! < 1.0 ? "Moderate Variation" : "Highly Variable"})`} /></div>}
+                      {domIso && <div className="mb-2"><DataRow label="Dominant Isoform Fraction" value={`${(gene.dominantIsoformFraction! * 100).toFixed(0)}% (${gene.dominantIsoformId ?? ""})`} /></div>}
+                      {diseaseFC && <div className="mb-2"><DataRow label="Disease Upregulation (log₂FC)" value={`${gene.diseaseFoldChange! >= 0 ? "+" : ""}${gene.diseaseFoldChange!.toFixed(2)}x (Diseased vs Normal)`} /></div>}
+                      {scPrev && <div className="mb-2"><DataRow label="Single-Cell Positive Fraction" value={`${(gene.singleCellPrevalence! * 100).toFixed(1)}% of ${gene.defaultCellType ?? "cells"}`} /></div>}
+                      {circ && <div className="mb-2"><DataRow label="Temporal / Circadian Variation" value={gene.circadianAmplitude!} /></div>}
+                      {intron && <div className="mb-2"><DataRow label="Nuclear Pre-mRNA Ratio" value={`${gene.intronRetentionRatio!.toFixed(2)} (${gene.intronRetentionRatio! > 0.3 ? "High Nuclear Pool" : "Low Nuclear Pool"})`} /></div>}
+                      {devExpr && <div className="mb-2"><DataRow label="Developmental / Age Expression" value={gene.developmentalExpression!} /></div>}
+                      {altPolyA && <div className="mb-2"><DataRow label="Alternative Polyadenylation (3' UTR)" value={gene.alternativePolyadenylation!} /></div>}
+                      {nucIndex && <div className="mb-2"><DataRow label="Cytoplasmic vs Nuclear Index" value={`${gene.nuclearRetentionIndex!.toFixed(2)} (${gene.nuclearRetentionIndex! > 0.5 ? "Nuclear Retained" : "Cytoplasmic Dominant"})`} /></div>}
+                    </div>
+                  );
+                })()}
+
                 {links.gtex && (
                   <a href={links.gtex} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[11px] font-medium text-brand hover:underline pt-1">
                     View full expression data on GTEx <ExternalLink className="h-3 w-3" />
@@ -243,7 +277,11 @@ export default function InfoGrid({ gene }: { gene: GeneTargetObject }) {
               </div>
             ) : (
               <p className="py-4 text-center text-[12px] text-slate-400">
-                {isViral ? "Not applicable to viral payloads." : "No tissue expression record returned."}
+                {isViral
+                  ? "Not applicable to viral payloads."
+                  : isHuman
+                  ? "No tissue expression record returned."
+                  : "Tissue expression data available for human genes via GTEx."}
               </p>
             )}
           </div>
@@ -252,29 +290,20 @@ export default function InfoGrid({ gene }: { gene: GeneTargetObject }) {
         {/* Protein & Genetics */}
         <Card className="flex flex-col">
           <MiniCardHeader icon={Link2} iconBg="#F5F3FF" iconColor="#7C3AED" title="Protein & Genetics" />
-          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+          <div className="flex-1 overflow-y-auto px-4 py-2 space-y-1.5">
             <DataRow label="Isoelectric Point (pI)" value={gene.isoelectricPoint ?? DASH} />
             <DataRow label="Secondary Structure" value={gene.secondaryStructureDistribution ?? DASH} />
             <DataRow label="Degradation / Ubiquitination" value={gene.ubiquitinationTarget ?? DASH} />
             <DataRow label="Quaternary Structure" value={gene.quaternaryStructure ?? DASH} />
             <DataRow label="Stability Score" value={gene.stabilityScore ?? DASH} />
-            <DataRow label="Transcription Time" value="~16 hours (co-transcriptional splicing)" />
-            <div>
-              <p className="text-[11px] font-medium text-slate-400">Structural Domains</p>
-              <ul className="mt-1 space-y-1">
-                <li className="text-[11.5px] text-slate-600 leading-snug"><span className="font-medium text-slate-700">N-terminus:</span> Actin-binding domain (ABD) linking ECM to F-actin</li>
-                <li className="text-[11.5px] text-slate-600 leading-snug"><span className="font-medium text-slate-700">Central Rod:</span> 24 spectrin-like repeats, 4 hinges (shock absorber)</li>
-                <li className="text-[11.5px] text-slate-600 leading-snug"><span className="font-medium text-slate-700">Cysteine-rich:</span> Binds β-dystroglycan</li>
-                <li className="text-[11.5px] text-slate-600 leading-snug"><span className="font-medium text-slate-700">C-terminus:</span> Binding sites for syntrophin, dystrobrevin, DAGC</li>
-              </ul>
-            </div>
-            <div>
-              <p className="text-[11px] font-medium text-slate-400">Function & Clinical Relevance</p>
-              <ul className="mt-1 space-y-1">
-                <li className="text-[11.5px] text-slate-600 leading-snug"><span className="font-medium text-slate-700">Primary:</span> Anchors ECM to intracellular cytoskeleton</li>
-                <li className="text-[11.5px] text-slate-600 leading-snug"><span className="font-medium text-slate-700">Interactions:</span> Ligand for dystroglycan; interacts with syntrophins, dystrobrevins</li>
-              </ul>
-            </div>
+            <DataRow label="Subcellular Location" value={gene.subcellularLocation ?? DASH} />
+            <DataRow label="Functional Domains" value={gene.criticalFunctionalDomains ?? DASH} />
+            <DataRow label="Disordered Content" value={gene.disorderedContent ?? DASH} />
+            <DataRow label="Proteosomal Turnover" value={gene.proteosomalTurnover ?? DASH} />
+            <DataRow label="AlphaFold pLDDT" value={gene.alphafoldPlddt ?? DASH} />
+            <DataRow label="GRAVY Index" value={gene.gravyIndex ?? DASH} />
+            <DataRow label="Protein Abundance" value={gene.proteinAbundance ?? DASH} />
+            <DataRow label="ASO Therapeutic Tractability" value={gene.tractability ?? DASH} highlight={gene.tractability?.includes("Undruggable") ?? false} />
             <div>
               <p className="text-[11px] font-medium text-slate-400">Synonyms</p>
               <p className="mt-0.5 text-[13px] font-medium text-slate-700 break-words leading-relaxed">
@@ -290,7 +319,7 @@ export default function InfoGrid({ gene }: { gene: GeneTargetObject }) {
               href={links.uniprot}
               target="_blank"
               rel="noreferrer"
-              className="flex items-center gap-1 border-t border-slate-100 px-4 py-2.5 text-[12px] font-medium text-brand hover:underline"
+              className="flex items-center gap-1 border-t border-slate-100 px-4 py-1.5 text-[12px] font-medium text-brand hover:underline"
             >
               Search in UniProt
               <ExternalLink className="h-3 w-3" />
@@ -301,7 +330,7 @@ export default function InfoGrid({ gene }: { gene: GeneTargetObject }) {
         {/* Disease Association */}
         <Card className="flex flex-col">
           <MiniCardHeader icon={HeartPulse} iconBg="#FEF2F2" iconColor="#DC2626" title="Disease Association" />
-          <div className="flex-1 px-4 py-3 space-y-3">
+          <div className="flex-1 px-4 py-2 space-y-1.5">
             {gene.diseaseName && (
               <div>
                 <p className="text-[11px] font-medium text-slate-400">Project Disease Label</p>
@@ -397,7 +426,7 @@ export default function InfoGrid({ gene }: { gene: GeneTargetObject }) {
               href={links.omim}
               target="_blank"
               rel="noreferrer"
-              className="flex items-center gap-1 border-t border-slate-100 px-4 py-2.5 text-[12px] font-medium text-brand hover:underline"
+              className="flex items-center gap-1 border-t border-slate-100 px-4 py-1.5 text-[12px] font-medium text-brand hover:underline"
             >
               View in OMIM
               <ExternalLink className="h-3 w-3" />

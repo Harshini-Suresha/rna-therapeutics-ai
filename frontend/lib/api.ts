@@ -66,7 +66,7 @@ export async function fetchGene(
     source: data.source ?? [],
     
     // Mapped directly from backend numerical Taxon ID definitions
-    taxonId: data.taxonId ?? "9606",
+    taxonId: data.taxonId ?? null,
 
     canonicalTranscript: data.canonicalTranscript ?? null,
     canonicalTranscriptLabel: data.canonicalTranscriptLabel ?? null,
@@ -87,6 +87,20 @@ export async function fetchGene(
     defaultCellType: data.defaultCellType ?? fallbackGene?.defaultCellType ?? null,
     cellExpressionLevel: data.cellExpressionLevel ?? fallbackGene?.cellExpressionLevel ?? null,
     cellTpm: data.cellTpm ?? fallbackGene?.cellTpm ?? null,
+    cellTypeAll: data.cellTypeAll ?? {},
+
+    expressionStabilityCV: data.expressionStabilityCV ?? null,
+    vitalOrganTpm: data.vitalOrganTpm ?? null,
+    vitalOrganTissues: Array.isArray(data.vitalOrganTissues) ? data.vitalOrganTissues : [],
+    dominantIsoformFraction: data.dominantIsoformFraction ?? null,
+    dominantIsoformId: data.dominantIsoformId ?? null,
+    diseaseFoldChange: data.diseaseFoldChange ?? null,
+    singleCellPrevalence: data.singleCellPrevalence ?? null,
+    circadianAmplitude: data.circadianAmplitude ?? null,
+    intronRetentionRatio: data.intronRetentionRatio ?? null,
+    developmentalExpression: data.developmentalExpression ?? null,
+    alternativePolyadenylation: data.alternativePolyadenylation ?? null,
+    nuclearRetentionIndex: data.nuclearRetentionIndex ?? null,
 
     proteinId: data.proteinId ?? null,
     proteinName: data.proteinName ?? null,
@@ -98,6 +112,14 @@ export async function fetchGene(
     ubiquitinationTarget: data.ubiquitinationTarget ?? null,
     quaternaryStructure: data.quaternaryStructure ?? null,
     stabilityScore: data.stabilityScore ?? null,
+    subcellularLocation: data.subcellularLocation ?? null,
+    criticalFunctionalDomains: data.criticalFunctionalDomains ?? null,
+    disorderedContent: data.disorderedContent ?? null,
+    proteosomalTurnover: data.proteosomalTurnover ?? null,
+    alphafoldPlddt: data.alphafoldPlddt ?? null,
+    gravyIndex: data.gravyIndex ?? null,
+    proteinAbundance: data.proteinAbundance ?? null,
+    tractability: data.tractability ?? null,
     interproId: data.interproId ?? null,
     pfamId: data.pfamId ?? null,
     pdbId: data.pdbId ?? null,
@@ -157,6 +179,7 @@ export async function fetchGene(
     selfDimerRisk: data.selfDimerRisk ?? null,
     polygTracts: data.polygTracts ?? null,
     transcriptSpecificity: data.transcriptSpecificity ?? null,
+    codonUsageBias: data.codonUsageBias ?? null,
 
     // RNA half-life and gene dependency
     rnaHalflife: data.rnaHalflife ?? null,
@@ -187,6 +210,7 @@ export async function fetchGene(
     mediumConfidenceCount: data.mediumConfidenceCount ?? null,
     experimentalCount: data.experimentalCount ?? null,
     databaseCount: data.databaseCount ?? null,
+    interactionNetworkDensity: data.interactionNetworkDensity ?? null,
 
     pubmedArticleCount: data.pubmedArticleCount ?? null,
     reviewCount: data.reviewCount ?? null,

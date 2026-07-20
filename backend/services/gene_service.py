@@ -71,19 +71,28 @@ def ensembl_gene_url(*args):
     """
     Generates a web link to the Ensembl browser page for a given gene ID.
     Intelligently handles calling signatures like (gene_id) or (gene_id, species).
+    Accepts both common names (mouse, human) and Ensembl species names (mus_musculus).
     """
     gene_id = ""
     organism = "human"
     
     for arg in args:
         arg_str = str(arg).strip()
+        # Match common names
         if any(sp in arg_str.lower() for sp in ["human", "mouse", "sapiens", "musculus", "rat", "norvegicus", "macaque", "zebrafish"]):
+            organism = arg_str
+        # Also match Ensembl species names directly (e.g. mus_musculus, danio_rerio)
+        elif "_" in arg_str and any(part in arg_str.lower() for part in ["sapiens", "musculus", "norvegicus", "fascicularis", "mulatta", "rerio", "melanogaster", "elegans", "cerevisiae", "pombe", "familiaris", "catus", "scrofa", "taurus", "caballus", "aries", "hircus", "gallus", "thaliana", "sativa", "mays", "aestivum", "lycopersicum", "coli", "aureus", "tuberculosis", "aeruginosa"]):
             organism = arg_str
         elif arg_str:
             gene_id = arg_str
             
     org_lower = organism.lower()
-    if "sapiens" in org_lower or "human" in org_lower:
+    # Direct Ensembl species name (e.g. mus_musculus) — capitalize for URL
+    if "_" in org_lower and not any(cn in org_lower for cn in ["human", "mouse", "rat", "zebrafish"]):
+        parts = org_lower.split("_")
+        species = "_".join(p.capitalize() for p in parts if p)
+    elif "sapiens" in org_lower or "human" in org_lower:
         species = "Homo_sapiens"
     elif "musculus" in org_lower or "mouse" in org_lower:
         species = "Mus_musculus"
@@ -145,6 +154,10 @@ def get_gene_metadata(gene_symbol: str, organism: str):
 
     if response.status_code == 404:
         return None
+    # 400 = species/symbol not on this Ensembl instance (e.g. plants, bacteria).
+    # Return None so the NCBI fallback in main.py can try.
+    if response.status_code == 400:
+        return None
     if not response.ok:
         raise EnsemblLookupUnavailable(
             f"Ensembl lookup is unavailable (HTTP {response.status_code}). Please try again shortly."
@@ -174,6 +187,7 @@ def get_gene_metadata(gene_symbol: str, organism: str):
 
     return {
         "geneName": gene_name,
+        "officialSymbol": data.get("display_name"),
         "id": data.get("id"),
         "seq_region_name": chromosome,
         "start": start,
@@ -193,13 +207,23 @@ def get_gene_metadata(gene_symbol: str, organism: str):
         "proteinId": canonical.get("Translation", {}).get("id", "N/A") if canonical.get("Translation") else "N/A"
     }
 
-def get_gene_phenotypes(gene_id: str, organism: str):
+def get_gene_phenotypes(gene_symbol: str, organism: str):
+    """Fetch phenotype associations from Ensembl.
+
+    Uses the /phenotype/gene/{species}/{symbol} endpoint which returns
+    cross-species phenotype data (MGI, ZFIN, RGD, etc.).
+    Phenotype responses can be large; use a longer timeout than typical lookups.
+    """
     species = organism.lower().strip().replace(" ", "_")
-    url = f"{REST_API_BASE}/phenotype/id/{species}/{gene_id}?feature_type=gene"
+    url = f"{REST_API_BASE}/phenotype/gene/{species}/{gene_symbol}"
     try:
-        response = _ensembl_get(url)
+        response = requests.get(
+            url,
+            headers={"Accept": "application/json"},
+            timeout=60,
+        )
         if not response.ok:
             return []
         return response.json()
-    except EnsemblLookupUnavailable:
+    except Exception:
         return []

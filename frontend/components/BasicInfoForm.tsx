@@ -63,7 +63,7 @@ export default function BasicInfoForm({
 
         {/* Gene symbol */}
         <div>
-          <FieldLabel hint="Any gene symbol recognized by Ensembl for the selected organism, e.g. DMD, TP53, BRCA1">
+          <FieldLabel hint="Any gene symbol recognized by Ensembl for the selected organism, e.g. DMD, TP53, Brca1">
             Gene Symbol <span className="text-red-500">*</span>
           </FieldLabel>
           <div className="relative">
@@ -72,7 +72,7 @@ export default function BasicInfoForm({
               onChange={(e) => setGeneSymbol(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && onLoadGene()}
               placeholder="e.g. DMD"
-              className="w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-3 pr-16 text-[13.5px] font-medium uppercase text-slate-700 placeholder:normal-case placeholder:font-normal placeholder:text-slate-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+              className="w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-3 pr-16 text-[13.5px] font-medium text-slate-700 placeholder:font-normal placeholder:text-slate-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
             />
             <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1">
               {geneSymbol && (

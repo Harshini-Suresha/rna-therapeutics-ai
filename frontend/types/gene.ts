@@ -66,6 +66,21 @@ export interface GeneTargetObject {
   defaultCellType: string | null;
   cellExpressionLevel: string | null;
   cellTpm: number | null;
+  cellTypeAll: Record<string, number>;
+
+  // ASO-relevant expression analytics
+  expressionStabilityCV: number | null;
+  vitalOrganTpm: number | null;
+  vitalOrganTissues: string[];
+  dominantIsoformFraction: number | null;
+  dominantIsoformId: string | null;
+  diseaseFoldChange: number | null;
+  singleCellPrevalence: number | null;
+  circadianAmplitude: string | null;
+  intronRetentionRatio: number | null;
+  developmentalExpression: string | null;
+  alternativePolyadenylation: string | null;
+  nuclearRetentionIndex: number | null;
 
   // Protein
   proteinId: string | null;
@@ -80,6 +95,14 @@ export interface GeneTargetObject {
   ubiquitinationTarget: string | null;
   quaternaryStructure: string | null;
   stabilityScore: string | null;
+  subcellularLocation: string | null;
+  criticalFunctionalDomains: string | null;
+  disorderedContent: string | null;
+  proteosomalTurnover: string | null;
+  alphafoldPlddt: string | null;
+  gravyIndex: string | null;
+  proteinAbundance: string | null;
+  tractability: string | null;
 
   // Protein database IDs
   interproId: string | null;
@@ -146,6 +169,7 @@ export interface GeneTargetObject {
   selfDimerRisk: string | null;
   polygTracts: string | null;
   transcriptSpecificity: string | null;
+  codonUsageBias: string | null;
 
   // RNA half-life and gene dependency
   rnaHalflife: string | null;
@@ -179,6 +203,7 @@ export interface GeneTargetObject {
   mediumConfidenceCount: number | null;
   experimentalCount: number | null;
   databaseCount: number | null;
+  interactionNetworkDensity: string | null;
 
   // Literature — real PubMed counts
   pubmedArticleCount: number | null;

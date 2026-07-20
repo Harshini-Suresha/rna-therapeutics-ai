@@ -65,12 +65,12 @@ export const ORGANISMS: Organism[] = [
   { id: "goat", commonName: "Goat", scientificName: "Capra hircus", tier: 3, status: "live", ensemblSpecies: "capra_hircus", taxonId: 9925 },
   { id: "chicken", commonName: "Chicken", scientificName: "Gallus gallus", tier: 3, status: "live", ensemblSpecies: "gallus_gallus", taxonId: 9031 },
 
-  // Tier 4 — Plants (future expansion, disabled per spec)
-  { id: "arabidopsis", commonName: "Arabidopsis", scientificName: "Arabidopsis thaliana", tier: 4, status: "comingSoon" },
-  { id: "rice", commonName: "Rice", scientificName: "Oryza sativa", tier: 4, status: "comingSoon" },
-  { id: "maize", commonName: "Maize", scientificName: "Zea mays", tier: 4, status: "comingSoon" },
-  { id: "wheat", commonName: "Wheat", scientificName: "Triticum aestivum", tier: 4, status: "comingSoon" },
-  { id: "tomato", commonName: "Tomato", scientificName: "Solanum lycopersicum", tier: 4, status: "comingSoon" },
+  // Tier 4 — Plants (live via Ensembl Plants API)
+  { id: "arabidopsis", commonName: "Arabidopsis", scientificName: "Arabidopsis thaliana", tier: 4, status: "live", ensemblSpecies: "arabidopsis_thaliana", taxonId: 3702 },
+  { id: "rice", commonName: "Rice", scientificName: "Oryza sativa", tier: 4, status: "live", ensemblSpecies: "oryza_sativa", taxonId: 39947 },
+  { id: "maize", commonName: "Maize", scientificName: "Zea mays", tier: 4, status: "live", ensemblSpecies: "zea_mays", taxonId: 4577 },
+  { id: "wheat", commonName: "Wheat", scientificName: "Triticum aestivum", tier: 4, status: "live", ensemblSpecies: "triticum_aestivum", taxonId: 4565 },
+  { id: "tomato", commonName: "Tomato", scientificName: "Solanum lycopersicum", tier: 4, status: "live", ensemblSpecies: "solanum_lycopersicum", taxonId: 4081 },
 
   // Tier 5 — Viruses (curated reference gene sets, not a live connector)
   { id: "sars-cov-2", commonName: "SARS-CoV-2", scientificName: "Severe acute respiratory syndrome coronavirus 2", tier: 5, status: "curated" },
@@ -80,11 +80,11 @@ export const ORGANISMS: Organism[] = [
   { id: "hcv", commonName: "HCV", scientificName: "Hepatitis C virus", tier: 5, status: "curated" },
   { id: "rsv", commonName: "RSV", scientificName: "Respiratory syncytial virus", tier: 5, status: "curated" },
 
-  // Tier 6 — Bacteria (optional, disabled for now)
-  { id: "ecoli", commonName: "Escherichia coli", scientificName: "Escherichia coli", tier: 6, status: "comingSoon" },
-  { id: "saureus", commonName: "Staphylococcus aureus", scientificName: "Staphylococcus aureus", tier: 6, status: "comingSoon" },
-  { id: "mtuberculosis", commonName: "Mycobacterium tuberculosis", scientificName: "Mycobacterium tuberculosis", tier: 6, status: "comingSoon" },
-  { id: "paeruginosa", commonName: "Pseudomonas aeruginosa", scientificName: "Pseudomonas aeruginosa", tier: 6, status: "comingSoon" },
+  // Tier 6 — Bacteria (live via NCBI Gene API fallback)
+  { id: "ecoli", commonName: "Escherichia coli", scientificName: "Escherichia coli", tier: 6, status: "live", ensemblSpecies: "escherichia_coli", taxonId: 511145 },
+  { id: "saureus", commonName: "Staphylococcus aureus", scientificName: "Staphylococcus aureus", tier: 6, status: "live", ensemblSpecies: "staphylococcus_aureus", taxonId: 1280 },
+  { id: "mtuberculosis", commonName: "Mycobacterium tuberculosis", scientificName: "Mycobacterium tuberculosis", tier: 6, status: "live", ensemblSpecies: "mycobacterium_tuberculosis", taxonId: 83332 },
+  { id: "paeruginosa", commonName: "Pseudomonas aeruginosa", scientificName: "Pseudomonas aeruginosa", tier: 6, status: "live", ensemblSpecies: "pseudomonas_aeruginosa", taxonId: 208964 },
 ];
 
 export function getOrganism(id: string): Organism | undefined {
@@ -93,4 +93,22 @@ export function getOrganism(id: string): Organism | undefined {
 
 export function organismsByTier(tier: number): Organism[] {
   return ORGANISMS.filter((o) => o.tier === tier);
+}
+
+/** Returns true if the organism is Tier 1-3 (Ensembl-based, full enrichment data). */
+export function isEnsemblOrganism(organismId: string): boolean {
+  const org = getOrganism(organismId);
+  return org ? org.tier >= 1 && org.tier <= 3 : false;
+}
+
+/** Returns true if the organism is a virus (Tier 5, curated data). */
+export function isViralOrganism(organismId: string): boolean {
+  const org = getOrganism(organismId);
+  return org ? org.tier === 5 : false;
+}
+
+/** Returns true if the organism is a plant (Tier 4) or bacteria (Tier 6). */
+export function isNonModelOrganism(organismId: string): boolean {
+  const org = getOrganism(organismId);
+  return org ? org.tier === 4 || org.tier === 6 : false;
 }

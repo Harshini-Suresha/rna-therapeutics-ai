@@ -69,6 +69,8 @@ function StatCard({ icon: Icon, iconBg, iconColor, title, rows, sources, notConn
 
 export default function StatsRow({ gene }: { gene: GeneTargetObject }) {
   const links = gene.deepLinks ?? {};
+  const organism = gene.organism ?? "homo_sapiens";
+  const isHuman = organism === "homo_sapiens";
   const hasInteractions = gene.stringHighConfidenceCount !== null || gene.totalInteractors !== null;
   const hasLiterature = gene.pubmedArticleCount !== null || gene.reviewCount !== null || gene.clinicalTrialsCount !== null || gene.preprintCount !== null || gene.caseReportsCount !== null;
   const hasPathways = gene.keggCount !== null || gene.reactomeCount !== null;
@@ -83,18 +85,18 @@ export default function StatsRow({ gene }: { gene: GeneTargetObject }) {
         iconColor="#DC2626"
         title="Target Vulnerability"
         rows={[
-          { label: "pHaplo Score", value: gene.haploinsufficiencyScore ?? DASH },
-          { label: "LOEUF Decile", value: gene.loeufDecile ?? DASH },
-          { label: "Triplosensitivity", value: gene.triplosensitivity ?? DASH },
-          { label: "RNA Half-Life (t₁/₂)", value: gene.rnaHalflife ?? DASH },
+          { label: "pHaplo Score", value: isHuman ? (gene.haploinsufficiencyScore ?? DASH) : "Human only" },
+          { label: "LOEUF Decile", value: isHuman ? (gene.loeufDecile ?? DASH) : "Human only" },
+          { label: "Triplosensitivity", value: isHuman ? (gene.triplosensitivity ?? DASH) : "Human only" },
+          { label: "RNA Half-Life (t₁/₂)", value: isHuman ? (gene.rnaHalflife ?? DASH) : "Human only" },
           { label: "DepMap Dependency", value: gene.depmapDependency ?? DASH },
         ]}
-        sources={[
+        sources={isHuman ? [
           { label: "Source: ClinGen", url: "https://search.clinicalgenome.org/kb/gene-dosage" },
           { label: "Source: gnomAD v2.1.1", url: `https://gnomad.broadinstitute.org/gene/${gene.geneId}?dataset=gnomad_r2_1` },
           { label: "Source: RNAdecayCafe", url: "https://zenodo.org/records/15785218" },
           { label: "Source: FAVOR", url: "https://xionglab.org/favor/" },
-        ]}
+        ] : []}
       />
 
       {/* 2. Transcript Architecture */}
@@ -126,6 +128,7 @@ export default function StatsRow({ gene }: { gene: GeneTargetObject }) {
           { label: "Self-Dimerization Risk", value: gene.selfDimerRisk ?? DASH },
           { label: "Poly-G Tracts", value: gene.polygTracts ?? DASH },
           { label: "Transcript Specificity", value: gene.transcriptSpecificity ?? DASH },
+          { label: "Codon Usage Bias", value: gene.codonUsageBias ?? DASH },
         ]}
         sources={links.ncbi ? [{ label: "Source: NCBI dbSNP", url: links.ncbi }] : []}
       />
@@ -180,6 +183,7 @@ export default function StatsRow({ gene }: { gene: GeneTargetObject }) {
           { label: "Total interactors", value: gene.totalInteractors ?? DASH },
           { label: "Experimental", value: gene.experimentalCount ?? DASH },
           { label: "Database-curated", value: gene.databaseCount ?? DASH },
+          { label: "Network Density", value: gene.interactionNetworkDensity ?? DASH },
           ...(gene.topInteractors.length > 0
             ? gene.topInteractors.slice(0, 2).map((p) => ({
                 label: p.name,

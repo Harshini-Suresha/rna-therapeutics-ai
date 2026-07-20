@@ -57,7 +57,7 @@ async def generate_aso_candidates(payload: CandidateRequest):
         chemistry=payload.chemistry,
         modifications=payload.modifications,
         mrna_sequence=target["mrnaSequence"],
-        exon_count=len(target.get("exons", [])),
+        exons=target.get("exons", []),
     )
 
     return {

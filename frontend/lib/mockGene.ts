@@ -56,6 +56,20 @@ export const MOCK_GENES: Record<string, GeneTargetObject> = {
     defaultCellType: "Myocyte",
     cellExpressionLevel: "High",
     cellTpm: 52.3,
+    cellTypeAll: { Myocyte: 52.3, "Satellite Cell": 12.1, Fibroblast: 3.2 },
+
+    expressionStabilityCV: 0.68,
+    vitalOrganTpm: 31.2,
+    vitalOrganTissues: ["Heart Left Ventricle"],
+    dominantIsoformFraction: 0.87,
+    dominantIsoformId: "ENST00000357033.9",
+    diseaseFoldChange: 2.45,
+    singleCellPrevalence: 0.72,
+    circadianAmplitude: "Low Fluctuation (Acyclic)",
+    intronRetentionRatio: 0.34,
+    developmentalExpression: "Ubiquitous (Age-Stable)",
+    alternativePolyadenylation: "Multiple 3' UTR Isoforms (44 transcripts)",
+    nuclearRetentionIndex: 0.32,
 
     proteinId: "P11532",
     proteinName: "Dystrophin",
@@ -67,6 +81,14 @@ export const MOCK_GENES: Record<string, GeneTargetObject> = {
     ubiquitinationTarget: "4x Ubiquitinyl lysine",
     quaternaryStructure: "Monomer",
     stabilityScore: "8.2/10, 4 disulfide bonds, 3 known variants",
+    subcellularLocation: "Cytoplasm; Cell membrane; Sarcolemma",
+    criticalFunctionalDomains: "Actin-binding; Zinc finger; WW domain",
+    disorderedContent: "89 residues (23%)",
+    proteosomalTurnover: "Chain (1-3685)",
+    alphafoldPlddt: "75.1 (High Confidence)",
+    gravyIndex: "-0.542 (Slightly Hydrophilic)",
+    proteinAbundance: null,
+    tractability: "Undruggable (Ideal ASO Target)",
 
     interproId: "IPR001589",
     pfamId: "PF00307",
@@ -162,6 +184,7 @@ export const MOCK_GENES: Record<string, GeneTargetObject> = {
     selfDimerRisk: "12/kb (Moderate)",
     polygTracts: "1 (Moderate)",
     transcriptSpecificity: "40 isoforms (Low)",
+    codonUsageBias: "GC3=49.3% (Balanced)",
 
     // RNA half-life and gene dependency
     rnaHalflife: "5.2 h",
@@ -205,6 +228,7 @@ export const MOCK_GENES: Record<string, GeneTargetObject> = {
     mediumConfidenceCount: 423,
     experimentalCount: 89,
     databaseCount: 134,
+    interactionNetworkDensity: "0.15 (Moderate)",
 
     pubmedArticleCount: 4823,
     reviewCount: 312,
