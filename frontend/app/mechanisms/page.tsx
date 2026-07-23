@@ -18,6 +18,7 @@ import {
   fetchMechanismOptions,
   rankGeneSilencingMechanisms,
   rankRnaProcessingMechanisms,
+  getGoalLabel,
 } from "@/lib/mechanismApi";
 
 const CONFIRMED_TARGET_KEY = "aso:confirmedTarget";
@@ -61,7 +62,7 @@ export default function MechanismSelectionPage() {
     }
 
     const savedGoal = sessionStorage.getItem(SELECTED_GOAL_KEY) as TherapeuticGoalId | null;
-    if (savedGoal && (savedGoal === "TG01" || savedGoal === "TG04")) {
+    if (savedGoal && THERAPEUTIC_GOALS.some((g) => g.id === savedGoal)) {
       setSelectedGoal(savedGoal);
     }
 
@@ -198,7 +199,7 @@ export default function MechanismSelectionPage() {
           {/* Step 2: Therapeutic Goal Selection */}
           <Card>
             <SectionHeader step="2" title="Select Therapeutic Goal" />
-            <div className="grid grid-cols-1 gap-3 px-6 pb-5 md:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 px-6 pb-5 sm:grid-cols-2 lg:grid-cols-3">
               {THERAPEUTIC_GOALS.map((goal) => (
                 <button
                   key={goal.id}
@@ -357,6 +358,19 @@ export default function MechanismSelectionPage() {
                       placeholder="e.g. c.1521_1523delCTT / p.Phe508del"
                       className="w-full rounded-lg border border-slate-300 bg-white py-2.5 px-3 text-[13.5px] text-slate-700 placeholder:text-slate-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
                     />
+                  </div>
+                </div>
+              )}
+
+              {selectedGoal !== "TG01" && selectedGoal !== "TG04" && (
+                <div className="px-6 pb-4">
+                  <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
+                    <p className="text-[13px] font-medium text-slate-600">
+                      Mechanism selection for {getGoalLabel(selectedGoal)} is coming soon.
+                    </p>
+                    <p className="mt-1 text-[12px] text-slate-400">
+                      The backend ranking engine for this therapeutic goal is under development.
+                    </p>
                   </div>
                 </div>
               )}

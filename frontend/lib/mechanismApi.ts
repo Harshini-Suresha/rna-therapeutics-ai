@@ -65,7 +65,14 @@ export async function rankRnaProcessingMechanisms(params: {
 export function getGoalLabel(goalId: TherapeuticGoalId): string {
   const labels: Record<TherapeuticGoalId, string> = {
     TG01: "Gene Silencing",
+    TG02: "Gene Activation / Upregulation",
+    TG03: "RNA Editing / Correction",
     TG04: "RNA Processing Modulation",
+    TG05: "RNA Neutralization",
+    TG06: "Translational Regulation",
+    TG07: "Isoform Engineering",
+    TG08: "Protein Replacement",
+    TG09: "Protein Function Modulation",
   };
   return labels[goalId] ?? goalId;
 }

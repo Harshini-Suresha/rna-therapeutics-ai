@@ -55,7 +55,16 @@ export interface MechanismRankingResponse {
   results: RankedMechanism[];
 }
 
-export type TherapeuticGoalId = "TG01" | "TG04";
+export type TherapeuticGoalId =
+  | "TG01"
+  | "TG02"
+  | "TG03"
+  | "TG04"
+  | "TG05"
+  | "TG06"
+  | "TG07"
+  | "TG08"
+  | "TG09";
 
 export interface TherapeuticGoal {
   id: TherapeuticGoalId;
@@ -70,8 +79,43 @@ export const THERAPEUTIC_GOALS: TherapeuticGoal[] = [
     description: "Reduce expression of a pathogenic gene or transcript through transcriptional or post-transcriptional mechanisms.",
   },
   {
+    id: "TG02",
+    name: "Gene Activation / Upregulation",
+    description: "Increase endogenous gene expression or restore production of a beneficial protein.",
+  },
+  {
+    id: "TG03",
+    name: "RNA Editing / Correction",
+    description: "Repair pathogenic RNA sequences or correct disease-causing RNA alterations without modifying genomic DNA.",
+  },
+  {
     id: "TG04",
     name: "RNA Processing Modulation",
     description: "Modify RNA maturation, including splicing, polyadenylation, transcript processing, and RNA stability.",
+  },
+  {
+    id: "TG05",
+    name: "RNA Neutralization",
+    description: "Neutralize toxic RNA molecules or block pathogenic RNA-protein interactions without necessarily degrading the RNA.",
+  },
+  {
+    id: "TG06",
+    name: "Translational Regulation",
+    description: "Increase or decrease protein synthesis by regulating mRNA translation without altering RNA abundance.",
+  },
+  {
+    id: "TG07",
+    name: "Isoform Engineering",
+    description: "Generate therapeutically beneficial transcript or protein isoforms by modifying RNA processing or transcript architecture.",
+  },
+  {
+    id: "TG08",
+    name: "Protein Replacement",
+    description: "Restore protein function by delivering therapeutic RNA molecules that encode the missing or defective protein.",
+  },
+  {
+    id: "TG09",
+    name: "Protein Function Modulation",
+    description: "Modulate protein activity directly using RNA molecules that bind and regulate protein function rather than gene expression.",
   },
 ];

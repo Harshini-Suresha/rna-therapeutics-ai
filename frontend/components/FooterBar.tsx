@@ -37,20 +37,21 @@ export default function FooterBar({
           </button>
         </div>
       </div>
-      <div className="mt-3 flex items-center gap-2">
+      <div className="mt-3 flex flex-wrap items-center gap-2">
         <span className="text-[12px] font-medium text-slate-500">Therapeutic goal:</span>
-        <div className="flex gap-1.5">
+        <div className="flex flex-wrap gap-1.5">
           {THERAPEUTIC_GOALS.map((goal) => (
             <button
               key={goal.id}
               onClick={() => onSelectGoal(goal.id)}
+              title={goal.description}
               className={`rounded-md px-2.5 py-1 text-[11.5px] font-medium transition-colors ${
                 selectedGoal === goal.id
                   ? "bg-brand text-white"
                   : "border border-slate-200 text-slate-600 hover:bg-slate-50"
               }`}
             >
-              {goal.id}
+              {goal.name}
             </button>
           ))}
         </div>
