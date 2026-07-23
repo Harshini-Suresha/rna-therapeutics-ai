@@ -11,20 +11,16 @@ import InfoGrid from "@/components/InfoGrid";
 import StatsRow from "@/components/StatsRow";
 import FooterBar from "@/components/FooterBar";
 import { GeneTargetObject } from "@/types/gene";
-import { TherapeuticGoalId } from "@/types/mechanism";
 import { fetchGene } from "@/lib/api";
 import { getOrganism } from "@/lib/organisms";
 import { findViralGene } from "@/lib/virusGenes";
 import { formatGeneSymbol } from "../shared/geneFormat";
-
-const SELECTED_GOAL_KEY = "aso:therapeuticGoal";
 
 export default function NewProjectPage() {
   const router = useRouter();
   const [organism, setOrganism] = useState("human");
   const [diseaseName, setDiseaseName] = useState("");
   const [geneSymbol, setGeneSymbol] = useState("");
-  const [selectedGoal, setSelectedGoal] = useState<TherapeuticGoalId | null>(null);
 
   const [gene, setGene] = useState<GeneTargetObject | null>(null);
   const [loading, setLoading] = useState(false);
@@ -249,9 +245,8 @@ export default function NewProjectPage() {
   }
 
   function handleConfirm() {
-    if (!gene || !selectedGoal) return;
+    if (!gene) return;
     sessionStorage.setItem("aso:confirmedTarget", JSON.stringify(gene));
-    sessionStorage.setItem(SELECTED_GOAL_KEY, selectedGoal);
     router.push("/mechanisms");
   }
 
@@ -504,8 +499,6 @@ export default function NewProjectPage() {
           <FooterBar
             onClear={handleClearAll}
             onConfirm={handleConfirm}
-            selectedGoal={selectedGoal}
-            onSelectGoal={setSelectedGoal}
           />
         )}
       </div>
