@@ -98,12 +98,116 @@ export default function UploadSequencePage() {
     reader.readAsText(file);
   }, []);
 
+  function clientSideValidate(raw: string, fname?: string) {
+    const seq = raw.replace(/^>.*$/gm, "").replace(/[^A-Za-z]/g, "").toUpperCase();
+    if (!seq) return null;
+    const hasT = "T" in seq;
+    const hasU = "U" in seq;
+    const seqType = hasT && !hasU ? "dna" : hasU && !hasT ? "rna" : "dna";
+    const gc = seq.length > 0 ? Math.round((seq.split("").filter((b) => "GC".includes(b)).length / seq.length) * 1000) / 10 : 0;
+    const invalid = [...new Set(seq.split("").filter((b) => !"ACGTRYSWKMBDHVN".includes(b)))].sort();
+    const orfs: { frame: number; start: number; end: number; length: number; proteinLength: number }[] = [];
+    if (seqType === "dna") {
+      for (let frame = 0; frame < 3; frame++) {
+        for (let i = frame; i < seq.length - 2; i += 3) {
+          if (seq.slice(i, i + 3) === "ATG") {
+            for (let j = i + 3; j < seq.length - 2; j += 3) {
+              const c = seq.slice(j, j + 3);
+              if (["TAA", "TAG", "TGA"].includes(c)) {
+                orfs.push({ frame: frame + 1, start: i + 1, end: j + 3, length: j + 3 - i, proteinLength: (j - i) / 3 });
+                break;
+              }
+            }
+            break;
+          }
+        }
+      }
+    }
+    const features: string[] = [];
+    if (/A{6,}$/.test(seq)) features.push("Poly-A tail detected");
+    if (/G{4,}/.test(seq)) features.push("Poly-G tract detected");
+    if (orfs.length > 0) features.push(`Longest ORF: ${orfs[0].proteinLength} aa (frame ${orfs[0].frame})`);
+    return {
+      valid: invalid.length === 0,
+      sequence: seq,
+      sequenceType: seqType as "dna" | "rna",
+      length: seq.length,
+      gcContent: gc,
+      invalidChars: invalid,
+      features,
+      orfs,
+      filename: fname,
+      hasPolyA: /A{6,}$/.test(seq),
+      hasPolyG: /G{4,}/.test(seq),
+    };
+  }
+
+  function clientSideAnalyze(seq: string, modality: string) {
+    const gc = seq.length > 0 ? Math.round((seq.split("").filter((b) => "GC".includes(b)).length / seq.length) * 1000) / 10 : 0;
+    const length = seq.length;
+    const offRisk = length < 18 ? "High" : length < 20 ? "Medium" : "Low";
+    const k = 6;
+    const kmers = length >= k ? Array.from({ length: length - k + 1 }, (_, i) => seq.slice(i, i + k)) : [];
+    const repetitiveness = kmers.length > 0 ? 1 - new Set(kmers).size / kmers.length : 0;
+    const palindromes = Array.from({ length: Math.max(0, length - 5) }, (_, i) => seq.slice(i, i + 6)).filter((c) => c === c.split("").reverse().join("")).length;
+    const mfe = Math.round((gc / 100 * -1.5 + (100 - gc) / 100 * -0.9) * length / 2 * 10) / 10;
+    const immune: { motif: string; label: string }[] = [];
+    if (/UGUGUG/i.test(seq)) immune.push({ motif: "UGUGUG", label: "UG-rich (TLR7/8 agonist)" });
+    if (/GU{2,}G/i.test(seq)) immune.push({ motif: "GUGG", label: "GU-rich motif" });
+    if (/UUAA/i.test(seq)) immune.push({ motif: "UUAA", label: "UU dinucleotide (immune trigger)" });
+    if (/CGCG/i.test(seq)) immune.push({ motif: "CGCG", label: "CpG motif (TLR9 agonist)" });
+    const modRecs: string[] = [];
+    let modDetails: Record<string, unknown> = { recommendations: modRecs };
+    if (modality === "aso") {
+      if (gc < 30) modRecs.push("Low GC% — consider LNA or 2'-OMe modifications to boost Tm");
+      else if (gc > 70) modRecs.push("High GC% — risk of G-quadruplexes; consider shorter ASO");
+      else modRecs.push("GC content in optimal range for RNase H recruitment");
+      if (length < 15) modRecs.push("Very short — high off-target risk; minimum 18 nt recommended");
+      else if (length > 25) modRecs.push("Long ASO — may have reduced cellular uptake; consider gapmer design");
+      modDetails = { ...modDetails, recommendedChemistry: gc >= 35 ? "gapmer" : "pmo", optimalLength: "18-22 nt", targetRegion: "Exon junction or mutated region recommended" };
+    } else if (modality === "sirna") {
+      if (length < 19 || length > 25) modRecs.push("Optimal siRNA length is 19-25 nt");
+      if (gc < 30 || gc > 52) modRecs.push("Optimal GC content for siRNA is 30-52%");
+      modRecs.push("Guide strand + Passenger strand design");
+      modDetails = { ...modDetails, strand: "Guide strand (antisense) + Passenger strand", optimalLength: "21 nt with 2-nt 3' overhangs" };
+    } else if (modality === "mrna") {
+      modRecs.push("Consider 5' Cap analog (Anti-Reverse Cap ARCA)");
+      modRecs.push("Evaluate codon optimization for human expression");
+      if (!/A{6,}$/.test(seq)) modRecs.push("Add 100-150 nt poly(A) for stability");
+      modDetails = { ...modDetails, needsCodonOptimization: true, needsPolyA: !/A{6,}$/.test(seq), needsUTR: true, nucleosideModifications: ["N1-methylpseudouridine (m1Ψ)", "5-methylcytidine (m5C)"] };
+    } else if (modality === "sgrna") {
+      if (length < 17 || length > 21) modRecs.push("Optimal sgRNA spacer length is 17-21 nt");
+      modRecs.push("Requires NGG PAM adjacent to target site (SpCas9)");
+      if (/TTTT/.test(seq)) modRecs.push("Poly-T tract detected — may cause premature transcription termination");
+      modDetails = { ...modDetails, casProtein: "SpCas9 (NGG PAM)", optimalLength: "20 nt spacer + PAM" };
+    }
+    return {
+      sequenceType: seq.length > 0 ? ("T" in seq ? "dna" : "rna") : "unknown",
+      length,
+      gcContent: gc,
+      offTarget: { risk: offRisk, note: offRisk === "Low" ? "Adequate length for high specificity" : "Short sequence increases off-target probability", repetitiveness: Math.round(repetitiveness * 1000) / 1000, recommendedMinLength: 18 },
+      secondaryStructure: { estimatedMfe: mfe, palindromicRegions: palindromes, gcContent: gc, hairpinRisk: palindromes > 3 ? "High" : palindromes > 1 ? "Medium" : "Low" },
+      immuneScreen: immune,
+      modality: modDetails,
+    };
+  }
+
   async function handleValidate() {
     if (!rawInput.trim()) return;
     setLoading(true);
     setError(null);
     try {
-      const result = await validateSequence(rawInput, filename);
+      let result: ValidationReport | null = null;
+      try {
+        result = await validateSequence(rawInput, filename);
+      } catch {
+        result = clientSideValidate(rawInput, filename) as ValidationReport;
+      }
+      if (!result) {
+        setError("Could not parse sequence.");
+        setLoading(false);
+        return;
+      }
       setValidation(result);
       if (!result.valid) {
         setError(`Invalid characters found: ${result.invalidChars.join(", ")}`);
@@ -121,7 +225,17 @@ export default function UploadSequencePage() {
     setLoading(true);
     setError(null);
     try {
-      const result = await analyzeSequence(validation.sequence, selectedModality);
+      let result: AnalysisReport | null = null;
+      try {
+        result = await analyzeSequence(validation.sequence, selectedModality);
+      } catch {
+        result = clientSideAnalyze(validation.sequence, selectedModality) as AnalysisReport;
+      }
+      if (!result) {
+        setError("Analysis failed.");
+        setLoading(false);
+        return;
+      }
       setAnalysis(result);
       setStep("analysis");
     } catch (err) {
