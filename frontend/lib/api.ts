@@ -1,8 +1,7 @@
 import { GeneTargetObject } from "@/types/gene";
 import { lookupMockGene } from "@/lib/mockGene";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
-
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://rna-therapeutics-ai.onrender.com";
 export async function fetchGene(
   organism: string, 
   diseaseName: string,
