@@ -11,7 +11,7 @@ import InfoGrid from "@/components/InfoGrid";
 import StatsRow from "@/components/StatsRow";
 import FooterBar from "@/components/FooterBar";
 import { GeneTargetObject } from "@/types/gene";
-import { TherapeuticGoalId, THERAPEUTIC_GOALS } from "@/types/mechanism";
+import { TherapeuticGoalId } from "@/types/mechanism";
 import { fetchGene } from "@/lib/api";
 import { getOrganism } from "@/lib/organisms";
 import { findViralGene } from "@/lib/virusGenes";
@@ -488,38 +488,6 @@ export default function NewProjectPage() {
                   therapeutic mechanism selection, perform mechanism-specific design,
                   optimize therapeutic candidates, and generate comprehensive
                   downloadable reports.
-                </div>
-              </div>
-
-              {/* Therapeutic Goals */}
-              <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-card">
-                <div className="mb-5 flex items-center gap-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-50 text-rose-600">
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h2 className="text-[15px] font-semibold text-slate-800">Therapeutic Goals</h2>
-                    <p className="text-[12px] text-slate-400 mt-0.5">9 supported mechanisms of action across RNA therapeutics</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {THERAPEUTIC_GOALS.map((goal) => (
-                    <div
-                      key={goal.id}
-                      className="rounded-xl border border-slate-100 bg-slate-50/60 p-4 transition-colors hover:border-brand/15 hover:bg-brand/[0.02]"
-                    >
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="inline-flex h-6 min-w-[24px] items-center justify-center rounded-md bg-brand/10 px-1.5 text-[10px] font-bold text-brand">
-                          {goal.id}
-                        </span>
-                        <h3 className="text-[13px] font-semibold text-slate-700">{goal.name}</h3>
-                      </div>
-                      <p className="text-[11.5px] text-slate-500 leading-relaxed">{goal.description}</p>
-                    </div>
-                  ))}
                 </div>
               </div>
             </>
