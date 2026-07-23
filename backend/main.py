@@ -39,6 +39,7 @@ except ImportError:  # ``uvicorn main:app`` while working in backend/
     from services.dependency_service import get_gene_dependency
     from api.mechanisms import router as mechanisms_router
     from api.gene_silencing import router as gene_silencing_router
+    from api.upload import router as upload_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -66,6 +67,7 @@ app.add_middleware(
 
 app.include_router(mechanisms_router)
 app.include_router(gene_silencing_router)
+app.include_router(upload_router)
 
 SPECIES_TAXON_IDS = {
     "homo_sapiens": 9606,
