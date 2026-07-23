@@ -108,6 +108,7 @@ export default function UploadSequencePage() {
       if (!result.valid) {
         setError(`Invalid characters found: ${result.invalidChars.join(", ")}`);
       }
+      setStep("validate");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Validation failed.");
     } finally {
