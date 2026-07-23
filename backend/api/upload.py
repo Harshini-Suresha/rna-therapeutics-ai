@@ -41,5 +41,4 @@ async def analyze(payload: AnalyzeRequest):
         )
 
     result = analyze_sequence(cleaned, payload.modality.lower())
-    result["modality"] = payload.modality
     return result

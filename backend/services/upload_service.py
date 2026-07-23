@@ -249,7 +249,7 @@ def _modality_analysis(seq: str, seq_type: str, modality: str) -> Dict[str, Any]
 
     if modality == "aso":
         return _aso_analysis(seq, seq_type, gc, length)
-    elif modality == " sirna":
+    elif modality == "sirna":
         return _sirna_analysis(seq, gc, length)
     elif modality == "mrna":
         return _mrna_analysis(seq, seq_type, gc, length)
