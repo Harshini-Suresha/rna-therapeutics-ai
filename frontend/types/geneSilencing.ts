@@ -51,3 +51,13 @@ export interface GenerateResponse {
   cdsLength: number | null;
   candidates: AssoCandidate[];
 }
+
+export interface ClinVarVariant {
+  variantId: string;
+  clinicalSignificance: string;
+  hgvsp: string;
+  hgvsc: string;
+  goldStars: number;
+  rsid: string | null;
+  alleleFrequency: number | null;
+}

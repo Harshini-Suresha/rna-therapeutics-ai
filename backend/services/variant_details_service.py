@@ -164,3 +164,82 @@ def get_variant_details(
     hgvs = _clinvar_top_hgvs(gene_symbol)
     rsid = _gnomad_rsid_for_gene(ensembl_gene_id) if ensembl_gene_id else None
     return {"topHgvsName": hgvs, "topRsId": rsid}
+
+
+def get_clinvar_variants(ensembl_gene_id: str) -> List[Dict[str, Any]]:
+    """Return pathogenic ClinVar variants for a gene (via gnomAD GraphQL).
+
+    Each variant dict contains:
+      - variant_id: gnomAD variant ID
+      - clinical_significance: e.g. "Pathogenic"
+      - hgvsp: protein HGVS (e.g. p.Arg2905Ter)
+      - hgvsc: coding HGVS (e.g. c.8713C>T)
+      - gold_stars: ClinVar review stars
+      - rsid: rsID if available in gnomAD
+      - allele_frequency: exome allele frequency if available
+    """
+    try:
+        resp = requests.post(
+            GNOMAD_API,
+            json={
+                "query": _GNOMAD_CLINVAR_Q,
+                "variables": {"geneId": ensembl_gene_id},
+            },
+            timeout=_TIMEOUT,
+        )
+        resp.raise_for_status()
+        clinvar_variants = (
+            resp.json()
+            .get("data", {})
+            .get("gene", {})
+            .get("clinvar_variants", [])
+        )
+        if not clinvar_variants:
+            return []
+
+        # Filter to pathogenic / likely-pathogenic
+        pathogenic = [
+            v for v in clinvar_variants
+            if v.get("clinical_significance") in _PATHOGENIC_TERMS
+        ]
+
+        # Enrich with rsID and allele frequency (max 20 to avoid hammering the API)
+        enriched: List[Dict[str, Any]] = []
+        for v in pathogenic[:20]:
+            entry: Dict[str, Any] = {
+                "variantId": v.get("variant_id", ""),
+                "clinicalSignificance": v.get("clinical_significance", ""),
+                "hgvsp": v.get("hgvsp", ""),
+                "hgvsc": v.get("hgvsc", ""),
+                "goldStars": v.get("gold_stars", 0),
+                "rsid": None,
+                "alleleFrequency": None,
+            }
+            if v.get("in_gnomad"):
+                try:
+                    vresp = requests.post(
+                        GNOMAD_API,
+                        json={
+                            "query": _GNOMAD_VARIANT_Q,
+                            "variables": {"variantId": v["variant_id"]},
+                        },
+                        timeout=10,
+                    )
+                    vdata = vresp.json().get("data", {}).get("variant")
+                    if vdata:
+                        entry["rsid"] = vdata.get("rsid")
+                        exome = vdata.get("exome") or {}
+                        af = exome.get("af")
+                        if af is not None:
+                            entry["alleleFrequency"] = float(af)
+                except Exception:
+                    pass
+            enriched.append(entry)
+
+        # Sort by gold stars (best first), then by whether they have an HGVS
+        enriched.sort(key=lambda x: (-x["goldStars"], x["hgvsp"] == ""))
+
+        return enriched
+    except Exception as exc:
+        logger.warning("ClinVar variants lookup failed for %s: %s", ensembl_gene_id, exc)
+        return []

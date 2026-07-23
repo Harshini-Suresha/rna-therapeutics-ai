@@ -13,6 +13,7 @@ from services.gene_silencing_service import (
     MODIFICATION_OPTIONS,
     LENGTH_RANGE,
 )
+from services.variant_details_service import get_clinvar_variants
 
 router = APIRouter()
 
@@ -70,3 +71,10 @@ async def generate_aso_candidates(payload: CandidateRequest):
         "cdsLength": target.get("cdsLength"),
         "candidates": candidates,
     }
+
+
+@router.get("/api/gene-silencing/variants/{ensembl_gene_id}")
+async def clinvar_variants(ensembl_gene_id: str):
+    """Fetch ClinVar pathogenic variants for allele-specific silencing."""
+    variants = get_clinvar_variants(ensembl_gene_id)
+    return {"geneId": ensembl_gene_id, "variants": variants}

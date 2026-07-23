@@ -2,6 +2,7 @@ import {
   TargetAnalysis,
   DesignOptions,
   GenerateResponse,
+  ClinVarVariant,
 } from "@/types/geneSilencing";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
@@ -51,4 +52,16 @@ export async function generateCandidates(params: {
     throw new Error(body.detail || "Could not generate candidates.");
   }
   return res.json();
+}
+
+export async function fetchClinVarVariants(
+  ensemblGeneId: string
+): Promise<ClinVarVariant[]> {
+  const res = await fetch(
+    `${API_BASE}/api/gene-silencing/variants/${ensemblGeneId}`,
+    { cache: "no-store" }
+  );
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.variants ?? [];
 }

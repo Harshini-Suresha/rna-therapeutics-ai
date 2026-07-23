@@ -8,13 +8,15 @@ import Topbar from "@/components/Topbar";
 import TargetAnalysisCard from "@/components/TargetAnalysisCard";
 import AssoDesignForm from "@/components/AssoDesignForm";
 import AssoCandidateCard from "@/components/AssoCandidateCard";
+import AlleleSelector from "@/components/AlleleSelector";
 import { Card, SectionHeader } from "@/components/ui";
 import { GeneTargetObject } from "@/types/gene";
-import { TargetAnalysis, DesignOptions, GenerateResponse } from "@/types/geneSilencing";
+import { TargetAnalysis, DesignOptions, GenerateResponse, ClinVarVariant } from "@/types/geneSilencing";
 import {
   fetchTargetAnalysis,
   fetchDesignOptions,
   generateCandidates,
+  fetchClinVarVariants,
 } from "@/lib/geneSilencingApi";
 
 const CONFIRMED_TARGET_KEY = "aso:confirmedTarget";
@@ -32,6 +34,9 @@ export default function GeneSilencingPage() {
   const [targetError, setTargetError] = useState<string | null>(null);
 
   const [options, setOptions] = useState<DesignOptions | null>(null);
+
+  const [variants, setVariants] = useState<ClinVarVariant[]>([]);
+  const [selectedVariant, setSelectedVariant] = useState<ClinVarVariant | null>(null);
 
   const [selectedExons, setSelectedExons] = useState<number[]>([]);
   const [isTotalKnockdown, setIsTotalKnockdown] = useState(false);
@@ -77,6 +82,12 @@ export default function GeneSilencingPage() {
   useEffect(() => {
     fetchDesignOptions().then(setOptions).catch(() => {});
   }, []);
+
+  // Fetch ClinVar variants for allele-specific silencing
+  useEffect(() => {
+    if (!gene?.geneId) return;
+    fetchClinVarVariants(gene.geneId).then(setVariants).catch(() => {});
+  }, [gene?.geneId]);
 
   function handleToggleMod(id: string) {
     setSelectedMods((prev) =>
@@ -209,6 +220,15 @@ export default function GeneSilencingPage() {
               onToggleTotalKnockdown={handleToggleTotalKnockdown}
             />
           ) : null}
+
+          {/* Allele-specific variant selector */}
+          {!isTotalKnockdown && !targetLoading && target && (
+            <AlleleSelector
+              variants={variants}
+              selectedVariant={selectedVariant}
+              onSelectVariant={setSelectedVariant}
+            />
+          )}
 
           {/* Steps 2 + 3: Design Form */}
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-5">
