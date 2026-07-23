@@ -15,7 +15,7 @@ import { TherapeuticGoalId, THERAPEUTIC_GOALS } from "@/types/mechanism";
 import { fetchGene } from "@/lib/api";
 import { getOrganism } from "@/lib/organisms";
 import { findViralGene } from "@/lib/virusGenes";
-import { formatGeneSymbol } from "../../shared/geneFormat";
+import { formatGeneSymbol } from "../shared/geneFormat";
 
 const SELECTED_GOAL_KEY = "aso:therapeuticGoal";
 
