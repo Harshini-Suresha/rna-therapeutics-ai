@@ -11,7 +11,7 @@ import {
   ArrowLeft,
   Dna,
   Scissors,
-  Rna,
+  BookOpen,
   Syringe,
   Zap,
   Shield,
@@ -48,7 +48,7 @@ const MODALITIES = [
   {
     id: "mrna",
     name: "mRNA Design / Optimization",
-    icon: Rna,
+    icon: BookOpen,
     color: "blue",
     description: "Codon optimization, UTR selection, and nucleoside modification.",
   },
