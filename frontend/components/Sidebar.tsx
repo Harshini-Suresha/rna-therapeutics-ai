@@ -84,9 +84,9 @@ export default function Sidebar() {
       </div>
 
       <div className="px-5 py-4 text-[11px] text-slate-500 border-t border-white/10">
-        © 2024 RNA Therapeutics
+        © 2026 RNA Therapeutics
         <br />
-        AI Platform
+        AI Platform · KoshKey
       </div>
     </aside>
   );
