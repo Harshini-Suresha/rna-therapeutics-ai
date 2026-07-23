@@ -1,6 +1,6 @@
 "use client";
 
-import { Dna, ExternalLink, CheckSquare, Square } from "lucide-react";
+import { Dna, ExternalLink, CheckSquare, Square, Layers, List } from "lucide-react";
 import { TargetAnalysis } from "@/types/geneSilencing";
 import { Card, SectionHeader } from "./ui";
 
@@ -9,15 +9,16 @@ export default function TargetAnalysisCard({
   selectedExons,
   onToggleExon,
   onSelectAll,
-  silencingScope,
+  isTotalKnockdown,
+  onToggleTotalKnockdown,
 }: {
   target: TargetAnalysis;
   selectedExons: number[];
   onToggleExon: (idx: number) => void;
   onSelectAll: (indices: number[]) => void;
-  silencingScope: string | null;
+  isTotalKnockdown: boolean;
+  onToggleTotalKnockdown: () => void;
 }) {
-  const isTotalKnockdown = silencingScope === "total_knockdown";
   const allIndices = target.exons.map((e) => e.index ?? 0);
   const allSelected = selectedExons.length === allIndices.length && allIndices.length > 0;
 
@@ -50,11 +51,56 @@ export default function TargetAnalysisCard({
           </a>
         </div>
 
+        {/* Targeting mode toggle */}
+        <div>
+          <p className="mb-2 text-[12.5px] font-medium text-slate-600">
+            Knockdown targeting mode:
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => { if (isTotalKnockdown) onToggleTotalKnockdown(); }}
+              className={`flex items-center gap-2.5 rounded-lg border p-3 text-left transition-colors ${
+                !isTotalKnockdown
+                  ? "border-brand bg-brand/5 ring-1 ring-brand"
+                  : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+              }`}
+            >
+              <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${
+                !isTotalKnockdown ? "bg-brand text-white" : "bg-slate-100 text-slate-400"
+              }`}>
+                <List className="h-3.5 w-3.5" />
+              </span>
+              <div>
+                <p className="text-[12.5px] font-semibold text-slate-700">Select Exons</p>
+                <p className="text-[11px] text-slate-400">Choose one or more exons to target</p>
+              </div>
+            </button>
+            <button
+              onClick={() => { if (!isTotalKnockdown) onToggleTotalKnockdown(); }}
+              className={`flex items-center gap-2.5 rounded-lg border p-3 text-left transition-colors ${
+                isTotalKnockdown
+                  ? "border-emerald-300 bg-emerald-50 ring-1 ring-emerald-400"
+                  : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+              }`}
+            >
+              <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${
+                isTotalKnockdown ? "bg-emerald-500 text-white" : "bg-slate-100 text-slate-400"
+              }`}>
+                <Layers className="h-3.5 w-3.5" />
+              </span>
+              <div>
+                <p className="text-[12.5px] font-semibold text-slate-700">Total Transcript Knockdown</p>
+                <p className="text-[11px] text-slate-400">Target all exons for full degradation</p>
+              </div>
+            </button>
+          </div>
+        </div>
+
         {/* Total knockdown banner */}
         {isTotalKnockdown && (
           <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
             <p className="text-[12.5px] font-medium text-emerald-700">
-              Total Transcript Knockdown
+              Total Transcript Knockdown Active
             </p>
             <p className="text-[11.5px] text-emerald-600 mt-0.5">
               All exons will be targeted for degradation. No exon selection needed — ASOs will be designed across the full transcript.

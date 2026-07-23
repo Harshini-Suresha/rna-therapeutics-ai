@@ -34,6 +34,7 @@ export default function GeneSilencingPage() {
   const [options, setOptions] = useState<DesignOptions | null>(null);
 
   const [selectedExons, setSelectedExons] = useState<number[]>([]);
+  const [isTotalKnockdown, setIsTotalKnockdown] = useState(false);
   const [asoLength, setAsoLength] = useState(18);
   const [chemistry, setChemistry] = useState("gapmer");
   const [selectedMods, setSelectedMods] = useState<string[]>(["phosphorothioate"]);
@@ -54,6 +55,9 @@ export default function GeneSilencingPage() {
         const parsed = JSON.parse(mechStored);
         setMechanism({ id: parsed.mechanism?.id ?? "", name: parsed.mechanism?.name ?? "" });
         setSilencingScope(parsed.silencingScope ?? null);
+        if (parsed.silencingScope === "total_knockdown") {
+          setIsTotalKnockdown(true);
+        }
       } catch { setMechanism(null); }
     }
   }, []);
@@ -90,6 +94,13 @@ export default function GeneSilencingPage() {
     setSelectedExons((prev) =>
       prev.length === allIndices.length ? [] : [...allIndices]
     );
+  }
+
+  function handleToggleTotalKnockdown() {
+    setIsTotalKnockdown((prev) => {
+      if (!prev) setSelectedExons([]);
+      return !prev;
+    });
   }
 
   async function handleGenerate() {
@@ -194,7 +205,8 @@ export default function GeneSilencingPage() {
               selectedExons={selectedExons}
               onToggleExon={handleToggleExon}
               onSelectAll={handleSelectAllExons}
-              silencingScope={silencingScope}
+              isTotalKnockdown={isTotalKnockdown}
+              onToggleTotalKnockdown={handleToggleTotalKnockdown}
             />
           ) : null}
 
@@ -214,7 +226,7 @@ export default function GeneSilencingPage() {
                     onToggleMod={handleToggleMod}
                     onGenerate={handleGenerate}
                     loading={genLoading}
-                    disabled={silencingScope !== "total_knockdown" && selectedExons.length === 0 || !target}
+                    disabled={!isTotalKnockdown && selectedExons.length === 0 || !target}
                   />
                 </div>
               </Card>
@@ -233,7 +245,7 @@ export default function GeneSilencingPage() {
                 <Card className="flex flex-col items-center justify-center px-6 py-12 text-center">
                   <Beaker className="h-8 w-8 text-slate-300" />
                   <p className="mt-3 text-[13px] font-medium text-slate-500">
-                    {silencingScope === "total_knockdown"
+                    {isTotalKnockdown
                       ? "Click Generate to create ASO candidates for total transcript knockdown"
                       : "Select exon(s) and click Generate to create ASO candidates"}
                   </p>
