@@ -600,7 +600,7 @@ export default function UploadSequencePage() {
                 </div>
                 <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-card">
                   <p className="text-[10px] uppercase tracking-wider text-slate-400">Modality</p>
-                  <p className="text-[15px] font-bold text-slate-800 mt-0.5 uppercase">{analysis.modality}</p>
+                  <p className="text-[15px] font-bold text-slate-800 mt-0.5 uppercase">{MODALITIES.find((m) => m.id === selectedModality)?.name ?? selectedModality}</p>
                 </div>
               </div>
 
@@ -721,7 +721,7 @@ export default function UploadSequencePage() {
                   <div className="flex items-center gap-2 px-6 pt-5 pb-3">
                     <BarChart3 className="h-4 w-4 text-slate-500" />
                     <h3 className="text-[14px] font-semibold text-slate-800">
-                      {MODALITIES.find((m) => m.id === analysis.modality)?.name ?? "Modality"} Recommendations
+                      {MODALITIES.find((m) => m.id === selectedModality)?.name ?? "Modality"} Recommendations
                     </h3>
                   </div>
                   <div className="px-6 pb-5 space-y-2">
