@@ -43,7 +43,7 @@ export interface AssoCandidate {
 
 export interface GenerateResponse {
   geneId: string;
-  targetExon: number | null;
+  targetExons: number[] | null;
   chemistry: string;
   modifications: string[];
   asoLength: number;

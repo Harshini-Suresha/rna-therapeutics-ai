@@ -1,18 +1,26 @@
 "use client";
 
-import { Dna, ExternalLink } from "lucide-react";
+import { Dna, ExternalLink, CheckSquare, Square } from "lucide-react";
 import { TargetAnalysis } from "@/types/geneSilencing";
 import { Card, SectionHeader } from "./ui";
 
 export default function TargetAnalysisCard({
   target,
-  selectedExon,
-  onSelectExon,
+  selectedExons,
+  onToggleExon,
+  onSelectAll,
+  silencingScope,
 }: {
   target: TargetAnalysis;
-  selectedExon: number | null;
-  onSelectExon: (exon: number) => void;
+  selectedExons: number[];
+  onToggleExon: (idx: number) => void;
+  onSelectAll: (indices: number[]) => void;
+  silencingScope: string | null;
 }) {
+  const isTotalKnockdown = silencingScope === "total_knockdown";
+  const allIndices = target.exons.map((e) => e.index ?? 0);
+  const allSelected = selectedExons.length === allIndices.length && allIndices.length > 0;
+
   return (
     <Card>
       <SectionHeader step="1" title="Target Analysis" />
@@ -42,37 +50,69 @@ export default function TargetAnalysisCard({
           </a>
         </div>
 
-        {/* Exon selector */}
-        <div>
-          <p className="mb-2 text-[12.5px] font-medium text-slate-600">
-            Select target exon for ASO design:
-          </p>
-          <div className="flex flex-wrap gap-1.5">
-            {target.exons.map((exon) => {
-              const idx = exon.index ?? 0;
-              const isSelected = selectedExon === idx;
-              return (
-                <button
-                  key={exon.id ?? idx}
-                  onClick={() => onSelectExon(idx)}
-                  className={`rounded-md px-3 py-1.5 text-[12px] font-medium transition-colors ${
-                    isSelected
-                      ? "bg-brand text-white"
-                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  }`}
-                >
-                  Exon {idx}
-                </button>
-              );
-            })}
-          </div>
-          {selectedExon !== null && (
-            <p className="mt-2 text-[11.5px] text-slate-400">
-              Targeting Exon {selectedExon} &middot;{" "}
-              {target.exons.find((e) => e.index === selectedExon)?.length ?? "—"} bp
+        {/* Total knockdown banner */}
+        {isTotalKnockdown && (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
+            <p className="text-[12.5px] font-medium text-emerald-700">
+              Total Transcript Knockdown
             </p>
-          )}
-        </div>
+            <p className="text-[11.5px] text-emerald-600 mt-0.5">
+              All exons will be targeted for degradation. No exon selection needed — ASOs will be designed across the full transcript.
+            </p>
+          </div>
+        )}
+
+        {/* Exon selector — only show when NOT total knockdown */}
+        {!isTotalKnockdown && (
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[12.5px] font-medium text-slate-600">
+                Select target exon(s) for ASO design:
+              </p>
+              <button
+                onClick={() => onSelectAll(allIndices)}
+                className="flex items-center gap-1.5 text-[11.5px] font-medium text-brand hover:text-brand-dark transition-colors"
+              >
+                {allSelected ? (
+                  <CheckSquare className="h-3.5 w-3.5" />
+                ) : (
+                  <Square className="h-3.5 w-3.5" />
+                )}
+                {allSelected ? "Deselect all" : "Select all exons"}
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {target.exons.map((exon) => {
+                const idx = exon.index ?? 0;
+                const isSelected = selectedExons.includes(idx);
+                return (
+                  <button
+                    key={exon.id ?? idx}
+                    onClick={() => onToggleExon(idx)}
+                    className={`rounded-md px-3 py-1.5 text-[12px] font-medium transition-colors ${
+                      isSelected
+                        ? "bg-brand text-white"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
+                  >
+                    Exon {idx}
+                  </button>
+                );
+              })}
+            </div>
+            {selectedExons.length > 0 && (
+              <p className="mt-2 text-[11.5px] text-slate-400">
+                Targeting {selectedExons.length} exon{selectedExons.length !== 1 ? "s" : ""}:{" "}
+                {selectedExons.sort((a, b) => a - b).join(", ")}
+              </p>
+            )}
+            {selectedExons.length === 0 && (
+              <p className="mt-2 text-[11.5px] text-slate-400">
+                Click exons to select them for knockdown, or use &quot;Select all exons&quot; for whole-transcript targeting.
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </Card>
   );

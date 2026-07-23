@@ -129,7 +129,7 @@ export default function MechanismSelectionPage() {
     if (mechanism) {
       sessionStorage.setItem(
         SELECTED_MECHANISM_KEY,
-        JSON.stringify({ geneSymbol: gene?.geneSymbol, mechanism })
+        JSON.stringify({ geneSymbol: gene?.geneSymbol, mechanism, silencingScope: selectedGoal === "TG01" ? silencingScope : null })
       );
     }
   }

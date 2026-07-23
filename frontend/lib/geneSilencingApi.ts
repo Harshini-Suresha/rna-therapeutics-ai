@@ -30,7 +30,7 @@ export async function fetchDesignOptions(): Promise<DesignOptions> {
 
 export async function generateCandidates(params: {
   ensemblGeneId: string;
-  targetExonIndex?: number | null;
+  targetExonIndices?: number[] | null;
   asoLength: number;
   chemistry: string;
   modifications: string[];
@@ -40,7 +40,7 @@ export async function generateCandidates(params: {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       ensembl_gene_id: params.ensemblGeneId,
-      target_exon_index: params.targetExonIndex ?? null,
+      target_exon_indices: params.targetExonIndices ?? null,
       aso_length: params.asoLength,
       chemistry: params.chemistry,
       modifications: params.modifications,

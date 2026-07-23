@@ -25,6 +25,7 @@ export default function GeneSilencingPage() {
 
   const [gene, setGene] = useState<GeneTargetObject | null>(null);
   const [mechanism, setMechanism] = useState<{ id: string; name: string } | null>(null);
+  const [silencingScope, setSilencingScope] = useState<string | null>(null);
 
   const [target, setTarget] = useState<TargetAnalysis | null>(null);
   const [targetLoading, setTargetLoading] = useState(true);
@@ -32,7 +33,7 @@ export default function GeneSilencingPage() {
 
   const [options, setOptions] = useState<DesignOptions | null>(null);
 
-  const [selectedExon, setSelectedExon] = useState<number | null>(null);
+  const [selectedExons, setSelectedExons] = useState<number[]>([]);
   const [asoLength, setAsoLength] = useState(18);
   const [chemistry, setChemistry] = useState("gapmer");
   const [selectedMods, setSelectedMods] = useState<string[]>(["phosphorothioate"]);
@@ -52,6 +53,7 @@ export default function GeneSilencingPage() {
       try {
         const parsed = JSON.parse(mechStored);
         setMechanism({ id: parsed.mechanism?.id ?? "", name: parsed.mechanism?.name ?? "" });
+        setSilencingScope(parsed.silencingScope ?? null);
       } catch { setMechanism(null); }
     }
   }, []);
@@ -78,15 +80,28 @@ export default function GeneSilencingPage() {
     );
   }
 
+  function handleToggleExon(idx: number) {
+    setSelectedExons((prev) =>
+      prev.includes(idx) ? prev.filter((e) => e !== idx) : [...prev, idx]
+    );
+  }
+
+  function handleSelectAllExons(allIndices: number[]) {
+    setSelectedExons((prev) =>
+      prev.length === allIndices.length ? [] : [...allIndices]
+    );
+  }
+
   async function handleGenerate() {
     if (!gene?.geneId) return;
     setGenLoading(true);
     setGenError(null);
     setResults(null);
     try {
+      const isTotalKnockdown = silencingScope === "total_knockdown";
       const res = await generateCandidates({
         ensemblGeneId: gene.geneId,
-        targetExonIndex: selectedExon,
+        targetExonIndices: isTotalKnockdown ? null : selectedExons.length > 0 ? selectedExons : null,
         asoLength,
         chemistry,
         modifications: selectedMods,
@@ -176,8 +191,10 @@ export default function GeneSilencingPage() {
           ) : target ? (
             <TargetAnalysisCard
               target={target}
-              selectedExon={selectedExon}
-              onSelectExon={setSelectedExon}
+              selectedExons={selectedExons}
+              onToggleExon={handleToggleExon}
+              onSelectAll={handleSelectAllExons}
+              silencingScope={silencingScope}
             />
           ) : null}
 
@@ -197,7 +214,7 @@ export default function GeneSilencingPage() {
                     onToggleMod={handleToggleMod}
                     onGenerate={handleGenerate}
                     loading={genLoading}
-                    disabled={!selectedExon || !target}
+                    disabled={silencingScope !== "total_knockdown" && selectedExons.length === 0 || !target}
                   />
                 </div>
               </Card>
@@ -216,7 +233,9 @@ export default function GeneSilencingPage() {
                 <Card className="flex flex-col items-center justify-center px-6 py-12 text-center">
                   <Beaker className="h-8 w-8 text-slate-300" />
                   <p className="mt-3 text-[13px] font-medium text-slate-500">
-                    Select an exon and click Generate to create ASO candidates
+                    {silencingScope === "total_knockdown"
+                      ? "Click Generate to create ASO candidates for total transcript knockdown"
+                      : "Select exon(s) and click Generate to create ASO candidates"}
                   </p>
                   <p className="mt-1 text-[12px] text-slate-400">
                     Candidates are ranked by composite quality score (GC%, Tm, self-dimer risk)
@@ -235,8 +254,11 @@ export default function GeneSilencingPage() {
               {results && results.candidates.length > 0 && (
                 <>
                   <p className="text-[12.5px] text-slate-500">
-                    {results.candidates.length} candidate{results.candidates.length !== 1 ? "s" : ""} for Exon{" "}
-                    {results.targetExon ?? "?"} &middot; {results.chemistry} &middot; {results.asoLength} nt
+                    {results.candidates.length} candidate{results.candidates.length !== 1 ? "s" : ""} for{" "}
+                    {results.targetExons && results.targetExons.length > 0
+                      ? `Exons ${results.targetExons.join(", ")}`
+                      : "all exons (total knockdown)"}{" "}
+                    &middot; {results.chemistry} &middot; {results.asoLength} nt
                   </p>
                   {results.candidates.map((c, i) => (
                     <AssoCandidateCard key={c.sequence} candidate={c} rank={i + 1} />
