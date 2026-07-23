@@ -64,47 +64,72 @@ def _has_poly_a_tail(seq: str, min_run: int = 6) -> bool:
     return bool(re.search(rf"A{{{min_run},}}$", seq.upper()))
 
 
-def _find_orfs(seq: str) -> List[Dict[str, Any]]:
-    """Find open reading frames in a DNA/RNA sequence."""
-    orfs = []
-    start_codons = {"ATG"} if "T" in seq else {"AUG"}
-    stop_codons = {"TAA", "TAG", "TGA"} if "T" in seq else {"UAA", "UAG", "UGA"}
+def _reverse_complement(seq: str, is_rna: bool) -> str:
+    comp = {"A": "U" if is_rna else "T", "T": "A", "U": "A", "G": "C", "C": "G"}
+    return "".join(comp.get(b, "N") for b in reversed(seq.upper()))
 
-    for frame in range(3):
-        i = frame
-        while i < len(seq) - 2:
-            codon = seq[i:i+3]
-            if codon in start_codons:
-                start = i
-                j = i + 3
-                while j < len(seq) - 2:
-                    c = seq[j:j+3]
-                    if c in stop_codons:
-                        orfs.append({
-                            "frame": frame + 1,
-                            "start": start + 1,
-                            "end": j + 3,
-                            "length": j + 3 - start,
-                            "proteinLength": (j - start) // 3,
-                        })
-                        break
-                    j += 3
-                i = j + 3 if j < len(seq) else len(seq)
-            else:
-                i += 3
+
+def _find_orfs(seq: str) -> List[Dict[str, Any]]:
+    """
+    Find open reading frames in a DNA/RNA sequence, scanning both strands
+    (6 frames total). Forward-only ORF finding would miss real coding
+    potential encoded on the reverse strand.
+    """
+    is_rna = "U" in seq and "T" not in seq
+    start_codons = {"AUG"} if is_rna else {"ATG"}
+    stop_codons = {"UAA", "UAG", "UGA"} if is_rna else {"TAA", "TAG", "TGA"}
+
+    def scan(strand_seq: str, strand_label: str) -> List[Dict[str, Any]]:
+        found = []
+        for frame in range(3):
+            i = frame
+            while i < len(strand_seq) - 2:
+                codon = strand_seq[i:i+3]
+                if codon in start_codons:
+                    start = i
+                    j = i + 3
+                    while j < len(strand_seq) - 2:
+                        c = strand_seq[j:j+3]
+                        if c in stop_codons:
+                            found.append({
+                                "strand": strand_label,
+                                "frame": frame + 1,
+                                "start": start + 1,
+                                "end": j + 3,
+                                "length": j + 3 - start,
+                                "proteinLength": (j - start) // 3,
+                            })
+                            break
+                        j += 3
+                    i = j + 3 if j < len(strand_seq) else len(strand_seq)
+                else:
+                    i += 3
+        return found
+
+    orfs = scan(seq, "+")
+    orfs += scan(_reverse_complement(seq, is_rna), "-")
     return orfs
 
 
-def _immunostimulatory_motifs(seq: str) -> List[Dict[str, str]]:
-    """Check for TLR7/8 immunostimulatory motifs."""
+def _immunostimulatory_motifs(seq: str, seq_type: str) -> List[Dict[str, str]]:
+    """
+    Flags sequence patterns loosely associated with innate-immune sensing
+    in the literature. This is pattern-matching against a short heuristic
+    list, NOT a validated immunogenicity assay — real TLR7/8 recognition
+    depends on broader GU/U-rich context than any single hexamer, and TLR9
+    specifically senses unmethylated CpG in a DNA context with defined
+    flanking bases, not any CG dinucleotide appearing in an RNA oligo.
+    """
     motifs = []
     checks = [
-        (r"UGUGUG", "UG-rich (TLR7/8 agonist)"),
-        (r"GU{2,}G", "GU-rich motif"),
-        (r"UUAA", "UU dinucleotide (immune trigger)"),
-        (r"CGCG", "CpG motif (TLR9 agonist)"),
-        (r"(.)\1{3,}", "Homopolymer run"),
+        (r"[GU]{2,}U[GU]{2,}", "GU-rich stretch (literature-associated with TLR7/8 sensing; not a confirmed motif)"),
+        (r"(.)\1{3,}", "Homopolymer run (4+ repeats; general repetitive-element flag)"),
     ]
+    if seq_type == "dna":
+        # CpG/TLR9 sensing is specifically a DNA-recognition pathway —
+        # only flag this for DNA-type input, never RNA.
+        checks.append((r"[AG][AG]CG[CT][CT]", "Unmethylated CpG in a purine-purine-CG-pyrimidine-pyrimidine context (literature TLR9 motif pattern; not a confirmed assay)"))
+
     for pattern, label in checks:
         matches = re.findall(pattern, seq.upper())
         if matches:
@@ -158,7 +183,7 @@ def validate_sequence(raw_input: str, filename: Optional[str] = None) -> Dict[st
     if _has_poly_g(seq):
         features.append("Poly-G tract detected")
 
-    orfs = _find_orfs(seq) if seq_type == "dna" else []
+    orfs = _find_orfs(seq)  # handles DNA and RNA internally
     if orfs:
         best = max(orfs, key=lambda o: o["proteinLength"])
         features.append(f"Longest ORF: {best['proteinLength']} aa (frame {best['frame']})")
@@ -191,7 +216,7 @@ def analyze_sequence(seq: str, modality: str) -> Dict[str, Any]:
     structure = _secondary_structure_score(seq)
 
     # Immune screening
-    immune = _immunostimulatory_motifs(seq)
+    immune = _immunostimulatory_motifs(seq, seq_type)
 
     # Modality-specific analysis
     modality_results = _modality_analysis(seq, seq_type, modality)
@@ -208,20 +233,26 @@ def analyze_sequence(seq: str, modality: str) -> Dict[str, Any]:
 
 
 def _estimate_off_targets(seq: str) -> Dict[str, Any]:
-    """Simplified off-target estimation based on sequence uniqueness."""
+    """
+    Sequence-uniqueness heuristic — NOT a real off-target screen. This does
+    not align the sequence against any genome or transcriptome, so it can't
+    actually detect off-target binding sites. It only reflects length and
+    local k-mer repetitiveness, which are weak, indirect proxies. Labeled
+    "specificityHeuristic" rather than "offTarget" so it isn't mistaken for
+    a real BLAST/alignment-based check (out of scope here — see Page 3
+    candidate design notes for the same boundary).
+    """
     length = len(seq)
-    # Shorter sequences have more off-target risk
     if length < 18:
         risk = "High"
-        note = "Short sequence increases off-target probability"
+        note = "Short sequence — generally correlates with higher off-target probability, not verified against any genome"
     elif length < 20:
         risk = "Medium"
-        note = "Moderate length; some off-target matches possible"
+        note = "Moderate length — not verified against any genome"
     else:
         risk = "Low"
-        note = "Adequate length for high specificity"
+        note = "Adequate length for specificity in general, not verified against any genome"
 
-    # Check for repetitive elements
     k = 6
     if length >= k:
         kmers = [seq[i:i+k] for i in range(length - k + 1)]
@@ -234,12 +265,9 @@ def _estimate_off_targets(seq: str) -> Dict[str, Any]:
         "risk": risk,
         "note": note,
         "repetitiveness": repetitiveness,
-        "recommendedMinLength": 18 if modality_any(seq) else 20,
+        "recommendedMinLength": 18,
+        "disclaimer": "This is a length/repetitiveness heuristic only — it does not check the sequence against any real genome or transcriptome. Use a real alignment tool (e.g. BLAST) for actual off-target screening.",
     }
-
-
-def modality_any(seq: str) -> bool:
-    return True
 
 
 def _modality_analysis(seq: str, seq_type: str, modality: str) -> Dict[str, Any]:
@@ -309,7 +337,7 @@ def _mrna_analysis(seq: str, seq_type: str, gc: float, length: int) -> Dict[str,
     if seq_type != "rna":
         recommendations.append("Convert to RNA (T→U) for mRNA therapeutic design")
 
-    orfs = _find_orfs(seq) if seq_type == "dna" else []
+    orfs = _find_orfs(seq)  # handles DNA and RNA internally
     if orfs:
         best = max(orfs, key=lambda o: o["proteinLength"])
         recommendations.append(f"Longest coding ORF: {best['proteinLength']} amino acids")
@@ -335,8 +363,8 @@ def _sgrna_analysis(seq: str, seq_type: str, gc: float, length: int) -> Dict[str
     if length < 17 or length > 21:
         recommendations.append("Optimal sgRNA spacer length is 17-21 nt (20 nt standard)")
 
-    # Check for PAM requirement
-    pam = "NGG" if "T" in seq else "NGG"
+    # SpCas9 requires an NGG PAM adjacent to the target site
+    pam = "NGG"
     recommendations.append(f"Requires {pam} PAM adjacent to target site (SpCas9)")
 
     if gc < 40 or gc > 80:
