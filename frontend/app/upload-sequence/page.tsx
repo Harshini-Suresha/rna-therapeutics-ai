@@ -39,6 +39,17 @@ import CodonUsageCard from "@/components/CodonUsageCard";
 import SequenceComplexityCard from "@/components/SequenceComplexityCard";
 import ModificationScorecard from "@/components/ModificationScorecard";
 import StackingEnergyChart from "@/components/StackingEnergyChart";
+import RestrictionSiteMap from "@/components/RestrictionSiteMap";
+import MiRNATargetingCard from "@/components/MiRNATargetingCard";
+import HairpinDiagram from "@/components/HairpinDiagram";
+import KmerFrequencyChart from "@/components/KmerFrequencyChart";
+import ThermodynamicProfile from "@/components/ThermodynamicProfile";
+import SequenceAnnotationBar from "@/components/SequenceAnnotationBar";
+import BasePairDotPlot from "@/components/BasePairDotPlot";
+import ModificationLandscapeCard from "@/components/ModificationLandscapeCard";
+import RiskScoreDashboard from "@/components/RiskScoreDashboard";
+import PhysicochemicalCard from "@/components/PhysicochemicalCard";
+import StabilityIndexChart from "@/components/StabilityIndexChart";
 
 type Step = "upload" | "validate" | "modality" | "analysis";
 
@@ -395,6 +406,239 @@ export default function UploadSequencePage() {
       energyProfile.push({ position: i + 1, energy: Math.round(sum / (chunk.length - 1) * 1000) / 1000 });
     }
 
+    // === NEW FIELD CALCULATIONS ===
+
+    // --- Restriction enzyme sites ---
+    const RESTRICTION_ENZYMES: { enzyme: string; site: string; overhang: "5'" | "3'" | "blunt" }[] = [
+      { enzyme: "EcoRI", site: "GAATTC", overhang: "5'" },
+      { enzyme: "BamHI", site: "GGATCC", overhang: "5'" },
+      { enzyme: "HindIII", site: "AAGCTT", overhang: "5'" },
+      { enzyme: "NotI", site: "GCGGCCGC", overhang: "5'" },
+      { enzyme: "XhoI", site: "CTCGAG", overhang: "5'" },
+      { enzyme: "SacI", site: "GAGCTC", overhang: "3'" },
+      { enzyme: "KpnI", site: "GGTACC", overhang: "3'" },
+      { enzyme: "SpeI", site: "ACTAGT", overhang: "5'" },
+      { enzyme: "NdeI", site: "CATATG", overhang: "5'" },
+      { enzyme: "SmaI", site: "CCCGGG", overhang: "blunt" },
+      { enzyme: "XbaI", site: "TCTAGA", overhang: "5'" },
+      { enzyme: "PstI", site: "CTGCAG", overhang: "3'" },
+      { enzyme: "SalI", site: "GTCGAC", overhang: "5'" },
+      { enzyme: "Apal", site: "GGGCCC", overhang: "3'" },
+      { enzyme: "NcoI", site: "CCATGG", overhang: "5'" },
+    ];
+    const restrictionSites: { enzyme: string; recognitionSite: string; cutPosition: number; strand: "+" | "-"; overhang: "5'" | "3'" | "blunt" }[] = [];
+    for (const enz of RESTRICTION_ENZYMES) {
+      const site = enz.site;
+      for (let i = 0; i <= length - site.length; i++) {
+        if (seq.slice(i, i + site.length) === site) {
+          restrictionSites.push({ enzyme: enz.enzyme, recognitionSite: site, cutPosition: i + Math.floor(site.length / 2) + 1, strand: "+", overhang: enz.overhang });
+        }
+      }
+    }
+
+    // --- miRNA seed-region targets (common seed 6-mers) ---
+    const SEED_HEXA_MERS = [
+      "AACCCU", "AGCACCA", "GGAGCUA", "UAAGGCA", "CUCCAGA",
+      "GAGGUUG", "UGCACUU", "AACAGUC", "GGCUGCA", "UCUACAG",
+      "AAUGCCC", "UUCCGGA", "CCAGUGA", "GGCUGAU", "AUUGCCU",
+    ];
+    const mirnaTargets: { mirnaId: string; seedSequence: string; start: number; end: number; bindingScore: number; conservationNote: string }[] = [];
+    for (let si = 0; si < SEED_HEXA_MERS.length && mirnaTargets.length < 15; si++) {
+      const seed = SEED_HEXA_MERS[si];
+      for (let i = 0; i <= length - seed.length; i++) {
+        if (seq.slice(i, i + seed.length) === seed) {
+          const gc = _gc(seed);
+          const score = Math.round((0.5 + gc / 200 + Math.random() * 0.15) * 100) / 100;
+          mirnaTargets.push({
+            mirnaId: `miR-seed-${si + 1}`,
+            seedSequence: seed,
+            start: i + 1,
+            end: i + seed.length,
+            bindingScore: Math.min(score, 0.99),
+            conservationNote: "Seed complementarity only; no expression context",
+          });
+          break;
+        }
+      }
+    }
+
+    // --- Hairpin structures ---
+    const hairpins: { start: number; end: number; stemLength: number; loopSize: number; stabilityScore: number; type: "hairpin" | "bulge" | "internal_loop" }[] = [];
+    for (let i = 0; i < length - 12; i += 3) {
+      for (let j = i + 12; j < Math.min(i + 40, length); j += 2) {
+        const seg = seq.slice(i, j + 1);
+        const half = Math.floor(seg.length / 2);
+        const stem1 = seg.slice(0, half);
+        const stem2 = seg.slice(seg.length - half);
+        const rc = revComp(stem2);
+        let matches = 0;
+        for (let k = 0; k < Math.min(stem1.length, rc.length); k++) {
+          if (stem1[k] === rc[k]) matches++;
+          else break;
+        }
+        if (matches >= 4) {
+          const loopStart = i + matches;
+          const loopEnd = j - matches;
+          const loopSize = Math.max(1, loopEnd - loopStart + 1);
+          const score = Math.round((matches / half) * (1 - loopSize / 20) * 100) / 100;
+          if (score > 0.3 && hairpins.length < 10) {
+            hairpins.push({
+              start: i + 1,
+              end: j + 1,
+              stemLength: matches,
+              loopSize,
+              stabilityScore: Math.max(0, Math.min(1, score)),
+              type: loopSize <= 4 ? "hairpin" : loopSize <= 8 ? "bulge" : "internal_loop",
+            });
+          }
+        }
+      }
+    }
+    // Deduplicate overlapping hairpins
+    const uniqueHairpins = hairpins.filter((h, i) => {
+      return !hairpins.slice(0, i).some((prev) => Math.abs(prev.start - h.start) < 5 && Math.abs(prev.end - h.end) < 5);
+    });
+
+    // --- Kmer frequency (k=6) ---
+    const km = 6;
+    const kmerMap: Record<string, number[]> = {};
+    for (let i = 0; i <= length - km; i++) {
+      const kmer = seq.slice(i, i + km);
+      if (!kmerMap[kmer]) kmerMap[kmer] = [];
+      kmerMap[kmer].push(i + 1);
+    }
+    const totalKmers = Math.max(length - km + 1, 1);
+    const uniqueKmers = Object.keys(kmerMap).length;
+    const shannonH = Object.values(kmerMap).reduce((sum, positions) => {
+      const p = positions.length / totalKmers;
+      return sum - p * Math.log2(p);
+    }, 0);
+    const kmerRepeats = Object.entries(kmerMap)
+      .filter(([, positions]) => positions.length > 1)
+      .sort((a, b) => b[1].length - a[1].length)
+      .slice(0, 20)
+      .map(([kmer, positions]) => ({ kmer, count: positions.length, positions }));
+
+    // --- Thermodynamic profile ---
+    const avgEnthalpy = energyProfile.length > 0
+      ? Math.round(energyProfile.reduce((s, e) => s + e.energy, 0) / energyProfile.length * 1000) / 1000
+      : -1.0;
+    const avgEntropy = Math.round(avgEnthalpy * 30 * 1000) / 1000;
+    const freeEnergy37 = Math.round((avgEnthalpy - 310.15 * avgEntropy / 1000) * 100) / 100;
+    const stabilityClass = freeEnergy37 < -10 ? "stable" as const : freeEnergy37 < -3 ? "moderate" as const : "unstable" as const;
+    const thermoProfile = {
+      avgEnthalpy,
+      avgEntropy,
+      freeEnergy37,
+      gcEnrichment: gc,
+      atEnrichment: 100 - gc,
+      stabilityClass,
+      notes: [
+        stabilityClass === "stable" ? "Sequence has favorable free energy for duplex formation." : stabilityClass === "unstable" ? "Low duplex stability — may require chemical modifications." : "Moderate thermodynamic stability.",
+      ],
+    };
+
+    // --- Dot plot (self-complementarity k=6) ---
+    const dotPlotPoints: { x: number; y: number; matchLen: number }[] = [];
+    for (let i = 0; i <= length - k; i += 2) {
+      for (let j = i + k; j <= length - k; j += 2) {
+        const fwd = seq.slice(i, i + k);
+        const rev = seq.slice(j, j + k);
+        if (fwd === rev || fwd === revComp(rev)) {
+          let matchLen = 0;
+          for (let m = 0; m < Math.min(k, length - Math.max(i, j)); m++) {
+            if (seq[i + m] === seq[j + m] || seq[i + m] === ({ A: "T", T: "A", G: "C", C: "G", U: "A" }[seq[j + m]] ?? "N")) {
+              matchLen++;
+            } else break;
+          }
+          if (matchLen >= 4 && Math.abs(i - j) > 5) {
+            dotPlotPoints.push({ x: i + 1, y: j + 1, matchLen });
+          }
+        }
+      }
+    }
+    const uniqueDotPlot = dotPlotPoints.filter((p, idx) => {
+      return !dotPlotPoints.slice(0, idx).some((prev) => Math.abs(prev.x - p.x) < 3 && Math.abs(prev.y - p.y) < 3);
+    }).slice(0, 200);
+
+    // --- Modification landscape ---
+    const modLandscape: { position: number; accessibilityScore: number; recommendedModification: string; confidenceLevel: "high" | "medium" | "low" }[] = [];
+    const windowMod = 6;
+    for (let i = 0; i <= length - windowMod; i += 3) {
+      const chunk = seq.slice(i, i + windowMod);
+      const localGc = _gc(chunk);
+      const localG = (chunk.match(/G/g) || []).length;
+      const accessibility = Math.round((localGc / 100 * 0.6 + (1 - Math.abs(localGc - 50) / 50) * 0.4) * 100) / 100;
+      const recMod = modality === "aso"
+        ? (localGc < 35 ? "LNA" : localGc < 55 ? "2'-MOE" : "PS")
+        : modality === "sirna"
+        ? (localGc < 40 ? "2'-OMe" : "PS")
+        : modality === "mrna"
+        ? (localG > 2 ? "N1-methylpseudouridine" : "5-methylcytidine")
+        : (localGc < 40 ? "2'-OMe" : "LNA");
+      const conf = Math.abs(localGc - 50) < 15 ? "high" as const : Math.abs(localGc - 50) < 25 ? "medium" as const : "low" as const;
+      modLandscape.push({ position: i + 1, accessibilityScore: accessibility, recommendedModification: recMod, confidenceLevel: conf });
+    }
+
+    // --- Risk scores ---
+    const specificityScore = Math.max(0, Math.min(100, length >= 18 ? 70 + (length - 18) * 2 : length * 3 + 10));
+    const stabilityScore = Math.max(0, Math.min(100, Math.round(50 + (gc - 50) * 0.8 - Math.abs(length - 20) * 1.5)));
+    const immunogenicityScore = Math.max(0, Math.min(100, 100 - immune.length * 8));
+    const deliveryScore = Math.max(0, Math.min(100, length >= 15 && length <= 25 ? 80 : length < 15 ? 40 : 50));
+    const toxicityScore = Math.max(0, Math.min(100, 80 - (palindromes > 3 ? 20 : 0) - (immune.length > 5 ? 15 : 0)));
+    const riskScores = {
+      specificity: Math.round(specificityScore),
+      stability: Math.round(stabilityScore),
+      immunogenicity: Math.round(immunogenicityScore),
+      delivery: Math.round(deliveryScore),
+      toxicity: Math.round(toxicityScore),
+      overall: Math.round((specificityScore + stabilityScore + immunogenicityScore + deliveryScore + toxicityScore) / 5),
+    };
+
+    // --- Physicochemical profile ---
+    const BASE_MW: Record<string, number> = { A: 331.2, C: 307.2, G: 347.2, T: 322.2, U: 324.2 };
+    const BASE_CHARGE: Record<string, number> = { A: -1, C: -1, G: -1, T: -1, U: -1 };
+    const BASE_HYDRO: Record<string, number> = { A: 0.5, C: -0.2, G: 0.1, T: 0.8, U: 0.3 };
+    let mw = 0;
+    let charge = 0;
+    let hydroSum = 0;
+    const hydroProfile: { position: number; value: number }[] = [];
+    const chargeProfileArr: { position: number; value: number }[] = [];
+    const mwWindow = 6;
+    for (let i = 0; i <= length - mwWindow; i += 3) {
+      const chunk = seq.slice(i, i + mwWindow);
+      let chunkMw = 0;
+      let chunkHydro = 0;
+      for (const b of chunk) {
+        chunkMw += BASE_MW[b] ?? 330;
+        chunkHydro += BASE_HYDRO[b] ?? 0;
+      }
+      mw += chunkMw;
+      charge += chunk.length * -1;
+      hydroSum += chunkHydro;
+      hydroProfile.push({ position: i + 1, value: Math.round(chunkHydro / chunk.length * 100) / 100 });
+      chargeProfileArr.push({ position: i + 1, value: Math.round(chunk.length * -1 * 100) / 100 });
+    }
+    const physicochemical = {
+      molecularWeight: Math.round(mw * 100) / 100,
+      netCharge: charge,
+      hydrophobicityIndex: Math.round(hydroSum / Math.max(length, 1) * 100) / 100,
+      hydrophobicityProfile: hydroProfile,
+      chargeProfile: chargeProfileArr,
+    };
+
+    // --- Stability index ---
+    const stabilityIndex: { position: number; rnaseH: number; duplexStability: number; singleStrandStability: number }[] = [];
+    const siWindow = 8;
+    for (let i = 0; i <= length - siWindow; i += 3) {
+      const chunk = seq.slice(i, i + siWindow);
+      const localGc = _gc(chunk);
+      const rnaseH = Math.round((localGc / 100 * 0.6 + (chunk.includes("T") || chunk.includes("U") ? 0.3 : 0) + 0.1) * 1000) / 1000;
+      const duplex = Math.round((localGc * 0.01 + 0.3) * 1000) / 1000;
+      const ss = Math.round((1 - localGc / 100 * 0.4 + 0.2) * 1000) / 1000;
+      stabilityIndex.push({ position: i + 1, rnaseH: Math.min(1, Math.max(0, rnaseH)), duplexStability: Math.min(1, Math.max(0, duplex)), singleStrandStability: Math.min(1, Math.max(0, ss)) });
+    }
+
     return {
       sequence: seq,
       sequenceType: length > 0 ? (hasT ? "dna" : "rna") : "unknown",
@@ -418,6 +662,16 @@ export default function UploadSequencePage() {
       codonUsage: { codons: codons.slice(0, 50), cai: caiCount > 0 ? Math.round(caiSum / caiCount * 1000) / 1000 : 0, rareCodons: rareCodons.slice(0, 20), totalCodons: caiCount, note: "CAI ranges 0-1; higher = more optimized for human expression." },
       modificationScores: { modality, scores: modScores, overallScore },
       energyProfile,
+      restrictionSites,
+      mirnaTargets,
+      hairpins: uniqueHairpins,
+      kmerFrequency: { k: km, totalKmers, uniqueKmers, repeats: kmerRepeats, shannonEntropy: Math.round(shannonH * 1000) / 1000 },
+      thermoProfile,
+      dotPlot: uniqueDotPlot,
+      modificationLandscape: modLandscape,
+      riskScores,
+      physicochemical,
+      stabilityIndex,
     };
   }
 
@@ -934,6 +1188,8 @@ export default function UploadSequencePage() {
                   orfs={analysis.orfs}
                   immuneHits={analysis.immuneScreen}
                   palindromePositions={analysis.secondaryStructure.palindromePositions ?? []}
+                  restrictionSites={analysis.restrictionSites}
+                  mirnaTargets={analysis.mirnaTargets}
                 />
               </Card>
 
@@ -1140,6 +1396,151 @@ export default function UploadSequencePage() {
                   <CodonUsageCard codonUsage={analysis.codonUsage} />
                 </Card>
               )}
+
+              {/* ===== NEW VISUALIZATION COMPONENTS ===== */}
+
+              {/* Risk Score Dashboard */}
+              {analysis.riskScores && (
+                <Card className="p-5">
+                  <RiskScoreDashboard riskScores={analysis.riskScores} />
+                </Card>
+              )}
+
+              <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                {/* Restriction Enzyme Map */}
+                {analysis.restrictionSites && analysis.restrictionSites.length > 0 && (
+                  <Card className="p-5">
+                    <RestrictionSiteMap
+                      sites={analysis.restrictionSites}
+                      seqLength={analysis.length}
+                    />
+                  </Card>
+                )}
+
+                {/* miRNA Targeting */}
+                {analysis.mirnaTargets && analysis.mirnaTargets.length > 0 && (
+                  <Card className="p-5">
+                    <MiRNATargetingCard
+                      targets={analysis.mirnaTargets}
+                      seqLength={analysis.length}
+                    />
+                  </Card>
+                )}
+
+                {/* Thermodynamic Profile */}
+                {analysis.thermoProfile && (
+                  <Card className="p-5">
+                    <ThermodynamicProfile profile={analysis.thermoProfile} />
+                  </Card>
+                )}
+
+                {/* Kmer Frequency */}
+                {analysis.kmerFrequency && (
+                  <Card className="p-5">
+                    <KmerFrequencyChart kmerData={analysis.kmerFrequency} />
+                  </Card>
+                )}
+              </div>
+
+              {/* Hairpin Diagram */}
+              {analysis.hairpins && analysis.hairpins.length > 0 && (
+                <Card className="p-5">
+                  <HairpinDiagram
+                    hairpins={analysis.hairpins}
+                    seqLength={analysis.length}
+                  />
+                </Card>
+              )}
+
+              <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                {/* Modification Landscape */}
+                {analysis.modificationLandscape && analysis.modificationLandscape.length > 0 && (
+                  <Card className="p-5">
+                    <ModificationLandscapeCard
+                      landscape={analysis.modificationLandscape}
+                      seqLength={analysis.length}
+                    />
+                  </Card>
+                )}
+
+                {/* Base Pair Dot Plot */}
+                {analysis.dotPlot && analysis.dotPlot.length > 0 && (
+                  <Card className="p-5">
+                    <BasePairDotPlot
+                      points={analysis.dotPlot}
+                      seqLength={analysis.length}
+                    />
+                  </Card>
+                )}
+
+                {/* Physicochemical Properties */}
+                {analysis.physicochemical && (
+                  <Card className="p-5">
+                    <PhysicochemicalCard profile={analysis.physicochemical} />
+                  </Card>
+                )}
+
+                {/* Stability Index */}
+                {analysis.stabilityIndex && analysis.stabilityIndex.length > 0 && (
+                  <Card className="p-5">
+                    <StabilityIndexChart
+                      data={analysis.stabilityIndex}
+                      seqLength={analysis.length}
+                    />
+                  </Card>
+                )}
+              </div>
+
+              {/* Sequence Annotation Bar (full width) */}
+              <Card className="p-5">
+                <SequenceAnnotationBar
+                  annotations={[
+                    ...(analysis.restrictionSites ?? []).map((s, i) => ({
+                      id: `restr-${i}`,
+                      label: s.enzyme,
+                      start: s.cutPosition,
+                      end: s.cutPosition,
+                      type: "restriction" as const,
+                    })),
+                    ...(analysis.mirnaTargets ?? []).map((t, i) => ({
+                      id: `mirna-${i}`,
+                      label: t.mirnaId,
+                      start: t.start,
+                      end: t.end,
+                      type: "mirna" as const,
+                    })),
+                    ...(analysis.immuneScreen ?? []).slice(0, 15).map((m, i) => ({
+                      id: `imm-${i}`,
+                      label: m.motif,
+                      start: m.start,
+                      end: m.end,
+                      type: "immune" as const,
+                    })),
+                    ...(analysis.orfs ?? []).map((o, i) => ({
+                      id: `orf-${i}`,
+                      label: `ORF ${o.strand} f${o.frame}`,
+                      start: o.start,
+                      end: o.end,
+                      type: "orfs" as const,
+                    })),
+                    ...(analysis.complexity?.gcRichRegions ?? []).map((r, i) => ({
+                      id: `gc-${i}`,
+                      label: `GC-rich`,
+                      start: r.start,
+                      end: r.end,
+                      type: "complexity" as const,
+                    })),
+                    ...(analysis.hairpins ?? []).map((h, i) => ({
+                      id: `hp-${i}`,
+                      label: h.type.replace("_", " "),
+                      start: h.start,
+                      end: h.end,
+                      type: "structure" as const,
+                    })),
+                  ]}
+                  seqLength={analysis.length}
+                />
+              </Card>
 
               {/* Action buttons */}
               <div className="flex justify-end gap-3">

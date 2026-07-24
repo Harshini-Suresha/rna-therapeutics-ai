@@ -18,22 +18,45 @@ interface ImmuneHit {
   end: number;
 }
 
+interface RestrictionSite {
+  enzyme: string;
+  recognitionSite: string;
+  cutPosition: number;
+  strand: "+" | "-";
+  overhang: "5'" | "3'" | "blunt";
+}
+
+interface MiRNATarget {
+  mirnaId: string;
+  seedSequence: string;
+  start: number;
+  end: number;
+  bindingScore: number;
+  conservationNote: string;
+}
+
 interface TrackProps {
   seqLength: number;
   orfs: OrfInfo[];
   immuneHits: ImmuneHit[];
   palindromePositions: number[];
+  restrictionSites?: RestrictionSite[];
+  mirnaTargets?: MiRNATarget[];
 }
 
 const ORF_COLORS = ["#6366f1", "#8b5cf6", "#a78bfa", "#c084fc", "#e879f9", "#f472b6"];
 const IMMUNE_COLOR = "#f59e0b";
 const PALINDROME_COLOR = "#10b981";
+const RESTRICTION_COLOR = "#ec4899";
+const MIRNA_COLOR = "#3b82f6";
 
 export default function SequenceTrackViewer({
   seqLength,
   orfs,
   immuneHits,
   palindromePositions,
+  restrictionSites = [],
+  mirnaTargets = [],
 }: TrackProps) {
   const [tooltip, setTooltip] = useState<{ x: number; y: number; text: string } | null>(null);
 
@@ -153,6 +176,90 @@ export default function SequenceTrackViewer({
     });
   }
 
+  // Restriction sites track
+  const restrY = palY + TRACK_H + TRACK_GAP + 8;
+  if (restrictionSites.length > 0) {
+    const restrItems = restrictionSites.slice(0, 40).map((site, i) => {
+      const x = xScale(site.cutPosition);
+      return (
+        <g key={`restr-${i}`}>
+          <line
+            x1={x}
+            y1={-2}
+            x2={x}
+            y2={TRACK_H + 2}
+            stroke={RESTRICTION_COLOR}
+            strokeWidth={2}
+            opacity={0.8}
+          />
+          <circle
+            cx={x}
+            cy={TRACK_H / 2}
+            r={3}
+            fill={RESTRICTION_COLOR}
+            stroke="#fff"
+            strokeWidth={1}
+            className="cursor-pointer"
+            onMouseEnter={(e) =>
+              showTip(
+                e.clientX,
+                e.clientY,
+                `${site.enzyme} (${site.recognitionSite}) @ pos ${site.cutPosition} [${site.strand}, ${site.overhang}]`
+              )
+            }
+            onMouseLeave={() => setTooltip(null)}
+          />
+        </g>
+      );
+    });
+    TRACKS.push({
+      label: "Restriction",
+      y: restrY,
+      items: <g transform={`translate(0,${restrY})`}>{restrItems}</g>,
+    });
+  }
+
+  // miRNA targets track
+  const mirnaY = restrictionSites.length > 0
+    ? restrY + TRACK_H + TRACK_GAP + 8
+    : palY + TRACK_H + TRACK_GAP + 8;
+  if (mirnaTargets.length > 0) {
+    const mirnaItems = mirnaTargets.slice(0, 20).map((target, i) => {
+      const x1 = xScale(target.start);
+      const x2 = xScale(target.end);
+      const w = Math.max(x2 - x1, 3);
+      return (
+        <rect
+          key={`mirna-${i}`}
+          x={x1}
+          y={0}
+          width={w}
+          height={TRACK_H}
+          rx={2}
+          fill={MIRNA_COLOR}
+          opacity={0.5 + target.bindingScore * 0.4}
+          className="cursor-pointer"
+          onMouseEnter={(e) =>
+            showTip(
+              e.clientX,
+              e.clientY,
+              `${target.mirnaId} seed:${target.seedSequence} @ ${target.start}–${target.end} (score: ${target.bindingScore.toFixed(2)})`
+            )
+          }
+          onMouseLeave={() => setTooltip(null)}
+        />
+      );
+    });
+    const adjustedMirnaY = restrictionSites.length > 0
+      ? restrY + TRACK_H + TRACK_GAP + 8
+      : palY + TRACK_H + TRACK_GAP + 8;
+    TRACKS.push({
+      label: "miRNA",
+      y: adjustedMirnaY,
+      items: <g transform={`translate(0,${adjustedMirnaY})`}>{mirnaItems}</g>,
+    });
+  }
+
   const totalH = TRACKS.length > 0 ? TRACKS[TRACKS.length - 1].y + TRACK_H + 28 : 60;
 
   // X axis ticks
@@ -218,6 +325,18 @@ export default function SequenceTrackViewer({
           <span className="inline-block h-2 w-4 rounded-sm" style={{ backgroundColor: PALINDROME_COLOR }} />
           Palindrome
         </span>
+        {restrictionSites.length > 0 && (
+          <span className="flex items-center gap-1">
+            <span className="inline-block h-2 w-4 rounded-sm" style={{ backgroundColor: RESTRICTION_COLOR }} />
+            Restriction site
+          </span>
+        )}
+        {mirnaTargets.length > 0 && (
+          <span className="flex items-center gap-1">
+            <span className="inline-block h-2 w-4 rounded-sm" style={{ backgroundColor: MIRNA_COLOR }} />
+            miRNA target
+          </span>
+        )}
       </div>
     </div>
   );

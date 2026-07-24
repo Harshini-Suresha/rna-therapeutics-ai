@@ -302,6 +302,8 @@ export default function UploadSequencePage() {
                     orfs={analysis.orfs}
                     immuneHits={analysis.immuneScreen}
                     palindromePositions={analysis.secondaryStructure.palindromePositions}
+                    restrictionSites={analysis.restrictionSites}
+                    mirnaTargets={analysis.mirnaTargets}
                   />
                 </div>
               </Card>

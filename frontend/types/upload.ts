@@ -132,6 +132,87 @@ export interface EnergyPoint {
   energy: number;
 }
 
+export interface RestrictionSite {
+  enzyme: string;
+  recognitionSite: string;
+  cutPosition: number;
+  strand: "+" | "-";
+  overhang: "5'" | "3'" | "blunt";
+}
+
+export interface MiRNATarget {
+  mirnaId: string;
+  seedSequence: string;
+  start: number;
+  end: number;
+  bindingScore: number;
+  conservationNote: string;
+}
+
+export interface Hairpin {
+  start: number;
+  end: number;
+  stemLength: number;
+  loopSize: number;
+  stabilityScore: number;
+  type: "hairpin" | "bulge" | "internal_loop";
+}
+
+export interface KmerFrequency {
+  k: number;
+  totalKmers: number;
+  uniqueKmers: number;
+  repeats: { kmer: string; count: number; positions: number[] }[];
+  shannonEntropy: number;
+}
+
+export interface ThermoProfile {
+  avgEnthalpy: number;
+  avgEntropy: number;
+  freeEnergy37: number;
+  gcEnrichment: number;
+  atEnrichment: number;
+  stabilityClass: "stable" | "moderate" | "unstable";
+  notes: string[];
+}
+
+export interface DotPlotPoint {
+  x: number;
+  y: number;
+  matchLen: number;
+}
+
+export interface ModificationLandscapePoint {
+  position: number;
+  accessibilityScore: number;
+  recommendedModification: string;
+  confidenceLevel: "high" | "medium" | "low";
+}
+
+export interface RiskScores {
+  specificity: number;
+  stability: number;
+  immunogenicity: number;
+  delivery: number;
+  toxicity: number;
+  overall: number;
+}
+
+export interface PhysicochemicalProfile {
+  molecularWeight: number;
+  netCharge: number;
+  hydrophobicityIndex: number;
+  hydrophobicityProfile: { position: number; value: number }[];
+  chargeProfile: { position: number; value: number }[];
+}
+
+export interface StabilityIndexPoint {
+  position: number;
+  rnaseH: number;
+  duplexStability: number;
+  singleStrandStability: number;
+}
+
 export interface AnalysisReport {
   sequence: string;
   sequenceType: string;
@@ -149,6 +230,16 @@ export interface AnalysisReport {
   codonUsage?: CodonUsage;
   modificationScores?: ModificationScores;
   energyProfile?: EnergyPoint[];
+  restrictionSites?: RestrictionSite[];
+  mirnaTargets?: MiRNATarget[];
+  hairpins?: Hairpin[];
+  kmerFrequency?: KmerFrequency;
+  thermoProfile?: ThermoProfile;
+  dotPlot?: DotPlotPoint[];
+  modificationLandscape?: ModificationLandscapePoint[];
+  riskScores?: RiskScores;
+  physicochemical?: PhysicochemicalProfile;
+  stabilityIndex?: StabilityIndexPoint[];
 }
 
 export type Modality = "aso" | "sirna" | "mrna" | "sgrna";
