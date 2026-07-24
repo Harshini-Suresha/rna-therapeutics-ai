@@ -14,6 +14,7 @@ export interface ValidationReport {
 }
 
 export interface OrfInfo {
+  strand: string;
   frame: number;
   start: number;
   end: number;
@@ -22,10 +23,11 @@ export interface OrfInfo {
 }
 
 export interface OffTargetResult {
-  risk: "High" | "Medium" | "Low";
+  lengthBasedRiskEstimate: "High" | "Medium" | "Low";
   note: string;
-  repetitiveness: number;
+  internalRepetitiveness: number;
   recommendedMinLength: number;
+  disclaimer: string;
 }
 
 export interface SecondaryStructureResult {

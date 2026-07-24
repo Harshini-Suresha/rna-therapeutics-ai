@@ -26,6 +26,7 @@ import Sidebar from "@/components/Sidebar";
 import Topbar from "@/components/Topbar";
 import { Card, SectionHeader } from "@/components/ui";
 import { ValidationReport, AnalysisReport } from "@/types/upload";
+import { Modality } from "@/types/upload-types";
 import { validateSequence, analyzeSequence } from "@/lib/uploadApi";
 
 type Step = "upload" | "validate" | "modality" | "analysis";
@@ -101,32 +102,52 @@ export default function UploadSequencePage() {
   function clientSideValidate(raw: string, fname?: string) {
     const seq = raw.replace(/^>.*$/gm, "").replace(/[^A-Za-z]/g, "").toUpperCase();
     if (!seq) return null;
-    const hasT = "T" in seq;
-    const hasU = "U" in seq;
+    const hasT = seq.includes("T");
+    const hasU = seq.includes("U");
     const seqType = hasT && !hasU ? "dna" : hasU && !hasT ? "rna" : "dna";
     const gc = seq.length > 0 ? Math.round((seq.split("").filter((b) => "GC".includes(b)).length / seq.length) * 1000) / 10 : 0;
     const invalid = [...new Set(seq.split("").filter((b) => !"ACGTRYSWKMBDHVN".includes(b)))].sort();
-    const orfs: { frame: number; start: number; end: number; length: number; proteinLength: number }[] = [];
-    if (seqType === "dna") {
+    const isRna = hasU && !hasT;
+    const startCodons = isRna ? ["AUG"] : ["ATG"];
+    const stopCodons = isRna ? ["UAA", "UAG", "UGA"] : ["TAA", "TAG", "TGA"];
+    const orfs: { strand: string; frame: number; start: number; end: number; length: number; proteinLength: number }[] = [];
+    function revComp(s: string): string {
+      const comp: Record<string, string> = isRna
+        ? { A: "U", U: "A", G: "C", C: "G" }
+        : { A: "T", T: "A", G: "C", C: "G" };
+      return s.split("").reverse().map((b) => comp[b] ?? "N").join("");
+    }
+    function scanOrfs(s: string, strand: string) {
       for (let frame = 0; frame < 3; frame++) {
-        for (let i = frame; i < seq.length - 2; i += 3) {
-          if (seq.slice(i, i + 3) === "ATG") {
-            for (let j = i + 3; j < seq.length - 2; j += 3) {
-              const c = seq.slice(j, j + 3);
-              if (["TAA", "TAG", "TGA"].includes(c)) {
-                orfs.push({ frame: frame + 1, start: i + 1, end: j + 3, length: j + 3 - i, proteinLength: (j - i) / 3 });
+        let i = frame;
+        while (i < s.length - 2) {
+          const codon = s.slice(i, i + 3);
+          if (startCodons.includes(codon)) {
+            const start = i;
+            let j = i + 3;
+            while (j < s.length - 2) {
+              if (stopCodons.includes(s.slice(j, j + 3))) {
+                orfs.push({ strand, frame: frame + 1, start: start + 1, end: j + 3, length: j + 3 - start, proteinLength: (j - start) / 3 });
                 break;
               }
+              j += 3;
             }
-            break;
+            i = j + 3 < s.length ? j + 3 : s.length;
+          } else {
+            i += 3;
           }
         }
       }
     }
+    scanOrfs(seq, "+");
+    scanOrfs(revComp(seq), "-");
     const features: string[] = [];
     if (/A{6,}$/.test(seq)) features.push("Poly-A tail detected");
     if (/G{4,}/.test(seq)) features.push("Poly-G tract detected");
-    if (orfs.length > 0) features.push(`Longest ORF: ${orfs[0].proteinLength} aa (frame ${orfs[0].frame})`);
+    if (orfs.length > 0) {
+      const best = orfs.reduce((a, b) => (b.proteinLength > a.proteinLength ? b : a));
+      features.push(`Longest ORF: ${best.proteinLength} aa (${best.strand} strand, frame ${best.frame})`);
+    }
     return {
       valid: invalid.length === 0,
       sequence: seq,
@@ -151,11 +172,19 @@ export default function UploadSequencePage() {
     const repetitiveness = kmers.length > 0 ? 1 - new Set(kmers).size / kmers.length : 0;
     const palindromes = Array.from({ length: Math.max(0, length - 5) }, (_, i) => seq.slice(i, i + 6)).filter((c) => c === c.split("").reverse().join("")).length;
     const mfe = Math.round((gc / 100 * -1.5 + (100 - gc) / 100 * -0.9) * length / 2 * 10) / 10;
+    const hasT = seq.includes("T");
+    const hasU = seq.includes("U");
+    const seqType = hasT && !hasU ? "dna" : hasU && !hasT ? "rna" : "dna";
     const immune: { motif: string; label: string }[] = [];
-    if (/UGUGUG/i.test(seq)) immune.push({ motif: "UGUGUG", label: "UG-rich (TLR7/8 agonist)" });
-    if (/GU{2,}G/i.test(seq)) immune.push({ motif: "GUGG", label: "GU-rich motif" });
-    if (/UUAA/i.test(seq)) immune.push({ motif: "UUAA", label: "UU dinucleotide (immune trigger)" });
-    if (/CGCG/i.test(seq)) immune.push({ motif: "CGCG", label: "CpG motif (TLR9 agonist)" });
+    const guRich = seq.match(/[GU]{2,}U[GU]{2,}/i);
+    if (guRich) immune.push({ motif: guRich[0], label: "GU-rich stretch (literature-associated with TLR7/8 sensing; not a confirmed motif)" });
+    const homopolymer = seq.match(/(.)\1{3,}/);
+    if (homopolymer) immune.push({ motif: homopolymer[0].slice(0, 6), label: "Homopolymer run (4+ repeats; general repetitive-element flag)" });
+    if (seqType === "dna") {
+      const cpgMatch = seq.match(/[AG][AG]CG[CT][CT]/i);
+      if (cpgMatch) immune.push({ motif: cpgMatch[0], label: "Unmethylated CpG in a purine-purine-CG-pyrimidine-pyrimidine context (literature TLR9 motif pattern; not a confirmed assay)" });
+    }
+    const offNote = offRisk === "Low" ? "Adequate length for specificity in general, not verified against any genome" : offRisk === "Medium" ? "Moderate length — not verified against any genome" : "Short sequence — generally correlates with higher off-target probability, not verified against any genome";
     const modRecs: string[] = [];
     let modDetails: Record<string, unknown> = { recommendations: modRecs };
     if (modality === "aso") {
@@ -182,10 +211,16 @@ export default function UploadSequencePage() {
       modDetails = { ...modDetails, casProtein: "SpCas9 (NGG PAM)", optimalLength: "20 nt spacer + PAM" };
     }
     return {
-      sequenceType: seq.length > 0 ? ("T" in seq ? "dna" : "rna") : "unknown",
+      sequenceType: length > 0 ? (hasT ? "dna" : "rna") : "unknown",
       length,
       gcContent: gc,
-      offTarget: { risk: offRisk, note: offRisk === "Low" ? "Adequate length for high specificity" : "Short sequence increases off-target probability", repetitiveness: Math.round(repetitiveness * 1000) / 1000, recommendedMinLength: 18 },
+      offTarget: {
+        lengthBasedRiskEstimate: offRisk,
+        note: offNote,
+        internalRepetitiveness: Math.round(repetitiveness * 1000) / 1000,
+        recommendedMinLength: 18,
+        disclaimer: "This is a length/repetitiveness heuristic only — it does not check the sequence against any real genome or transcriptome. Use a real alignment tool (e.g. BLAST) for actual off-target screening.",
+      },
       secondaryStructure: { estimatedMfe: mfe, palindromicRegions: palindromes, gcContent: gc, hairpinRisk: palindromes > 3 ? "High" : palindromes > 1 ? "Medium" : "Low" },
       immuneScreen: immune,
       modality: modDetails,
@@ -199,9 +234,9 @@ export default function UploadSequencePage() {
     try {
       let result: ValidationReport | null = null;
       try {
-        result = await validateSequence(rawInput, filename);
+        result = await validateSequence(rawInput, filename) as unknown as ValidationReport;
       } catch {
-        result = clientSideValidate(rawInput, filename) as ValidationReport;
+        result = clientSideValidate(rawInput, filename) as unknown as ValidationReport;
       }
       if (!result) {
         setError("Could not parse sequence.");
@@ -227,9 +262,9 @@ export default function UploadSequencePage() {
     try {
       let result: AnalysisReport | null = null;
       try {
-        result = await analyzeSequence(validation.sequence, selectedModality);
+        result = await analyzeSequence(validation.sequence, selectedModality as Modality) as unknown as AnalysisReport;
       } catch {
-        result = clientSideAnalyze(validation.sequence, selectedModality) as AnalysisReport;
+        result = clientSideAnalyze(validation.sequence, selectedModality) as unknown as AnalysisReport;
       }
       if (!result) {
         setError("Analysis failed.");
@@ -468,10 +503,15 @@ export default function UploadSequencePage() {
                 {/* ORFs */}
                 {validation.orfs.length > 0 && (
                   <div>
-                    <p className="mb-2 text-[12.5px] font-medium text-slate-600">Open Reading Frames</p>
+                    <p className="mb-2 text-[12.5px] font-medium text-slate-600">Open Reading Frames ({validation.orfs.length} found, both strands)</p>
                     <div className="space-y-1.5">
-                      {validation.orfs.map((orf) => (
-                        <div key={`${orf.frame}-${orf.start}`} className="flex items-center gap-3 rounded-lg bg-slate-50 px-3 py-2 text-[12px]">
+                      {validation.orfs.map((orf, i) => (
+                        <div key={`${orf.frame}-${orf.start}-${i}`} className="flex items-center gap-3 rounded-lg bg-slate-50 px-3 py-2 text-[12px]">
+                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                            orf.strand === "-" ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"
+                          }`}>
+                            {orf.strand} strand
+                          </span>
                           <span className="font-mono text-slate-500">Frame {orf.frame}</span>
                           <span className="text-slate-400">|</span>
                           <span className="text-slate-600">
@@ -609,38 +649,42 @@ export default function UploadSequencePage() {
                 <Card>
                   <div className="flex items-center gap-2 px-6 pt-5 pb-3">
                     <Shield className="h-4 w-4 text-slate-500" />
-                    <h3 className="text-[14px] font-semibold text-slate-800">Off-Target & Specificity</h3>
+                    <h3 className="text-[14px] font-semibold text-slate-800">Specificity Heuristic</h3>
                   </div>
                   <div className="px-6 pb-5 space-y-3">
                     <div className="flex items-center gap-3">
                       <span
                         className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                          analysis.offTarget.risk === "Low"
+                          analysis.offTarget.lengthBasedRiskEstimate === "Low"
                             ? "bg-emerald-100 text-emerald-700"
-                            : analysis.offTarget.risk === "Medium"
+                            : analysis.offTarget.lengthBasedRiskEstimate === "Medium"
                             ? "bg-amber-100 text-amber-700"
                             : "bg-red-100 text-red-700"
                         }`}
                       >
-                        {analysis.offTarget.risk} Risk
+                        {analysis.offTarget.lengthBasedRiskEstimate} Risk
                       </span>
                     </div>
                     <p className="text-[12px] text-slate-500">{analysis.offTarget.note}</p>
                     <div className="rounded-lg bg-slate-50 p-3">
                       <div className="flex justify-between text-[11px]">
-                        <span className="text-slate-400">Repetitiveness</span>
+                        <span className="text-slate-400">Internal repetitiveness</span>
                         <span className="font-medium text-slate-600">
-                          {(analysis.offTarget.repetitiveness * 100).toFixed(1)}%
+                          {(analysis.offTarget.internalRepetitiveness * 100).toFixed(1)}%
                         </span>
                       </div>
                       <div className="mt-1 h-1.5 rounded-full bg-slate-200">
                         <div
                           className={`h-full rounded-full ${
-                            analysis.offTarget.repetitiveness > 0.3 ? "bg-red-400" : "bg-emerald-400"
+                            analysis.offTarget.internalRepetitiveness > 0.3 ? "bg-red-400" : "bg-emerald-400"
                           }`}
-                          style={{ width: `${Math.min(analysis.offTarget.repetitiveness * 100, 100)}%` }}
+                          style={{ width: `${Math.min(analysis.offTarget.internalRepetitiveness * 100, 100)}%` }}
                         />
                       </div>
+                    </div>
+                    <div className="flex items-start gap-1.5 rounded-lg bg-amber-50 px-3 py-2 text-[11.5px] text-amber-700">
+                      <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                      {analysis.offTarget.disclaimer}
                     </div>
                   </div>
                 </Card>

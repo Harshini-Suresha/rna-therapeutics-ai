@@ -262,9 +262,9 @@ def _estimate_off_targets(seq: str) -> Dict[str, Any]:
         repetitiveness = 0
 
     return {
-        "risk": risk,
+        "lengthBasedRiskEstimate": risk,
         "note": note,
-        "repetitiveness": repetitiveness,
+        "internalRepetitiveness": repetitiveness,
         "recommendedMinLength": 18,
         "disclaimer": "This is a length/repetitiveness heuristic only — it does not check the sequence against any real genome or transcriptome. Use a real alignment tool (e.g. BLAST) for actual off-target screening.",
     }

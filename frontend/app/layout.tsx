@@ -4,6 +4,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "RNA Therapeutics AI Platform",
   description: "ASO design platform — gene retrieval, mechanism selection, and candidate design.",
+  icons: { icon: "/icon.png" },
 };
 
 export default function RootLayout({

@@ -26,6 +26,7 @@ try:  # ``uvicorn backend.main:app`` from the repository root
     from .services.dependency_service import get_gene_dependency
     from .api.mechanisms import router as mechanisms_router
     from .api.gene_silencing import router as gene_silencing_router
+    from .api.upload import router as upload_router
 except ImportError:  # ``uvicorn main:app`` while working in backend/
     from services.gene_service import EnsemblLookupUnavailable, clean_synonyms, get_gene_metadata, get_gene_phenotypes, ensembl_gene_url
     from services.enrichment_service import get_gene_enrichment, get_aso_analysis
