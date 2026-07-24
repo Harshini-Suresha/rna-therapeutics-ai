@@ -132,14 +132,17 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      {/* Quick action */}
+      {/* Quick Links */}
       <div className="border-t border-white/10 px-3 py-3">
+        <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+          Quick Links
+        </p>
         <a
           href="/upload-sequence"
-          className="flex w-full items-center gap-3 rounded-lg bg-white/[0.06] border border-white/[0.08] px-3 py-2.5 text-[13px] text-slate-300 hover:bg-white/[0.1] hover:text-white transition-colors"
+          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-[13px] text-slate-300 hover:bg-white/5 hover:text-white transition-colors"
         >
           <UploadCloud className="h-4 w-4 text-slate-400" />
-          Quick Analysis
+          Upload Sequence
         </a>
       </div>
 
