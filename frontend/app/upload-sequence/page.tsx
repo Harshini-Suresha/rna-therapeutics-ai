@@ -82,6 +82,7 @@ export default function UploadSequencePage() {
   const [selectedModality, setSelectedModality] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<AnalysisReport | null>(null);
   const [loading, setLoading] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [expandedRecs, setExpandedRecs] = useState<Record<string, boolean>>({});
 
@@ -451,7 +452,31 @@ export default function UploadSequencePage() {
   async function handleAnalyze() {
     if (!validation?.sequence || !selectedModality) return;
     setLoading(true);
+    setProgress(0);
     setError(null);
+
+    // Simulated progress steps: stalls at 90% until real work finishes
+    const steps = [
+      { pct: 12, delay: 200 },
+      { pct: 28, delay: 350 },
+      { pct: 45, delay: 400 },
+      { pct: 62, delay: 350 },
+      { pct: 78, delay: 300 },
+      { pct: 88, delay: 250 },
+      { pct: 90, delay: 200 },
+    ];
+    let cancelled = false;
+    let timerIdx = 0;
+    const advance = () => {
+      if (cancelled || timerIdx >= steps.length) return;
+      const step = steps[timerIdx++];
+      setProgress(step.pct);
+      if (timerIdx < steps.length) {
+        setTimeout(advance, step.delay);
+      }
+    };
+    setTimeout(advance, 150);
+
     try {
       let result: AnalysisReport | null = null;
       try {
@@ -459,17 +484,23 @@ export default function UploadSequencePage() {
       } catch {
         result = clientSideAnalyze(validation.sequence, selectedModality) as unknown as AnalysisReport;
       }
+      cancelled = true;
       if (!result) {
         setError("Analysis failed.");
         setLoading(false);
+        setProgress(0);
         return;
       }
+      setProgress(100);
+      // Brief pause at 100% so user sees the bar complete
+      await new Promise((r) => setTimeout(r, 350));
       setAnalysis(result);
       setStep("analysis");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Analysis failed.");
     } finally {
       setLoading(false);
+      setProgress(0);
     }
   }
 
@@ -793,13 +824,50 @@ export default function UploadSequencePage() {
                   <button
                     onClick={handleAnalyze}
                     disabled={!selectedModality || loading}
-                    className="flex items-center gap-2 rounded-lg bg-brand px-5 py-2.5 text-[13.5px] font-medium text-white shadow-sm transition-colors hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-50"
+                    className="relative flex items-center gap-2 overflow-hidden rounded-lg bg-brand px-5 py-2.5 text-[13.5px] font-medium text-white shadow-sm transition-colors hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-                    {loading ? "Analyzing..." : "Run Analysis"}
-                    <ArrowRight className="h-3.5 w-3.5" />
+                    {loading && (
+                      <div
+                        className="absolute inset-0 bg-white/20 transition-all duration-300 ease-out"
+                        style={{ width: `${progress}%` }}
+                      />
+                    )}
+                    <span className="relative flex items-center gap-2">
+                      {loading ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Analyzing… {progress}%
+                        </>
+                      ) : (
+                        <>
+                          Run Analysis
+                          <ArrowRight className="h-3.5 w-3.5" />
+                        </>
+                      )}
+                    </span>
                   </button>
                 </div>
+                {loading && (
+                  <div className="mt-3">
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
+                      <div
+                        className="h-full rounded-full bg-brand transition-all duration-300 ease-out"
+                        style={{ width: `${progress}%` }}
+                      />
+                    </div>
+                    <p className="mt-1.5 text-[11px] text-slate-400">
+                      {progress < 15
+                        ? "Preparing sequence data…"
+                        : progress < 50
+                        ? "Computing thermodynamic properties…"
+                        : progress < 75
+                        ? "Analyzing modality-specific features…"
+                        : progress < 95
+                        ? "Running motif and complexity scans…"
+                        : "Finalizing results…"}
+                    </p>
+                  </div>
+                )}
               </div>
             </Card>
           )}
