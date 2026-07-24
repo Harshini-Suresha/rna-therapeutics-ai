@@ -808,3 +808,359 @@ def _stacking_energy_profile(seq: str, window: int = 10, step: int = 2) -> List[
         avg = sum(energies) / len(energies) if energies else 0
         points.append({"position": i + 1, "energy": round(avg, 3)})
     return points
+
+
+# ---------------------------------------------------------------------------
+# Tm sliding window curve
+# ---------------------------------------------------------------------------
+
+def _tm_sliding_window(seq: str, window: int = 10, step: int = 2) -> List[Dict[str, Any]]:
+    """Nearest-neighbor Tm at each window position along the sequence."""
+    dna = seq.upper().replace("U", "T")
+    length = len(dna)
+    if length < window:
+        tm = _melting_temperature(seq)
+        return [{"position": 1, "tm": tm["tmNearestNeighbor"]}]
+    points = []
+    for i in range(0, length - window + 1, step):
+        chunk = dna[i:i + window]
+        dH = dS = 0.0
+        for j in range(len(chunk) - 1):
+            dinuc = chunk[j:j + 2]
+            if dinuc in _DNA_NN:
+                h, s = _DNA_NN[dinuc]
+                dH += h; dS += s
+        if dS != 0:
+            import math
+            R = 1.987; C = 250e-6
+            tm = round(dH * 1000 / (dS + R * math.log(C / 4)) - 273.15, 1)
+        else:
+            tm = 0
+        points.append({"position": i + 1, "tm": tm})
+    return points
+
+
+# ---------------------------------------------------------------------------
+# Molecular weight & A260 extinction coefficient
+# ---------------------------------------------------------------------------
+
+_DNA_MW = {"A": 331.22, "T": 322.21, "G": 347.22, "C": 307.18}
+_RNA_MW = {"A": 347.22, "U": 324.18, "G": 363.22, "C": 323.18}
+_DNA_EC = {"A": 15400, "T": 8700, "G": 11500, "C": 7400}
+_RNA_EC = {"A": 15400, "U": 10000, "G": 11500, "C": 7400}
+
+
+def _molecular_weight(seq: str) -> Dict[str, Any]:
+    """MW and A260 extinction coefficient for bench work."""
+    seq_upper = seq.upper()
+    is_rna = "U" in seq_upper and "T" not in seq_upper
+    mw_table = _RNA_MW if is_rna else _DNA_MW
+    ec_table = _RNA_EC if is_rna else _DNA_EC
+    base_count = {b: seq_upper.count(b) for b in mw_table}
+    base_mw = sum(base_count.get(b, 0) * mw_table[b] for b in mw_table)
+    backbone_mw = (len(seq_upper) - 1) * 62.97
+    total_mw = round(base_mw + backbone_mw, 1)
+    extinction = sum(base_count.get(b, 0) * ec_table[b] for b in ec_table)
+    return {
+        "molecularWeight": total_mw,
+        "molecularWeightKda": round(total_mw / 1000, 2),
+        "extinctionCoefficient": extinction,
+        "baseCounts": base_count,
+        "length": len(seq_upper),
+        "type": "RNA" if is_rna else "DNA",
+        "note": "MW assumes standard phosphodiester backbone. PS bonds add ~16 Da per substitution.",
+    }
+
+
+# ---------------------------------------------------------------------------
+# GC skew
+# ---------------------------------------------------------------------------
+
+def _gc_skew(seq: str, window: int = 10, step: int = 2) -> List[Dict[str, Any]]:
+    """GC skew = (G − C) / (G + C) in sliding windows."""
+    seq_upper = seq.upper()
+    length = len(seq_upper)
+    if length < window:
+        g = seq_upper.count("G"); c = seq_upper.count("C")
+        skew = (g - c) / (g + c) if (g + c) > 0 else 0
+        return [{"position": 1, "skew": round(skew, 4), "g": g, "c": c}]
+    points = []
+    for i in range(0, length - window + 1, step):
+        chunk = seq_upper[i:i + window]
+        g = chunk.count("G"); c = chunk.count("C")
+        skew = (g - c) / (g + c) if (g + c) > 0 else 0
+        points.append({"position": i + 1, "skew": round(skew, 4), "g": g, "c": c})
+    return points
+
+
+# ---------------------------------------------------------------------------
+# Dinucleotide frequency
+# ---------------------------------------------------------------------------
+
+_BASES_DNA = ["A", "C", "G", "T"]
+_BASES_RNA = ["A", "C", "G", "U"]
+
+
+def _dinucleotide_frequency(seq: str) -> Dict[str, Any]:
+    """Count all 16 dinucleotide combinations for heatmap rendering."""
+    seq_upper = seq.upper()
+    is_rna = "U" in seq_upper and "T" not in seq_upper
+    seq_upper = seq_upper.replace("T", "U") if not is_rna else seq_upper
+    bases = _BASES_RNA if is_rna else ["A", "C", "G", "U"]
+    if not is_rna:
+        seq_upper = seq_upper.replace("U", "T")
+        bases = _BASES_DNA
+
+    counts = {}
+    for b1 in bases:
+        for b2 in bases:
+            counts[f"{b1}{b2}"] = 0
+    for i in range(len(seq_upper) - 1):
+        dinuc = seq_upper[i:i + 2]
+        if dinuc in counts:
+            counts[dinuc] += 1
+    matrix = [[counts[f"{b1}{b2}"] for b2 in bases] for b1 in bases]
+    total = sum(counts.values())
+    freq = {k: round(v / total, 4) if total > 0 else 0 for k, v in counts.items()}
+    return {"counts": counts, "frequency": freq, "matrix": matrix, "bases": bases, "total": total}
+
+
+# ---------------------------------------------------------------------------
+# Self-complementarity dot plot
+# ---------------------------------------------------------------------------
+
+def _dotplot_data(seq: str, min_stem: int = 4) -> Dict[str, Any]:
+    """Dot plot data: positions where complementary stretches exist."""
+    comp = {"A": "T", "T": "A", "G": "C", "C": "G", "U": "A"}
+    seq_upper = seq.upper()
+    max_len = min(len(seq_upper), 200)
+    dots = []
+    for i in range(max_len):
+        for j in range(i + min_stem, max_len):
+            match = True
+            for k in range(min_stem):
+                if i + k >= max_len or j + k >= max_len:
+                    match = False; break
+                if comp.get(seq_upper[i + k], "?") != seq_upper[j + k]:
+                    match = False; break
+            if match:
+                dots.append({"i": i + 1, "j": j + 1, "len": min_stem})
+                if len(dots) >= 500:
+                    break
+        if len(dots) >= 500:
+            break
+    return {"dots": dots, "length": max_len, "minStem": min_stem, "totalDots": len(dots)}
+
+
+# ---------------------------------------------------------------------------
+# Restriction enzyme sites
+# ---------------------------------------------------------------------------
+
+_RESTRICTION_ENZYMES = [
+    {"name": "EcoRI", "pattern": "GAATTC", "cutAfter": 1, "overhang": "5'"},
+    {"name": "BamHI", "pattern": "GGATCC", "cutAfter": 1, "overhang": "5'"},
+    {"name": "HindIII", "pattern": "AAGCTT", "cutAfter": 1, "overhang": "5'"},
+    {"name": "NotI", "pattern": "GCGGCCGC", "cutAfter": 2, "overhang": "5'"},
+    {"name": "XhoI", "pattern": "CTCGAG", "cutAfter": 1, "overhang": "5'"},
+    {"name": "SpeI", "pattern": "ACTAGT", "cutAfter": 1, "overhang": "5'"},
+    {"name": "NheI", "pattern": "GCTAGC", "cutAfter": 1, "overhang": "5'"},
+    {"name": "XbaI", "pattern": "TCTAGA", "cutAfter": 1, "overhang": "5'"},
+    {"name": "KpnI", "pattern": "GGTACC", "cutAfter": 5, "overhang": "3'"},
+    {"name": "PstI", "pattern": "CTGCAG", "cutAfter": 5, "overhang": "3'"},
+    {"name": "SmaI", "pattern": "CCCGGG", "cutAfter": 3, "overhang": "blunt"},
+    {"name": "MluI", "pattern": "ACGCGT", "cutAfter": 1, "overhang": "5'"},
+]
+
+
+def _restriction_sites(seq: str) -> List[Dict[str, Any]]:
+    """Find recognition sites for common restriction enzymes."""
+    seq_upper = seq.upper().replace("U", "T")
+    found = []
+    for enz in _RESTRICTION_ENZYMES:
+        for m in re.finditer(re.escape(enz["pattern"]), seq_upper):
+            found.append({
+                "enzyme": enz["name"], "pattern": enz["pattern"],
+                "start": m.start() + 1, "end": m.end(),
+                "cutAfter": enz["cutAfter"], "overhang": enz["overhang"],
+            })
+    return found
+
+
+# ---------------------------------------------------------------------------
+# miRNA seed-match screening
+# ---------------------------------------------------------------------------
+
+_HUMAN_MIRNA_SEEDS = [
+    {"name": "hsa-let-7a", "seed": "UGAGGUAG"},
+    {"name": "hsa-miR-21", "seed": "AGCUUAUC"},
+    {"name": "hsa-miR-155", "seed": "UUAAUGCU"},
+    {"name": "hsa-miR-122", "seed": "GGAGUGUG"},
+    {"name": "hsa-miR-34a", "seed": "GGCAGUGU"},
+    {"name": "hsa-miR-17", "seed": "CAAAGUGC"},
+    {"name": "hsa-miR-200a", "seed": "UAACACUG"},
+    {"name": "hsa-miR-15a", "seed": "AGCAGCAC"},
+    {"name": "hsa-miR-16", "seed": "AGCAGCAC"},
+    {"name": "hsa-miR-223", "seed": "UGUCAGUU"},
+    {"name": "hsa-miR-146a", "seed": "GAGAACUG"},
+    {"name": "hsa-miR-125b", "seed": "UCACAAGU"},
+    {"name": "hsa-miR-let-7b", "seed": "UGAGGUAG"},
+]
+
+
+def _mirna_seed_matches(seq: str) -> List[Dict[str, Any]]:
+    """Check for complementary matches to known miRNA seed regions."""
+    seq_upper = seq.upper().replace("T", "U")
+    comp = {"A": "U", "U": "A", "G": "C", "C": "G"}
+    matches = []
+    for mirna in _HUMAN_MIRNA_SEEDS:
+        seed = mirna["seed"]
+        for i in range(len(seq_upper) - 5):
+            fragment = seq_upper[i:i + min(8, len(seq_upper) - i)]
+            frag_rc = "".join(comp.get(b, "N") for b in reversed(fragment))
+            if len(frag_rc) >= 6 and seed[:len(frag_rc)] == frag_rc:
+                matches.append({
+                    "mirna": mirna["name"], "seed": seed,
+                    "matchPosition": i + 1, "matchLength": len(frag_rc),
+                    "matchSequence": fragment,
+                })
+                break
+        if len(matches) >= 15:
+            break
+    return matches
+
+
+# ---------------------------------------------------------------------------
+# Approved drug comparison
+# ---------------------------------------------------------------------------
+
+_APPROVED_ASO_DRUGS = [
+    {"name": "Nusinersen (Spinraza)", "length": 18, "gc": 55.6, "modality": "aso", "target": "SMN2"},
+    {"name": "Eteplirsen (Exondys 51)", "length": 30, "gc": 46.7, "modality": "aso", "target": "DMD exon 51"},
+    {"name": "Inotersen (Tegsedi)", "length": 18, "gc": 50.0, "modality": "aso", "target": "TTR"},
+    {"name": "Tofersen (Qalsody)", "length": 20, "gc": 55.0, "modality": "aso", "target": "SOD1"},
+    {"name": "Milasen (custom)", "length": 19, "gc": 47.4, "modality": "aso", "target": "Batten CLN7"},
+    {"name": "Viltolarsen (Viltepso)", "length": 23, "gc": 43.5, "modality": "aso", "target": "DMD exon 53"},
+    {"name": "Fomivirsen (Vitravene)", "length": 21, "gc": 47.6, "modality": "aso", "target": "CMV retinitis"},
+]
+_APPROVED_SIRNA_DRUGS = [
+    {"name": "Patisiran (Onpattro)", "length": 21, "gc": 47.6, "modality": "sirna", "target": "TTR"},
+    {"name": "Givosiran (Givlaari)", "length": 21, "gc": 42.9, "modality": "sirna", "target": "ALAS1"},
+    {"name": "Lumasiran (Oxlumo)", "length": 21, "gc": 52.4, "modality": "sirna", "target": "HAO1"},
+    {"name": "Inclisiran (Leqvio)", "length": 21, "gc": 47.6, "modality": "sirna", "target": "PCSK9"},
+    {"name": "Vutrisiran (Amvuttra)", "length": 21, "gc": 47.6, "modality": "sirna", "target": "TTR"},
+    {"name": "Nedosiran (Rivfloza)", "length": 21, "gc": 42.9, "modality": "sirna", "target": "LDHA"},
+]
+_APPROVED_SGRNA_DRUGS = [
+    {"name": "Casgevy (exa-cel)", "length": 20, "gc": 55.0, "modality": "sgrna", "target": "BCL11A enhancer"},
+]
+
+
+def _approved_drug_comparison(seq: str, modality: str) -> Dict[str, Any]:
+    """Compare sequence against real FDA-approved drugs of same modality."""
+    gc = _gc_content(seq)
+    length = len(seq)
+    drugs = {"aso": _APPROVED_ASO_DRUGS, "sirna": _APPROVED_SIRNA_DRUGS, "sgrna": _APPROVED_SGRNA_DRUGS}.get(modality, [])
+    my_data = {"name": "Your sequence", "length": length, "gc": gc, "modality": modality, "target": "—", "isUser": True}
+    return {
+        "drugs": drugs, "yourSequence": my_data,
+        "lengthRange": {"min": min(d["length"] for d in drugs) if drugs else 0, "max": max(d["length"] for d in drugs) if drugs else 0},
+        "gcRange": {"min": min(d["gc"] for d in drugs) if drugs else 0, "max": max(d["gc"] for d in drugs) if drugs else 0},
+    }
+
+
+# ---------------------------------------------------------------------------
+# Design-rule checklist
+# ---------------------------------------------------------------------------
+
+def _design_rule_checklist(seq: str, modality: str) -> Dict[str, Any]:
+    """Pass/fail checklist against modality-specific numeric design rules."""
+    gc = _gc_content(seq)
+    length = len(seq)
+    rules = []
+    if modality == "aso":
+        rules = [
+            {"rule": "Length 18–25 nt", "pass": 18 <= length <= 25, "actual": f"{length} nt"},
+            {"rule": "GC content 30–70%", "pass": 30 <= gc <= 70, "actual": f"{gc}%"},
+            {"rule": "No poly-G ≥ 4", "pass": "GGGG" not in seq.upper(), "actual": "Clear" if "GGGG" not in seq.upper() else "GGGG found"},
+            {"rule": "No poly-C ≥ 6", "pass": "CCCCCC" not in seq.upper(), "actual": "Clear" if "CCCCCC" not in seq.upper() else "CCCCCC found"},
+            {"rule": "No palindrome ≥ 8 nt", "pass": not _has_long_palindrome(seq, 8), "actual": "Clear" if not _has_long_palindrome(seq, 8) else "Found"},
+        ]
+    elif modality == "sirna":
+        rules = [
+            {"rule": "Length 19–25 nt", "pass": 19 <= length <= 25, "actual": f"{length} nt"},
+            {"rule": "GC content 30–52%", "pass": 30 <= gc <= 52, "actual": f"{gc}%"},
+            {"rule": "No poly-U ≥ 4 at 3' end", "pass": not seq.upper().endswith("UUUU"), "actual": "Clear" if not seq.upper().endswith("UUUU") else "Poly-U at 3'"},
+        ]
+    elif modality == "mrna":
+        orfs = _find_orfs(seq)
+        rules = [
+            {"rule": "Contains ORF", "pass": len(orfs) > 0, "actual": f"{len(orfs)} found"},
+            {"rule": "Poly-A tail present", "pass": _has_poly_a_tail(seq), "actual": "Yes" if _has_poly_a_tail(seq) else "No"},
+            {"rule": "GC content 40–60%", "pass": 40 <= gc <= 60, "actual": f"{gc}%"},
+            {"rule": "No poly-G ≥ 4", "pass": "GGGG" not in seq.upper(), "actual": "Clear" if "GGGG" not in seq.upper() else "GGGG found"},
+        ]
+    elif modality == "sgrna":
+        rules = [
+            {"rule": "Length 17–21 nt", "pass": 17 <= length <= 21, "actual": f"{length} nt"},
+            {"rule": "GC content 40–80%", "pass": 40 <= gc <= 80, "actual": f"{gc}%"},
+            {"rule": "NGG PAM at 3' end", "pass": bool(re.search(r"GG", seq.upper()[-5:])), "actual": "Yes" if bool(re.search(r"GG", seq.upper()[-5:])) else "Not detected"},
+            {"rule": "No poly-T ≥ 4", "pass": "TTTT" not in seq.upper(), "actual": "Clear" if "TTTT" not in seq.upper() else "TTTT found"},
+        ]
+    passed = sum(1 for r in rules if r["pass"])
+    return {"rules": rules, "passed": passed, "total": len(rules), "score": round(passed / len(rules) * 100) if rules else 0}
+
+
+def _has_long_palindrome(seq: str, min_len: int = 8) -> bool:
+    seq_upper = seq.upper()
+    for i in range(len(seq_upper) - min_len + 1):
+        chunk = seq_upper[i:i + min_len]
+        if chunk == chunk[::-1]:
+            return True
+    return False
+
+
+# ---------------------------------------------------------------------------
+# siRNA thermodynamic asymmetry
+# ---------------------------------------------------------------------------
+
+def _sirna_asymmetry(seq: str) -> Dict[str, Any]:
+    """Schwarz/Khvorova rule: 5' end of guide should be less stable."""
+    seq_upper = seq.upper().replace("T", "U")
+    length = len(seq_upper)
+    half = length // 2
+    if half < 5:
+        return {"asymmetric": False, "firstHalfEnergy": 0, "secondHalfEnergy": 0, "note": "Too short"}
+    first_half = seq_upper[:half].replace("U", "T")
+    second_half = seq_upper[half:].replace("U", "T")
+    def terminal_energy(subseq: str) -> float:
+        e = 0.0
+        for i in range(min(5, len(subseq)) - 1):
+            dinuc = subseq[i:i + 2]
+            if dinuc in _DNA_NN:
+                e += _DNA_NN[dinuc][0]
+        return round(e, 3)
+    fe = terminal_energy(first_half)
+    se = terminal_energy(second_half)
+    return {
+        "asymmetric": fe > se,
+        "firstHalfEnergy": fe, "secondHalfEnergy": se,
+        "firstHalfLength": half, "secondHalfLength": length - half,
+        "note": "5' terminal stability of guide should be LOWER (less negative ΔG) than 3' end — favors correct RISC loading (Schwarz/Khvorova rule).",
+    }
+
+
+# ---------------------------------------------------------------------------
+# Reverse complement view
+# ---------------------------------------------------------------------------
+
+def _reverse_complement_data(seq: str) -> Dict[str, Any]:
+    """Sequence and reverse complement for side-by-side display."""
+    seq_upper = seq.upper()
+    is_rna = "U" in seq_upper and "T" not in seq_upper
+    rc = _reverse_complement(seq_upper, is_rna)
+    matches = [seq_upper[i] == rc[i] for i in range(min(len(seq_upper), len(rc)))]
+    return {
+        "sequence": seq_upper, "reverseComplement": rc, "matches": matches,
+        "identity": round(sum(matches) / max(len(matches), 1) * 100, 1),
+        "type": "RNA" if is_rna else "DNA",
+    }

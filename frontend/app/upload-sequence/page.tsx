@@ -22,6 +22,11 @@ import {
   ChevronDown,
   ChevronUp,
   Info,
+  LayoutDashboard,
+  AlignLeft,
+  List,
+  GitBranch,
+  FlaskConical,
 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import Topbar from "@/components/Topbar";
@@ -50,6 +55,10 @@ import ModificationLandscapeCard from "@/components/ModificationLandscapeCard";
 import RiskScoreDashboard from "@/components/RiskScoreDashboard";
 import PhysicochemicalCard from "@/components/PhysicochemicalCard";
 import StabilityIndexChart from "@/components/StabilityIndexChart";
+import AnalysisTabs from "@/components/AnalysisTabs";
+import PairwiseAlignmentViewer from "@/components/PairwiseAlignmentViewer";
+import FeatureTable from "@/components/FeatureTable";
+import AnnotatedSequenceViewer from "@/components/AnnotatedSequenceViewer";
 
 type Step = "upload" | "validate" | "modality" | "analysis";
 
@@ -96,6 +105,7 @@ export default function UploadSequencePage() {
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [expandedRecs, setExpandedRecs] = useState<Record<string, boolean>>({});
+  const [activeTab, setActiveTab] = useState("overview");
 
   const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1180,367 +1190,487 @@ export default function UploadSequencePage() {
                 </div>
               </div>
 
-              {/* Sequence Track Viewer — full width */}
-              <Card className="p-5">
-                <p className="text-[14px] font-semibold text-slate-800 mb-3">Sequence Map</p>
-                <SequenceTrackViewer
-                  seqLength={analysis.length}
-                  orfs={analysis.orfs}
-                  immuneHits={analysis.immuneScreen}
-                  palindromePositions={analysis.secondaryStructure.palindromePositions ?? []}
-                  restrictionSites={analysis.restrictionSites}
-                  mirnaTargets={analysis.mirnaTargets}
-                />
-              </Card>
-
-              <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-                {/* GC Content Chart — full width */}
-                <Card className="p-5 lg:col-span-2">
-                  <p className="text-[14px] font-semibold text-slate-800 mb-1">GC Content Distribution</p>
-                  <p className="text-[11px] text-slate-400 mb-3">10 nt sliding window — green band marks the 40–60% optimal range</p>
-                  <GcContentChart data={analysis.gcCurve} seqLength={analysis.length} />
-                </Card>
-
-                {/* Nucleotide Composition */}
-                <Card className="p-5">
-                  <p className="text-[14px] font-semibold text-slate-800 mb-3">Nucleotide Composition</p>
-                  <NucleotideCompositionChart composition={analysis.composition} />
-                </Card>
-
-                {/* Specificity Heuristic */}
-                <Card className="p-5">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Shield className="h-4 w-4 text-slate-500" />
-                    <p className="text-[14px] font-semibold text-slate-800">Specificity Heuristic</p>
-                  </div>
-                  <div className="flex items-center gap-3 mb-2">
-                    <span
-                      className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                        analysis.offTarget.lengthBasedRiskEstimate === "Low"
-                          ? "bg-emerald-100 text-emerald-700"
-                          : analysis.offTarget.lengthBasedRiskEstimate === "Medium"
-                          ? "bg-amber-100 text-amber-700"
-                          : "bg-red-100 text-red-700"
-                      }`}
-                    >
-                      {analysis.offTarget.lengthBasedRiskEstimate} Risk
-                    </span>
-                  </div>
-                  <p className="text-[12px] text-slate-500 mb-2">{analysis.offTarget.note}</p>
-                  <div className="rounded-lg bg-slate-50 p-3 mb-2">
-                    <div className="flex justify-between text-[11px]">
-                      <span className="text-slate-400">Internal repetitiveness</span>
-                      <span className="font-medium text-slate-600">{(analysis.offTarget.internalRepetitiveness * 100).toFixed(1)}%</span>
-                    </div>
-                    <div className="mt-1 h-1.5 rounded-full bg-slate-200">
-                      <div
-                        className={`h-full rounded-full ${analysis.offTarget.internalRepetitiveness > 0.3 ? "bg-red-400" : "bg-emerald-400"}`}
-                        style={{ width: `${Math.min(analysis.offTarget.internalRepetitiveness * 100, 100)}%` }}
+              {/* Tabbed analysis interface */}
+              <AnalysisTabs
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+                tabs={[
+                  { id: "overview", label: "Overview", icon: LayoutDashboard },
+                  { id: "alignments", label: "Alignments", icon: AlignLeft },
+                  {
+                    id: "features",
+                    label: "Features",
+                    icon: List,
+                    badge: (analysis.restrictionSites?.length ?? 0) + (analysis.mirnaTargets?.length ?? 0) + analysis.immuneScreen.length + (analysis.orfs?.length ?? 0),
+                  },
+                  { id: "structure", label: "Structure", icon: GitBranch },
+                  { id: "properties", label: "Properties", icon: FlaskConical },
+                ]}
+              >
+                {/* ===== OVERVIEW TAB ===== */}
+                {activeTab === "overview" && (
+                  <div className="p-5 space-y-5">
+                    {/* Sequence Track Viewer */}
+                    <div>
+                      <p className="text-[14px] font-semibold text-slate-800 mb-3">Sequence Map</p>
+                      <SequenceTrackViewer
+                        seqLength={analysis.length}
+                        orfs={analysis.orfs}
+                        immuneHits={analysis.immuneScreen}
+                        palindromePositions={analysis.secondaryStructure.palindromePositions ?? []}
+                        restrictionSites={analysis.restrictionSites}
+                        mirnaTargets={analysis.mirnaTargets}
                       />
                     </div>
-                  </div>
-                  <div className="flex items-start gap-1.5 rounded-lg bg-amber-50 px-3 py-2 text-[11.5px] text-amber-700">
-                    <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-                    {analysis.offTarget.disclaimer}
-                  </div>
-                </Card>
 
-                {/* Secondary Structure */}
-                <Card className="p-5">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Thermometer className="h-4 w-4 text-slate-500" />
-                    <p className="text-[14px] font-semibold text-slate-800">Secondary Structure</p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3 mb-3">
-                    <div className="rounded-lg bg-slate-50 p-3 text-center">
-                      <p className="text-[10px] uppercase text-slate-400">Est. ΔG</p>
-                      <p className="text-[16px] font-bold text-slate-800 mt-0.5">{analysis.secondaryStructure.estimatedMfe} kcal/mol</p>
-                    </div>
-                    <div className="rounded-lg bg-slate-50 p-3 text-center">
-                      <p className="text-[10px] uppercase text-slate-400">Palindromes</p>
-                      <p className="text-[16px] font-bold text-slate-800 mt-0.5">{analysis.secondaryStructure.palindromicRegions}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-[11px] text-slate-400">Hairpin risk:</span>
-                    <span
-                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                        analysis.secondaryStructure.hairpinRisk === "Low"
-                          ? "bg-emerald-100 text-emerald-700"
-                          : analysis.secondaryStructure.hairpinRisk === "Medium"
-                          ? "bg-amber-100 text-amber-700"
-                          : "bg-red-100 text-red-700"
-                      }`}
-                    >
-                      {analysis.secondaryStructure.hairpinRisk}
-                    </span>
-                  </div>
-                  <div className="flex items-start gap-1.5 rounded-lg bg-slate-50 px-3 py-2 text-[11.5px] text-slate-500">
-                    <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-                    Composition-based MFE estimate, not a real folding prediction (e.g. RNAfold). Treat as a rough proxy only.
-                  </div>
-                </Card>
+                    <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                      {/* GC Content Chart */}
+                      <Card className="p-5 lg:col-span-2">
+                        <p className="text-[14px] font-semibold text-slate-800 mb-1">GC Content Distribution</p>
+                        <p className="text-[11px] text-slate-400 mb-3">10 nt sliding window — green band marks the 40–60% optimal range</p>
+                        <GcContentChart data={analysis.gcCurve} seqLength={analysis.length} />
+                      </Card>
 
-                {/* Immune Screen */}
-                <Card className="p-5">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Syringe className="h-4 w-4 text-slate-500" />
-                    <p className="text-[14px] font-semibold text-slate-800">Immune Sensing Patterns</p>
-                  </div>
-                  {analysis.immuneScreen.length === 0 ? (
-                    <div className="flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2.5">
-                      <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                      <p className="text-[12px] text-emerald-600">No immunostimulatory motifs detected</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-1.5 max-h-40 overflow-y-auto">
-                      {analysis.immuneScreen.map((m, i) => (
-                        <div key={i} className="flex items-center gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-1.5 text-[11px]">
-                          <span className="font-mono font-semibold text-amber-700 shrink-0">{m.motif}</span>
-                          <span className="text-amber-600 shrink-0">@ {m.start}–{m.end}</span>
-                          <span className="text-slate-500 truncate">{m.label}</span>
+                      {/* Nucleotide Composition */}
+                      <Card className="p-5">
+                        <p className="text-[14px] font-semibold text-slate-800 mb-3">Nucleotide Composition</p>
+                        <NucleotideCompositionChart composition={analysis.composition} />
+                      </Card>
+
+                      {/* Specificity Heuristic */}
+                      <Card className="p-5">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Shield className="h-4 w-4 text-slate-500" />
+                          <p className="text-[14px] font-semibold text-slate-800">Specificity Heuristic</p>
                         </div>
-                      ))}
+                        <div className="flex items-center gap-3 mb-2">
+                          <span
+                            className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                              analysis.offTarget.lengthBasedRiskEstimate === "Low"
+                                ? "bg-emerald-100 text-emerald-700"
+                                : analysis.offTarget.lengthBasedRiskEstimate === "Medium"
+                                ? "bg-amber-100 text-amber-700"
+                                : "bg-red-100 text-red-700"
+                            }`}
+                          >
+                            {analysis.offTarget.lengthBasedRiskEstimate} Risk
+                          </span>
+                        </div>
+                        <p className="text-[12px] text-slate-500 mb-2">{analysis.offTarget.note}</p>
+                        <div className="rounded-lg bg-slate-50 p-3 mb-2">
+                          <div className="flex justify-between text-[11px]">
+                            <span className="text-slate-400">Internal repetitiveness</span>
+                            <span className="font-medium text-slate-600">{(analysis.offTarget.internalRepetitiveness * 100).toFixed(1)}%</span>
+                          </div>
+                          <div className="mt-1 h-1.5 rounded-full bg-slate-200">
+                            <div
+                              className={`h-full rounded-full ${analysis.offTarget.internalRepetitiveness > 0.3 ? "bg-red-400" : "bg-emerald-400"}`}
+                              style={{ width: `${Math.min(analysis.offTarget.internalRepetitiveness * 100, 100)}%` }}
+                            />
+                          </div>
+                        </div>
+                        <div className="flex items-start gap-1.5 rounded-lg bg-amber-50 px-3 py-2 text-[11.5px] text-amber-700">
+                          <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                          {analysis.offTarget.disclaimer}
+                        </div>
+                      </Card>
+
+                      {/* Secondary Structure */}
+                      <Card className="p-5">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Thermometer className="h-4 w-4 text-slate-500" />
+                          <p className="text-[14px] font-semibold text-slate-800">Secondary Structure</p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3 mb-3">
+                          <div className="rounded-lg bg-slate-50 p-3 text-center">
+                            <p className="text-[10px] uppercase text-slate-400">Est. ΔG</p>
+                            <p className="text-[16px] font-bold text-slate-800 mt-0.5">{analysis.secondaryStructure.estimatedMfe} kcal/mol</p>
+                          </div>
+                          <div className="rounded-lg bg-slate-50 p-3 text-center">
+                            <p className="text-[10px] uppercase text-slate-400">Palindromes</p>
+                            <p className="text-[16px] font-bold text-slate-800 mt-0.5">{analysis.secondaryStructure.palindromicRegions}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-[11px] text-slate-400">Hairpin risk:</span>
+                          <span
+                            className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                              analysis.secondaryStructure.hairpinRisk === "Low"
+                                ? "bg-emerald-100 text-emerald-700"
+                                : analysis.secondaryStructure.hairpinRisk === "Medium"
+                                ? "bg-amber-100 text-amber-700"
+                                : "bg-red-100 text-red-700"
+                            }`}
+                          >
+                            {analysis.secondaryStructure.hairpinRisk}
+                          </span>
+                        </div>
+                        <div className="flex items-start gap-1.5 rounded-lg bg-slate-50 px-3 py-2 text-[11.5px] text-slate-500">
+                          <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                          Composition-based MFE estimate, not a real folding prediction (e.g. RNAfold). Treat as a rough proxy only.
+                        </div>
+                      </Card>
+
+                      {/* Immune Screen */}
+                      <Card className="p-5">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Syringe className="h-4 w-4 text-slate-500" />
+                          <p className="text-[14px] font-semibold text-slate-800">Immune Sensing Patterns</p>
+                        </div>
+                        {analysis.immuneScreen.length === 0 ? (
+                          <div className="flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2.5">
+                            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                            <p className="text-[12px] text-emerald-600">No immunostimulatory motifs detected</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                            {analysis.immuneScreen.map((m, i) => (
+                              <div key={i} className="flex items-center gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-1.5 text-[11px]">
+                                <span className="font-mono font-semibold text-amber-700 shrink-0">{m.motif}</span>
+                                <span className="text-amber-600 shrink-0">@ {m.start}–{m.end}</span>
+                                <span className="text-slate-500 truncate">{m.label}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        <div className="mt-3 flex items-start gap-1.5 rounded-lg bg-amber-50 px-3 py-2 text-[11.5px] text-amber-700">
+                          <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                          Pattern-matching against a short literature-informed list, not a validated immunogenicity assay. Positions are exact regex matches; biological labels are literature-informed guesses.
+                        </div>
+                      </Card>
+
+                      {/* Modality Recommendations */}
+                      <Card className="p-5">
+                        <div className="flex items-center gap-2 mb-3">
+                          <BarChart3 className="h-4 w-4 text-slate-500" />
+                          <p className="text-[14px] font-semibold text-slate-800">
+                            {MODALITIES.find((m) => m.id === selectedModality)?.name ?? "Modality"} Recommendations
+                          </p>
+                        </div>
+                        <div className="space-y-2">
+                          {(analysis.modality.recommendations ?? []).map((rec, i) => (
+                            <div key={i} className="flex items-start gap-2 rounded-lg bg-slate-50 px-3 py-2">
+                              <Star className="h-3 w-3 mt-0.5 shrink-0 text-brand" />
+                              <p className="text-[12px] text-slate-600">{rec}</p>
+                            </div>
+                          ))}
+                        </div>
+                        {analysis.modality.optimalLength && (
+                          <div className="mt-3 flex items-center gap-2 text-[12px] text-slate-500">
+                            <span className="font-medium">Optimal length:</span>
+                            <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-600">{analysis.modality.optimalLength}</span>
+                          </div>
+                        )}
+                        {analysis.modality.recommendedChemistry && (
+                          <div className="flex items-center gap-2 text-[12px] text-slate-500 mt-1">
+                            <span className="font-medium">Chemistry:</span>
+                            <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-600">{analysis.modality.recommendedChemistry}</span>
+                          </div>
+                        )}
+                        {analysis.modality.casProtein && (
+                          <div className="flex items-center gap-2 text-[12px] text-slate-500 mt-1">
+                            <span className="font-medium">Cas protein:</span>
+                            <span className="rounded-md bg-purple-50 px-2 py-0.5 text-[11px] font-medium text-purple-600">{analysis.modality.casProtein}</span>
+                          </div>
+                        )}
+                        {analysis.modality.nucleosideModifications && (
+                          <div className="mt-3">
+                            <p className="text-[11px] font-medium text-slate-500 mb-1">Suggested modifications:</p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {analysis.modality.nucleosideModifications.map((mod) => (
+                                <span key={mod} className="rounded-full bg-blue-50 px-2.5 py-0.5 text-[10px] font-medium text-blue-600">{mod}</span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </Card>
                     </div>
-                  )}
-                  <div className="mt-3 flex items-start gap-1.5 rounded-lg bg-amber-50 px-3 py-2 text-[11.5px] text-amber-700">
-                    <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-                    Pattern-matching against a short literature-informed list, not a validated immunogenicity assay. Positions are exact regex matches; biological labels are literature-informed guesses.
+
+                    {/* Melting Temperature */}
+                    {analysis.meltingTemp && (
+                      <Card className="p-5">
+                        <MeltingTemperatureCard tm={analysis.meltingTemp} />
+                      </Card>
+                    )}
                   </div>
-                </Card>
+                )}
 
-                {/* Modality Recommendations */}
-                <Card className="p-5">
-                  <div className="flex items-center gap-2 mb-3">
-                    <BarChart3 className="h-4 w-4 text-slate-500" />
-                    <p className="text-[14px] font-semibold text-slate-800">
-                      {MODALITIES.find((m) => m.id === selectedModality)?.name ?? "Modality"} Recommendations
-                    </p>
+                {/* ===== ALIGNMENTS TAB ===== */}
+                {activeTab === "alignments" && (
+                  <div className="p-5 space-y-5">
+                    <Card className="p-5">
+                      <PairwiseAlignmentViewer
+                        sequence={analysis.sequence}
+                        features={[
+                          ...(analysis.restrictionSites ?? []).map((s) => ({
+                            start: s.cutPosition,
+                            end: s.cutPosition + s.recognitionSite.length - 1,
+                            label: s.enzyme,
+                            type: "restriction",
+                            color: "#ec4899",
+                          })),
+                          ...(analysis.mirnaTargets ?? []).map((t) => ({
+                            start: t.start,
+                            end: t.end,
+                            label: t.mirnaId,
+                            type: "mirna",
+                            color: "#8b5cf6",
+                          })),
+                          ...(analysis.immuneScreen ?? []).slice(0, 10).map((m) => ({
+                            start: m.start,
+                            end: m.end,
+                            label: m.motif,
+                            type: "immune",
+                            color: "#f59e0b",
+                          })),
+                          ...(analysis.orfs ?? []).slice(0, 5).map((o) => ({
+                            start: o.start,
+                            end: o.end,
+                            label: `ORF ${o.strand} f${o.frame}`,
+                            type: "orf",
+                            color: "#3b82f6",
+                          })),
+                        ]}
+                      />
+                    </Card>
+
+                    {/* Restriction Enzyme Map */}
+                    {analysis.restrictionSites && analysis.restrictionSites.length > 0 && (
+                      <Card className="p-5">
+                        <RestrictionSiteMap
+                          sites={analysis.restrictionSites}
+                          seqLength={analysis.length}
+                        />
+                      </Card>
+                    )}
+
+                    {/* miRNA Targeting */}
+                    {analysis.mirnaTargets && analysis.mirnaTargets.length > 0 && (
+                      <Card className="p-5">
+                        <MiRNATargetingCard
+                          targets={analysis.mirnaTargets}
+                          seqLength={analysis.length}
+                        />
+                      </Card>
+                    )}
                   </div>
-                  <div className="space-y-2">
-                    {(analysis.modality.recommendations ?? []).map((rec, i) => (
-                      <div key={i} className="flex items-start gap-2 rounded-lg bg-slate-50 px-3 py-2">
-                        <Star className="h-3 w-3 mt-0.5 shrink-0 text-brand" />
-                        <p className="text-[12px] text-slate-600">{rec}</p>
-                      </div>
-                    ))}
+                )}
+
+                {/* ===== FEATURES TAB ===== */}
+                {activeTab === "features" && (
+                  <div className="p-5 space-y-5">
+                    <FeatureTable
+                      restrictionSites={analysis.restrictionSites}
+                      mirnaTargets={analysis.mirnaTargets}
+                      immuneHits={analysis.immuneScreen}
+                      orfs={analysis.orfs}
+                      hairpins={analysis.hairpins}
+                    />
+
+                    <AnnotatedSequenceViewer
+                      sequence={analysis.sequence}
+                      features={[
+                        ...(analysis.restrictionSites ?? []).map((s) => ({
+                          start: s.cutPosition,
+                          end: s.cutPosition + s.recognitionSite.length - 1,
+                          label: s.enzyme,
+                          type: "restriction",
+                          color: "#ec4899",
+                        })),
+                        ...(analysis.mirnaTargets ?? []).map((t) => ({
+                          start: t.start,
+                          end: t.end,
+                          label: t.mirnaId,
+                          type: "mirna",
+                          color: "#8b5cf6",
+                        })),
+                        ...(analysis.immuneScreen ?? []).slice(0, 10).map((m) => ({
+                          start: m.start,
+                          end: m.end,
+                          label: m.motif,
+                          type: "immune",
+                          color: "#f59e0b",
+                        })),
+                        ...(analysis.orfs ?? []).slice(0, 5).map((o) => ({
+                          start: o.start,
+                          end: o.end,
+                          label: `ORF ${o.strand} f${o.frame}`,
+                          type: "orfs",
+                          color: "#3b82f6",
+                        })),
+                        ...(analysis.hairpins ?? []).map((h) => ({
+                          start: h.start,
+                          end: h.end,
+                          label: h.type.replace("_", " "),
+                          type: "structure",
+                          color: "#10b981",
+                        })),
+                      ]}
+                    />
+
+                    {/* Modification Scores */}
+                    {analysis.modificationScores && (
+                      <Card className="p-5">
+                        <ModificationScorecard scores={analysis.modificationScores} />
+                      </Card>
+                    )}
+
+                    {/* Codon Usage */}
+                    {analysis.codonUsage && analysis.codonUsage.totalCodons > 0 && (
+                      <Card className="p-5">
+                        <CodonUsageCard codonUsage={analysis.codonUsage} />
+                      </Card>
+                    )}
                   </div>
-                  {analysis.modality.optimalLength && (
-                    <div className="mt-3 flex items-center gap-2 text-[12px] text-slate-500">
-                      <span className="font-medium">Optimal length:</span>
-                      <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-600">{analysis.modality.optimalLength}</span>
+                )}
+
+                {/* ===== STRUCTURE TAB ===== */}
+                {activeTab === "structure" && (
+                  <div className="p-5 space-y-5">
+                    {/* Thermodynamic Profile */}
+                    {analysis.thermoProfile && (
+                      <Card className="p-5">
+                        <ThermodynamicProfile profile={analysis.thermoProfile} />
+                      </Card>
+                    )}
+
+                    {/* Hairpin Diagram */}
+                    {analysis.hairpins && analysis.hairpins.length > 0 && (
+                      <Card className="p-5">
+                        <HairpinDiagram
+                          hairpins={analysis.hairpins}
+                          seqLength={analysis.length}
+                        />
+                      </Card>
+                    )}
+
+                    {/* Base Pair Dot Plot */}
+                    {analysis.dotPlot && analysis.dotPlot.length > 0 && (
+                      <Card className="p-5">
+                        <BasePairDotPlot
+                          points={analysis.dotPlot}
+                          seqLength={analysis.length}
+                        />
+                      </Card>
+                    )}
+
+                    <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                      {/* Stacking Energy Profile */}
+                      {analysis.energyProfile && analysis.energyProfile.length > 0 && (
+                        <Card className="p-5">
+                          <p className="text-[14px] font-semibold text-slate-800 mb-1">Base-Stacking Energy Profile</p>
+                          <p className="text-[11px] text-slate-400 mb-3">10 nt sliding window average nearest-neighbor ΔG (kcal/mol)</p>
+                          <StackingEnergyChart data={analysis.energyProfile} seqLength={analysis.length} />
+                        </Card>
+                      )}
+
+                      {/* Stability Index */}
+                      {analysis.stabilityIndex && analysis.stabilityIndex.length > 0 && (
+                        <Card className="p-5">
+                          <StabilityIndexChart
+                            data={analysis.stabilityIndex}
+                            seqLength={analysis.length}
+                          />
+                        </Card>
+                      )}
                     </div>
-                  )}
-                  {analysis.modality.recommendedChemistry && (
-                    <div className="flex items-center gap-2 text-[12px] text-slate-500 mt-1">
-                      <span className="font-medium">Chemistry:</span>
-                      <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-600">{analysis.modality.recommendedChemistry}</span>
+
+                    {/* Sequence Complexity */}
+                    {analysis.complexity && (
+                      <Card className="p-5">
+                        <SequenceComplexityCard complexity={analysis.complexity} />
+                      </Card>
+                    )}
+
+                    {/* Sequence Annotation Bar */}
+                    <Card className="p-5">
+                      <SequenceAnnotationBar
+                        annotations={[
+                          ...(analysis.restrictionSites ?? []).map((s, i) => ({
+                            id: `restr-${i}`,
+                            label: s.enzyme,
+                            start: s.cutPosition,
+                            end: s.cutPosition,
+                            type: "restriction" as const,
+                          })),
+                          ...(analysis.mirnaTargets ?? []).map((t, i) => ({
+                            id: `mirna-${i}`,
+                            label: t.mirnaId,
+                            start: t.start,
+                            end: t.end,
+                            type: "mirna" as const,
+                          })),
+                          ...(analysis.immuneScreen ?? []).slice(0, 15).map((m, i) => ({
+                            id: `imm-${i}`,
+                            label: m.motif,
+                            start: m.start,
+                            end: m.end,
+                            type: "immune" as const,
+                          })),
+                          ...(analysis.orfs ?? []).map((o, i) => ({
+                            id: `orf-${i}`,
+                            label: `ORF ${o.strand} f${o.frame}`,
+                            start: o.start,
+                            end: o.end,
+                            type: "orfs" as const,
+                          })),
+                          ...(analysis.complexity?.gcRichRegions ?? []).map((r, i) => ({
+                            id: `gc-${i}`,
+                            label: `GC-rich`,
+                            start: r.start,
+                            end: r.end,
+                            type: "complexity" as const,
+                          })),
+                          ...(analysis.hairpins ?? []).map((h, i) => ({
+                            id: `hp-${i}`,
+                            label: h.type.replace("_", " "),
+                            start: h.start,
+                            end: h.end,
+                            type: "structure" as const,
+                          })),
+                        ]}
+                        seqLength={analysis.length}
+                      />
+                    </Card>
+                  </div>
+                )}
+
+                {/* ===== PROPERTIES TAB ===== */}
+                {activeTab === "properties" && (
+                  <div className="p-5 space-y-5">
+                    {/* Risk Score Dashboard */}
+                    {analysis.riskScores && (
+                      <RiskScoreDashboard riskScores={analysis.riskScores} />
+                    )}
+
+                    <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                      {/* Modification Landscape */}
+                      {analysis.modificationLandscape && analysis.modificationLandscape.length > 0 && (
+                        <Card className="p-5">
+                          <ModificationLandscapeCard
+                            landscape={analysis.modificationLandscape}
+                            seqLength={analysis.length}
+                          />
+                        </Card>
+                      )}
+
+                      {/* Kmer Frequency */}
+                      {analysis.kmerFrequency && (
+                        <Card className="p-5">
+                          <KmerFrequencyChart kmerData={analysis.kmerFrequency} />
+                        </Card>
+                      )}
+
+                      {/* Physicochemical Properties */}
+                      {analysis.physicochemical && (
+                        <Card className="p-5">
+                          <PhysicochemicalCard profile={analysis.physicochemical} />
+                        </Card>
+                      )}
                     </div>
-                  )}
-                  {analysis.modality.casProtein && (
-                    <div className="flex items-center gap-2 text-[12px] text-slate-500 mt-1">
-                      <span className="font-medium">Cas protein:</span>
-                      <span className="rounded-md bg-purple-50 px-2 py-0.5 text-[11px] font-medium text-purple-600">{analysis.modality.casProtein}</span>
-                    </div>
-                  )}
-                  {analysis.modality.nucleosideModifications && (
-                    <div className="mt-3">
-                      <p className="text-[11px] font-medium text-slate-500 mb-1">Suggested modifications:</p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {analysis.modality.nucleosideModifications.map((mod) => (
-                          <span key={mod} className="rounded-full bg-blue-50 px-2.5 py-0.5 text-[10px] font-medium text-blue-600">{mod}</span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </Card>
-              </div>
-
-              {/* ===== NEW ANALYSIS CARDS ===== */}
-
-              {/* Melting Temperature */}
-              {analysis.meltingTemp && (
-                <Card className="p-5">
-                  <MeltingTemperatureCard tm={analysis.meltingTemp} />
-                </Card>
-              )}
-
-              {/* Modification Scores */}
-              {analysis.modificationScores && (
-                <Card className="p-5">
-                  <ModificationScorecard scores={analysis.modificationScores} />
-                </Card>
-              )}
-
-              <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-                {/* Stacking Energy Profile */}
-                {analysis.energyProfile && analysis.energyProfile.length > 0 && (
-                  <Card className="p-5">
-                    <p className="text-[14px] font-semibold text-slate-800 mb-1">Base-Stacking Energy Profile</p>
-                    <p className="text-[11px] text-slate-400 mb-3">10 nt sliding window average nearest-neighbor ΔG (kcal/mol)</p>
-                    <StackingEnergyChart data={analysis.energyProfile} seqLength={analysis.length} />
-                  </Card>
+                  </div>
                 )}
-
-                {/* Sequence Complexity */}
-                {analysis.complexity && (
-                  <Card className="p-5">
-                    <SequenceComplexityCard complexity={analysis.complexity} />
-                  </Card>
-                )}
-              </div>
-
-              {/* Codon Usage (relevant for mRNA, show for all) */}
-              {analysis.codonUsage && analysis.codonUsage.totalCodons > 0 && (
-                <Card className="p-5">
-                  <CodonUsageCard codonUsage={analysis.codonUsage} />
-                </Card>
-              )}
-
-              {/* ===== NEW VISUALIZATION COMPONENTS ===== */}
-
-              {/* Risk Score Dashboard */}
-              {analysis.riskScores && (
-                <Card className="p-5">
-                  <RiskScoreDashboard riskScores={analysis.riskScores} />
-                </Card>
-              )}
-
-              <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-                {/* Restriction Enzyme Map */}
-                {analysis.restrictionSites && analysis.restrictionSites.length > 0 && (
-                  <Card className="p-5">
-                    <RestrictionSiteMap
-                      sites={analysis.restrictionSites}
-                      seqLength={analysis.length}
-                    />
-                  </Card>
-                )}
-
-                {/* miRNA Targeting */}
-                {analysis.mirnaTargets && analysis.mirnaTargets.length > 0 && (
-                  <Card className="p-5">
-                    <MiRNATargetingCard
-                      targets={analysis.mirnaTargets}
-                      seqLength={analysis.length}
-                    />
-                  </Card>
-                )}
-
-                {/* Thermodynamic Profile */}
-                {analysis.thermoProfile && (
-                  <Card className="p-5">
-                    <ThermodynamicProfile profile={analysis.thermoProfile} />
-                  </Card>
-                )}
-
-                {/* Kmer Frequency */}
-                {analysis.kmerFrequency && (
-                  <Card className="p-5">
-                    <KmerFrequencyChart kmerData={analysis.kmerFrequency} />
-                  </Card>
-                )}
-              </div>
-
-              {/* Hairpin Diagram */}
-              {analysis.hairpins && analysis.hairpins.length > 0 && (
-                <Card className="p-5">
-                  <HairpinDiagram
-                    hairpins={analysis.hairpins}
-                    seqLength={analysis.length}
-                  />
-                </Card>
-              )}
-
-              <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-                {/* Modification Landscape */}
-                {analysis.modificationLandscape && analysis.modificationLandscape.length > 0 && (
-                  <Card className="p-5">
-                    <ModificationLandscapeCard
-                      landscape={analysis.modificationLandscape}
-                      seqLength={analysis.length}
-                    />
-                  </Card>
-                )}
-
-                {/* Base Pair Dot Plot */}
-                {analysis.dotPlot && analysis.dotPlot.length > 0 && (
-                  <Card className="p-5">
-                    <BasePairDotPlot
-                      points={analysis.dotPlot}
-                      seqLength={analysis.length}
-                    />
-                  </Card>
-                )}
-
-                {/* Physicochemical Properties */}
-                {analysis.physicochemical && (
-                  <Card className="p-5">
-                    <PhysicochemicalCard profile={analysis.physicochemical} />
-                  </Card>
-                )}
-
-                {/* Stability Index */}
-                {analysis.stabilityIndex && analysis.stabilityIndex.length > 0 && (
-                  <Card className="p-5">
-                    <StabilityIndexChart
-                      data={analysis.stabilityIndex}
-                      seqLength={analysis.length}
-                    />
-                  </Card>
-                )}
-              </div>
-
-              {/* Sequence Annotation Bar (full width) */}
-              <Card className="p-5">
-                <SequenceAnnotationBar
-                  annotations={[
-                    ...(analysis.restrictionSites ?? []).map((s, i) => ({
-                      id: `restr-${i}`,
-                      label: s.enzyme,
-                      start: s.cutPosition,
-                      end: s.cutPosition,
-                      type: "restriction" as const,
-                    })),
-                    ...(analysis.mirnaTargets ?? []).map((t, i) => ({
-                      id: `mirna-${i}`,
-                      label: t.mirnaId,
-                      start: t.start,
-                      end: t.end,
-                      type: "mirna" as const,
-                    })),
-                    ...(analysis.immuneScreen ?? []).slice(0, 15).map((m, i) => ({
-                      id: `imm-${i}`,
-                      label: m.motif,
-                      start: m.start,
-                      end: m.end,
-                      type: "immune" as const,
-                    })),
-                    ...(analysis.orfs ?? []).map((o, i) => ({
-                      id: `orf-${i}`,
-                      label: `ORF ${o.strand} f${o.frame}`,
-                      start: o.start,
-                      end: o.end,
-                      type: "orfs" as const,
-                    })),
-                    ...(analysis.complexity?.gcRichRegions ?? []).map((r, i) => ({
-                      id: `gc-${i}`,
-                      label: `GC-rich`,
-                      start: r.start,
-                      end: r.end,
-                      type: "complexity" as const,
-                    })),
-                    ...(analysis.hairpins ?? []).map((h, i) => ({
-                      id: `hp-${i}`,
-                      label: h.type.replace("_", " "),
-                      start: h.start,
-                      end: h.end,
-                      type: "structure" as const,
-                    })),
-                  ]}
-                  seqLength={analysis.length}
-                />
-              </Card>
+              </AnalysisTabs>
 
               {/* Action buttons */}
               <div className="flex justify-end gap-3">
