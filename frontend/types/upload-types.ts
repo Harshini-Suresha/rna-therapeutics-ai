@@ -33,6 +33,7 @@ export interface SpecificityHeuristic {
 export interface SecondaryStructureEstimate {
   estimatedMfe: number;
   palindromicRegions: number;
+  palindromePositions: number[];
   gcContent: number;
   hairpinRisk: "High" | "Medium" | "Low";
 }
@@ -40,6 +41,21 @@ export interface SecondaryStructureEstimate {
 export interface ImmuneMotifHit {
   motif: string;
   label: string;
+  start: number;
+  end: number;
+}
+
+export interface GcCurvePoint {
+  position: number;
+  gc: number;
+}
+
+export interface NucleotideComposition {
+  A: number;
+  C: number;
+  G: number;
+  T: number;
+  U: number;
 }
 
 export type Modality = "aso" | "sirna" | "mrna" | "sgrna";
@@ -60,6 +76,7 @@ export interface ModalityAnalysis {
 }
 
 export interface AnalyzeResponse {
+  sequence: string;
   sequenceType: "dna" | "rna" | "unknown";
   length: number;
   gcContent: number;
@@ -67,4 +84,7 @@ export interface AnalyzeResponse {
   secondaryStructure: SecondaryStructureEstimate;
   immuneScreen: ImmuneMotifHit[];
   modality: ModalityAnalysis;
+  gcCurve: GcCurvePoint[];
+  composition: NucleotideComposition;
+  orfs: OrfHit[];
 }

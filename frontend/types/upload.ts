@@ -33,6 +33,7 @@ export interface OffTargetResult {
 export interface SecondaryStructureResult {
   estimatedMfe: number;
   palindromicRegions: number;
+  palindromePositions: number[];
   gcContent: number;
   hairpinRisk: "High" | "Medium" | "Low";
 }
@@ -40,6 +41,8 @@ export interface SecondaryStructureResult {
 export interface ImmuneMotif {
   motif: string;
   label: string;
+  start: number;
+  end: number;
 }
 
 export interface ModalityResult {
@@ -57,7 +60,21 @@ export interface ModalityResult {
   offTargetMitigation?: string;
 }
 
+export interface GcWindow {
+  position: number;
+  gc: number;
+}
+
+export interface NucleotideComposition {
+  A: number;
+  C: number;
+  G: number;
+  T: number;
+  U: number;
+}
+
 export interface AnalysisReport {
+  sequence: string;
   sequenceType: string;
   length: number;
   gcContent: number;
@@ -65,4 +82,9 @@ export interface AnalysisReport {
   secondaryStructure: SecondaryStructureResult;
   immuneScreen: ImmuneMotif[];
   modality: ModalityResult;
+  gcCurve: GcWindow[];
+  composition: NucleotideComposition;
+  orfs: OrfInfo[];
 }
+
+export type Modality = "aso" | "sirna" | "mrna" | "sgrna";

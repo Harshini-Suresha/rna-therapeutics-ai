@@ -13,8 +13,12 @@ import {
 import Sidebar from "@/components/Sidebar";
 import Topbar from "@/components/Topbar";
 import { Card, SectionHeader, Pill } from "@/components/ui";
+import GcContentChart from "@/components/GcContentChart";
+import NucleotideCompositionChart from "@/components/NucleotideCompositionChart";
+import SequenceTrackViewer from "@/components/SequenceTrackViewer";
+import ExportMenu from "@/components/ExportMenu";
 import { validateSequence, analyzeSequence } from "@/lib/uploadApi";
-import { ValidateResponse, AnalyzeResponse, Modality } from "@/types/upload-types";
+import type { ValidateResponse, AnalyzeResponse, Modality } from "@/types/upload-types";
 
 const MODALITIES: { id: Modality; label: string }[] = [
   { id: "aso", label: "ASO (antisense oligonucleotide)" },
@@ -202,7 +206,7 @@ export default function UploadSequencePage() {
                 <div className="border-t border-slate-100 px-6 py-3">
                   <p className="mb-1.5 text-[11px] font-medium text-slate-400">Features</p>
                   <ul className="space-y-1">
-                    {validation.features.map((f: string, i: number) => (
+                    {validation.features.map((f, i) => (
                       <li key={i} className="text-[12.5px] text-slate-600">
                         • {f}
                       </li>
@@ -217,7 +221,7 @@ export default function UploadSequencePage() {
                     Open Reading Frames ({validation.orfs.length} found, both strands)
                   </p>
                   <div className="space-y-1">
-                    {validation.orfs.map((orf: { strand: string; frame: number; start: number; end: number; proteinLength: number }, i: number) => (
+                    {validation.orfs.map((orf, i) => (
                       <div key={i} className="flex items-center gap-3 text-[12px] text-slate-600">
                         <Pill tone="blue">{orf.strand} strand</Pill>
                         <span>Frame {orf.frame}</span>
@@ -270,13 +274,66 @@ export default function UploadSequencePage() {
 
           {/* Analysis results */}
           {analysis && (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <p className="text-[13px] text-slate-500">
+                  Analysis for {analysis.length} nt sequence, analyzed as{" "}
+                  {MODALITIES.find((m) => m.id === modality)?.label}.
+                </p>
+                {validation && validation.sequence && (
+                  <ExportMenu
+                    sequence={validation.sequence}
+                    validation={validation}
+                    analysis={analysis}
+                    modalityName={MODALITIES.find((m) => m.id === modality)?.label ?? modality}
+                  />
+                )}
+              </div>
+
+              {/* Sequence track — real positions, not just counts */}
+              <Card className="p-5">
+                <p className="text-[13px] font-semibold text-slate-800">Sequence Map</p>
+                <p className="mt-0.5 text-[12px] text-slate-500">
+                  Hover any marker for details. Positions are exact, computed from the real sequence.
+                </p>
+                <div className="mt-4">
+                  <SequenceTrackViewer
+                    seqLength={analysis.length}
+                    orfs={analysis.orfs}
+                    immuneHits={analysis.immuneScreen}
+                    palindromePositions={analysis.secondaryStructure.palindromePositions}
+                  />
+                </div>
+              </Card>
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                {/* GC content curve */}
+                <Card className="p-5">
+                  <p className="text-[13px] font-semibold text-slate-800">GC Content Along Sequence</p>
+                  <p className="mt-0.5 text-[12px] text-slate-500">
+                    10 nt sliding window · shaded band = typical optimal range (30–70%)
+                  </p>
+                  <div className="mt-3">
+                    <GcContentChart data={analysis.gcCurve} seqLength={analysis.length} />
+                  </div>
+                </Card>
+
+                {/* Nucleotide composition */}
+                <Card className="p-5">
+                  <p className="text-[13px] font-semibold text-slate-800">Nucleotide Composition</p>
+                  <p className="mt-0.5 text-[12px] text-slate-500">Real base counts from the sequence</p>
+                  <div className="mt-4">
+                    <NucleotideCompositionChart composition={analysis.composition} />
+                  </div>
+                </Card>
+              </div>
+
               {/* Modality-specific recommendations */}
-              <Card className="p-5 md:col-span-2">
+              <Card className="p-5">
                 <p className="text-[13px] font-semibold text-slate-800">
                   {MODALITIES.find((m) => m.id === modality)?.label} Design Recommendations
                 </p>
-                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
                   {analysis.modality.recommendedChemistry && (
                     <Stat label="Recommended Chemistry" value={analysis.modality.recommendedChemistry} />
                   )}
@@ -292,7 +349,7 @@ export default function UploadSequencePage() {
                 </div>
                 {analysis.modality.recommendations && analysis.modality.recommendations.length > 0 && (
                   <ul className="mt-3 space-y-1 border-t border-slate-100 pt-3">
-                    {analysis.modality.recommendations.map((r: string, i: number) => (
+                    {analysis.modality.recommendations.map((r, i) => (
                       <li key={i} className="text-[12.5px] text-slate-600">
                         • {r}
                       </li>
@@ -301,47 +358,52 @@ export default function UploadSequencePage() {
                 )}
               </Card>
 
-              {/* Specificity heuristic — clearly not a real off-target screen */}
-              <Card className="p-5">
-                <div className="flex items-center justify-between">
-                  <p className="text-[13px] font-semibold text-slate-800">Specificity Heuristic</p>
-                  <Pill tone={riskTone(analysis.offTarget.lengthBasedRiskEstimate)}>
-                    {analysis.offTarget.lengthBasedRiskEstimate}
-                  </Pill>
-                </div>
-                <p className="mt-1.5 text-[12px] text-slate-500">{analysis.offTarget.note}</p>
-                <p className="mt-2 text-[12px] text-slate-500">
-                  Internal repetitiveness: {analysis.offTarget.internalRepetitiveness}
-                </p>
-                <div className="mt-3 flex items-start gap-1.5 rounded-lg bg-amber-50 px-3 py-2 text-[11.5px] text-amber-700">
-                  <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-                  {analysis.offTarget.disclaimer}
-                </div>
-              </Card>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                {/* Specificity heuristic — clearly not a real off-target screen */}
+                <Card className="p-5">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[13px] font-semibold text-slate-800">Specificity Heuristic</p>
+                    <Pill tone={riskTone(analysis.offTarget.lengthBasedRiskEstimate)}>
+                      {analysis.offTarget.lengthBasedRiskEstimate}
+                    </Pill>
+                  </div>
+                  <p className="mt-1.5 text-[12px] text-slate-500">{analysis.offTarget.note}</p>
+                  <p className="mt-2 text-[12px] text-slate-500">
+                    Internal repetitiveness: {analysis.offTarget.internalRepetitiveness}
+                  </p>
+                  <div className="mt-3 flex items-start gap-1.5 rounded-lg bg-amber-50 px-3 py-2 text-[11.5px] text-amber-700">
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                    {analysis.offTarget.disclaimer}
+                  </div>
+                </Card>
 
-              {/* Secondary structure estimate */}
-              <Card className="p-5">
-                <p className="text-[13px] font-semibold text-slate-800">Secondary Structure (Estimated)</p>
-                <div className="mt-3 grid grid-cols-2 gap-3">
-                  <Stat label="Est. MFE" value={`${analysis.secondaryStructure.estimatedMfe} kcal/mol`} />
-                  <Stat label="Hairpin Risk" value={analysis.secondaryStructure.hairpinRisk} />
-                  <Stat label="Palindromic Regions" value={String(analysis.secondaryStructure.palindromicRegions)} />
-                  <Stat label="GC Content" value={`${analysis.secondaryStructure.gcContent}%`} />
-                </div>
-                <div className="mt-3 flex items-start gap-1.5 rounded-lg bg-slate-50 px-3 py-2 text-[11.5px] text-slate-500">
-                  <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-                  Simplified GC/AU-composition estimate, not a real folding prediction (e.g. RNAfold). Treat as a rough proxy only.
-                </div>
-              </Card>
+                {/* Secondary structure estimate */}
+                <Card className="p-5">
+                  <p className="text-[13px] font-semibold text-slate-800">Secondary Structure (Estimated)</p>
+                  <div className="mt-3 grid grid-cols-2 gap-3">
+                    <Stat label="Est. MFE" value={`${analysis.secondaryStructure.estimatedMfe} kcal/mol`} />
+                    <Stat label="Hairpin Risk" value={analysis.secondaryStructure.hairpinRisk} />
+                    <Stat label="Palindromic Regions" value={String(analysis.secondaryStructure.palindromicRegions)} />
+                    <Stat label="GC Content" value={`${analysis.secondaryStructure.gcContent}%`} />
+                  </div>
+                  <div className="mt-3 flex items-start gap-1.5 rounded-lg bg-slate-50 px-3 py-2 text-[11.5px] text-slate-500">
+                    <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                    Simplified GC/AU-composition estimate, not a real folding prediction (e.g. RNAfold). Treat as a rough proxy only.
+                  </div>
+                </Card>
+              </div>
 
               {/* Immune motif screen */}
-              <Card className="p-5 md:col-span-2">
+              <Card className="p-5">
                 <p className="text-[13px] font-semibold text-slate-800">Innate-Immune Sensing Pattern Check</p>
                 {analysis.immuneScreen.length > 0 ? (
                   <ul className="mt-2 space-y-1.5">
-                    {analysis.immuneScreen.map((m: { motif: string; label: string }, i: number) => (
+                    {analysis.immuneScreen.map((m, i) => (
                       <li key={i} className="flex items-center gap-2 text-[12.5px] text-slate-600">
                         <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px]">{m.motif}</span>
+                        <span className="text-slate-400">
+                          ({m.start}-{m.end})
+                        </span>
                         {m.label}
                       </li>
                     ))}

@@ -111,7 +111,7 @@ def _find_orfs(seq: str) -> List[Dict[str, Any]]:
     return orfs
 
 
-def _immunostimulatory_motifs(seq: str, seq_type: str) -> List[Dict[str, str]]:
+def _immunostimulatory_motifs(seq: str, seq_type: str) -> List[Dict[str, Any]]:
     """
     Flags sequence patterns loosely associated with innate-immune sensing
     in the literature. This is pattern-matching against a short heuristic
@@ -119,6 +119,9 @@ def _immunostimulatory_motifs(seq: str, seq_type: str) -> List[Dict[str, str]]:
     depends on broader GU/U-rich context than any single hexamer, and TLR9
     specifically senses unmethylated CpG in a DNA context with defined
     flanking bases, not any CG dinucleotide appearing in an RNA oligo.
+
+    Returns every match (capped) with its position, so the frontend can
+    plot hits along the sequence rather than just report a count.
     """
     motifs = []
     checks = [
@@ -126,14 +129,18 @@ def _immunostimulatory_motifs(seq: str, seq_type: str) -> List[Dict[str, str]]:
         (r"(.)\1{3,}", "Homopolymer run (4+ repeats; general repetitive-element flag)"),
     ]
     if seq_type == "dna":
-        # CpG/TLR9 sensing is specifically a DNA-recognition pathway —
-        # only flag this for DNA-type input, never RNA.
         checks.append((r"[AG][AG]CG[CT][CT]", "Unmethylated CpG in a purine-purine-CG-pyrimidine-pyrimidine context (literature TLR9 motif pattern; not a confirmed assay)"))
 
     for pattern, label in checks:
-        matches = re.findall(pattern, seq.upper())
-        if matches:
-            motifs.append({"motif": matches[0], "label": label})
+        for m in re.finditer(pattern, seq.upper()):
+            motifs.append({
+                "motif": m.group(0),
+                "label": label,
+                "start": m.start() + 1,
+                "end": m.end(),
+            })
+            if len(motifs) >= 40:  # cap payload size for highly repetitive sequences
+                return motifs
     return motifs
 
 
@@ -142,23 +149,49 @@ def _secondary_structure_score(seq: str) -> Dict[str, Any]:
     gc = _gc_content(seq)
     length = len(seq)
 
-    # Estimate hairpin propensity
-    palindromes = 0
+    # Estimate hairpin propensity — record actual positions, not just a count
+    palindrome_positions = []
     for i in range(length - 5):
         chunk = seq[i:i+6]
         if chunk == chunk[::-1]:
-            palindromes += 1
+            palindrome_positions.append(i + 1)
 
-    # MFE estimate (very simplified)
+    # MFE estimate (very simplified — composition-based, not a real fold)
     gc_stability = gc / 100 * -1.5  # kcal/mol per GC pair estimate
     au_stability = (100 - gc) / 100 * -0.9  # kcal/mol per AU pair
     estimated_mfe = round((gc_stability + au_stability) * length / 2, 1)
 
     return {
         "estimatedMfe": estimated_mfe,
-        "palindromicRegions": palindromes,
+        "palindromicRegions": len(palindrome_positions),
+        "palindromePositions": palindrome_positions[:50],  # cap payload
         "gcContent": gc,
-        "hairpinRisk": "High" if palindromes > 3 else "Medium" if palindromes > 1 else "Low",
+        "hairpinRisk": "High" if len(palindrome_positions) > 3 else "Medium" if len(palindrome_positions) > 1 else "Low",
+    }
+
+
+def _gc_sliding_window(seq: str, window: int = 10, step: int = 2) -> List[Dict[str, Any]]:
+    """Real per-window GC% across the sequence, for plotting GC distribution
+    rather than just a single average."""
+    length = len(seq)
+    if length < window:
+        return [{"position": 1, "gc": _gc_content(seq)}]
+    points = []
+    for i in range(0, length - window + 1, step):
+        chunk = seq[i:i + window]
+        points.append({"position": i + 1, "gc": _gc_content(chunk)})
+    return points
+
+
+def _nucleotide_composition(seq: str) -> Dict[str, int]:
+    """Real base counts from the actual sequence."""
+    seq = seq.upper()
+    return {
+        "A": seq.count("A"),
+        "C": seq.count("C"),
+        "G": seq.count("G"),
+        "T": seq.count("T"),
+        "U": seq.count("U"),
     }
 
 
@@ -221,7 +254,13 @@ def analyze_sequence(seq: str, modality: str) -> Dict[str, Any]:
     # Modality-specific analysis
     modality_results = _modality_analysis(seq, seq_type, modality)
 
+    # Real, directly-computed visual data — not modeled/estimated
+    gc_curve = _gc_sliding_window(seq)
+    composition = _nucleotide_composition(seq)
+    orfs = _find_orfs(seq)
+
     return {
+        "sequence": seq,
         "sequenceType": seq_type,
         "length": length,
         "gcContent": gc,
@@ -229,6 +268,9 @@ def analyze_sequence(seq: str, modality: str) -> Dict[str, Any]:
         "secondaryStructure": structure,
         "immuneScreen": immune,
         "modality": modality_results,
+        "gcCurve": gc_curve,
+        "composition": composition,
+        "orfs": orfs[:20],
     }
 
 

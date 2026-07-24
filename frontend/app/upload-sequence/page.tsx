@@ -21,13 +21,19 @@ import {
   Star,
   ChevronDown,
   ChevronUp,
+  Info,
 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import Topbar from "@/components/Topbar";
 import { Card, SectionHeader } from "@/components/ui";
 import { ValidationReport, AnalysisReport } from "@/types/upload";
-import { Modality } from "@/types/upload-types";
+import { Modality } from "@/types/upload";
+import type { AnalyzeResponse } from "@/types/upload-types";
 import { validateSequence, analyzeSequence } from "@/lib/uploadApi";
+import SequenceTrackViewer from "@/components/SequenceTrackViewer";
+import GcContentChart from "@/components/GcContentChart";
+import NucleotideCompositionChart from "@/components/NucleotideCompositionChart";
+import ExportMenu from "@/components/ExportMenu";
 
 type Step = "upload" | "validate" | "modality" | "analysis";
 
@@ -170,20 +176,82 @@ export default function UploadSequencePage() {
     const k = 6;
     const kmers = length >= k ? Array.from({ length: length - k + 1 }, (_, i) => seq.slice(i, i + k)) : [];
     const repetitiveness = kmers.length > 0 ? 1 - new Set(kmers).size / kmers.length : 0;
-    const palindromes = Array.from({ length: Math.max(0, length - 5) }, (_, i) => seq.slice(i, i + 6)).filter((c) => c === c.split("").reverse().join("")).length;
+
+    // Palindrome positions
+    const palindromePositions: number[] = [];
+    for (let i = 0; i < length - 5; i++) {
+      const chunk = seq.slice(i, i + 6);
+      if (chunk === chunk.split("").reverse().join("")) palindromePositions.push(i + 1);
+    }
+    const palindromes = palindromePositions.length;
     const mfe = Math.round((gc / 100 * -1.5 + (100 - gc) / 100 * -0.9) * length / 2 * 10) / 10;
+
     const hasT = seq.includes("T");
     const hasU = seq.includes("U");
     const seqType = hasT && !hasU ? "dna" : hasU && !hasT ? "rna" : "dna";
-    const immune: { motif: string; label: string }[] = [];
-    const guRich = seq.match(/[GU]{2,}U[GU]{2,}/i);
-    if (guRich) immune.push({ motif: guRich[0], label: "GU-rich stretch (literature-associated with TLR7/8 sensing; not a confirmed motif)" });
-    const homopolymer = seq.match(/(.)\1{3,}/);
-    if (homopolymer) immune.push({ motif: homopolymer[0].slice(0, 6), label: "Homopolymer run (4+ repeats; general repetitive-element flag)" });
-    if (seqType === "dna") {
-      const cpgMatch = seq.match(/[AG][AG]CG[CT][CT]/i);
-      if (cpgMatch) immune.push({ motif: cpgMatch[0], label: "Unmethylated CpG in a purine-purine-CG-pyrimidine-pyrimidine context (literature TLR9 motif pattern; not a confirmed assay)" });
+
+    // Immune hits with positions
+    const immune: { motif: string; label: string; start: number; end: number }[] = [];
+    const guRichRe = /[GU]{2,}U[GU]{2,}/gi;
+    let m;
+    while ((m = guRichRe.exec(seq)) !== null && immune.length < 40) {
+      immune.push({ motif: m[0], label: "GU-rich stretch (literature-associated with TLR7/8 sensing; not a confirmed motif)", start: m.index + 1, end: m.index + m[0].length });
     }
+    const homoRe = /(.)\1{3,}/g;
+    while ((m = homoRe.exec(seq)) !== null && immune.length < 40) {
+      immune.push({ motif: m[0].slice(0, 6), label: "Homopolymer run (4+ repeats; general repetitive-element flag)", start: m.index + 1, end: m.index + m[0].length });
+    }
+    if (seqType === "dna") {
+      const cpgRe = /[AG][AG]CG[CT][CT]/gi;
+      while ((m = cpgRe.exec(seq)) !== null && immune.length < 40) {
+        immune.push({ motif: m[0], label: "Unmethylated CpG in a purine-purine-CG-pyrimidine-pyrimidine context (literature TLR9 motif pattern; not a confirmed assay)", start: m.index + 1, end: m.index + m[0].length });
+      }
+    }
+
+    // ORFs (both strands)
+    const orfs: { strand: string; frame: number; start: number; end: number; length: number; proteinLength: number }[] = [];
+    const isRna = hasU && !hasT;
+    const startCodons = isRna ? ["AUG"] : ["ATG"];
+    const stopCodons = isRna ? ["UAA", "UAG", "UGA"] : ["TAA", "TAG", "TGA"];
+    function revComp(s: string): string {
+      const comp: Record<string, string> = isRna ? { A: "U", U: "A", G: "C", C: "G" } : { A: "T", T: "A", G: "C", C: "G" };
+      return s.split("").reverse().map((b) => comp[b] ?? "N").join("");
+    }
+    function scanOrfs(s: string, strand: string) {
+      for (let frame = 0; frame < 3; frame++) {
+        let i = frame;
+        while (i < s.length - 2) {
+          if (startCodons.includes(s.slice(i, i + 3))) {
+            const start = i;
+            let j = i + 3;
+            while (j < s.length - 2) {
+              if (stopCodons.includes(s.slice(j, j + 3))) {
+                orfs.push({ strand, frame: frame + 1, start: start + 1, end: j + 3, length: j + 3 - start, proteinLength: (j - start) / 3 });
+                break;
+              }
+              j += 3;
+            }
+            i = j + 3 < s.length ? j + 3 : s.length;
+          } else { i += 3; }
+        }
+      }
+    }
+    scanOrfs(seq, "+");
+    scanOrfs(revComp(seq), "-");
+
+    // GC sliding window
+    const windowSize = 10;
+    const step = 2;
+    const gcCurve: { position: number; gc: number }[] = [];
+    for (let i = 0; i <= length - windowSize; i += step) {
+      const chunk = seq.slice(i, i + windowSize);
+      const gcCount = chunk.split("").filter((b) => "GC".includes(b)).length;
+      gcCurve.push({ position: i + 1, gc: Math.round((gcCount / windowSize) * 1000) / 10 });
+    }
+
+    // Nucleotide composition
+    const composition = { A: (seq.match(/A/g) || []).length, C: (seq.match(/C/g) || []).length, G: (seq.match(/G/g) || []).length, T: (seq.match(/T/g) || []).length, U: (seq.match(/U/g) || []).length };
+
     const offNote = offRisk === "Low" ? "Adequate length for specificity in general, not verified against any genome" : offRisk === "Medium" ? "Moderate length — not verified against any genome" : "Short sequence — generally correlates with higher off-target probability, not verified against any genome";
     const modRecs: string[] = [];
     let modDetails: Record<string, unknown> = { recommendations: modRecs };
@@ -211,6 +279,7 @@ export default function UploadSequencePage() {
       modDetails = { ...modDetails, casProtein: "SpCas9 (NGG PAM)", optimalLength: "20 nt spacer + PAM" };
     }
     return {
+      sequence: seq,
       sequenceType: length > 0 ? (hasT ? "dna" : "rna") : "unknown",
       length,
       gcContent: gc,
@@ -221,9 +290,12 @@ export default function UploadSequencePage() {
         recommendedMinLength: 18,
         disclaimer: "This is a length/repetitiveness heuristic only — it does not check the sequence against any real genome or transcriptome. Use a real alignment tool (e.g. BLAST) for actual off-target screening.",
       },
-      secondaryStructure: { estimatedMfe: mfe, palindromicRegions: palindromes, gcContent: gc, hairpinRisk: palindromes > 3 ? "High" : palindromes > 1 ? "Medium" : "Low" },
+      secondaryStructure: { estimatedMfe: mfe, palindromicRegions: palindromes, palindromePositions: palindromePositions.slice(0, 50), gcContent: gc, hairpinRisk: palindromes > 3 ? "High" : palindromes > 1 ? "Medium" : "Low" },
       immuneScreen: immune,
       modality: modDetails,
+      gcCurve,
+      composition,
+      orfs: orfs.slice(0, 20),
     };
   }
 
@@ -616,12 +688,33 @@ export default function UploadSequencePage() {
             <div className="space-y-5">
               <div className="flex items-center justify-between">
                 <SectionHeader step="4" title="Analysis Results" />
-                <button
-                  onClick={() => setStep("modality")}
-                  className="flex items-center gap-1 text-[12px] font-medium text-brand hover:underline"
-                >
-                  <ArrowLeft className="h-3 w-3" /> Change modality
-                </button>
+                <div className="flex items-center gap-3">
+                  <ExportMenu
+                    sequence={analysis.sequence}
+                    validation={{
+                      valid: true,
+                      sequenceType: (validation?.sequenceType ?? analysis.sequenceType) as "dna" | "rna" | "unknown",
+                      length: validation?.length ?? analysis.length,
+                      gcContent: validation?.gcContent ?? analysis.gcContent,
+                      features: validation?.features ?? [],
+                      orfs: (validation?.orfs ?? analysis.orfs).map((orf) => ({
+                        ...orf,
+                        strand: orf.strand as "+" | "-",
+                      })),
+                      invalidChars: [],
+                      hasPolyA: validation?.hasPolyA ?? false,
+                      hasPolyG: validation?.hasPolyG ?? false,
+                    }}
+                    analysis={analysis as unknown as AnalyzeResponse}
+                    modalityName={MODALITIES.find((m) => m.id === selectedModality)?.name ?? selectedModality ?? ""}
+                  />
+                  <button
+                    onClick={() => setStep("modality")}
+                    className="flex items-center gap-1 text-[12px] font-medium text-brand hover:underline"
+                  >
+                    <ArrowLeft className="h-3 w-3" /> Change modality
+                  </button>
+                </div>
               </div>
 
               {/* Summary bar */}
@@ -644,174 +737,177 @@ export default function UploadSequencePage() {
                 </div>
               </div>
 
+              {/* Sequence Track Viewer — full width */}
+              <Card className="p-5">
+                <p className="text-[14px] font-semibold text-slate-800 mb-3">Sequence Map</p>
+                <SequenceTrackViewer
+                  seqLength={analysis.length}
+                  orfs={analysis.orfs}
+                  immuneHits={analysis.immuneScreen}
+                  palindromePositions={analysis.secondaryStructure.palindromePositions ?? []}
+                />
+              </Card>
+
               <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-                {/* Off-Target */}
-                <Card>
-                  <div className="flex items-center gap-2 px-6 pt-5 pb-3">
+                {/* GC Content Chart — full width */}
+                <Card className="p-5 lg:col-span-2">
+                  <p className="text-[14px] font-semibold text-slate-800 mb-1">GC Content Distribution</p>
+                  <p className="text-[11px] text-slate-400 mb-3">10 nt sliding window — green band marks the 40–60% optimal range</p>
+                  <GcContentChart data={analysis.gcCurve} seqLength={analysis.length} />
+                </Card>
+
+                {/* Nucleotide Composition */}
+                <Card className="p-5">
+                  <p className="text-[14px] font-semibold text-slate-800 mb-3">Nucleotide Composition</p>
+                  <NucleotideCompositionChart composition={analysis.composition} />
+                </Card>
+
+                {/* Specificity Heuristic */}
+                <Card className="p-5">
+                  <div className="flex items-center gap-2 mb-3">
                     <Shield className="h-4 w-4 text-slate-500" />
-                    <h3 className="text-[14px] font-semibold text-slate-800">Specificity Heuristic</h3>
+                    <p className="text-[14px] font-semibold text-slate-800">Specificity Heuristic</p>
                   </div>
-                  <div className="px-6 pb-5 space-y-3">
-                    <div className="flex items-center gap-3">
-                      <span
-                        className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                          analysis.offTarget.lengthBasedRiskEstimate === "Low"
-                            ? "bg-emerald-100 text-emerald-700"
-                            : analysis.offTarget.lengthBasedRiskEstimate === "Medium"
-                            ? "bg-amber-100 text-amber-700"
-                            : "bg-red-100 text-red-700"
-                        }`}
-                      >
-                        {analysis.offTarget.lengthBasedRiskEstimate} Risk
-                      </span>
+                  <div className="flex items-center gap-3 mb-2">
+                    <span
+                      className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                        analysis.offTarget.lengthBasedRiskEstimate === "Low"
+                          ? "bg-emerald-100 text-emerald-700"
+                          : analysis.offTarget.lengthBasedRiskEstimate === "Medium"
+                          ? "bg-amber-100 text-amber-700"
+                          : "bg-red-100 text-red-700"
+                      }`}
+                    >
+                      {analysis.offTarget.lengthBasedRiskEstimate} Risk
+                    </span>
+                  </div>
+                  <p className="text-[12px] text-slate-500 mb-2">{analysis.offTarget.note}</p>
+                  <div className="rounded-lg bg-slate-50 p-3 mb-2">
+                    <div className="flex justify-between text-[11px]">
+                      <span className="text-slate-400">Internal repetitiveness</span>
+                      <span className="font-medium text-slate-600">{(analysis.offTarget.internalRepetitiveness * 100).toFixed(1)}%</span>
                     </div>
-                    <p className="text-[12px] text-slate-500">{analysis.offTarget.note}</p>
-                    <div className="rounded-lg bg-slate-50 p-3">
-                      <div className="flex justify-between text-[11px]">
-                        <span className="text-slate-400">Internal repetitiveness</span>
-                        <span className="font-medium text-slate-600">
-                          {(analysis.offTarget.internalRepetitiveness * 100).toFixed(1)}%
-                        </span>
-                      </div>
-                      <div className="mt-1 h-1.5 rounded-full bg-slate-200">
-                        <div
-                          className={`h-full rounded-full ${
-                            analysis.offTarget.internalRepetitiveness > 0.3 ? "bg-red-400" : "bg-emerald-400"
-                          }`}
-                          style={{ width: `${Math.min(analysis.offTarget.internalRepetitiveness * 100, 100)}%` }}
-                        />
-                      </div>
+                    <div className="mt-1 h-1.5 rounded-full bg-slate-200">
+                      <div
+                        className={`h-full rounded-full ${analysis.offTarget.internalRepetitiveness > 0.3 ? "bg-red-400" : "bg-emerald-400"}`}
+                        style={{ width: `${Math.min(analysis.offTarget.internalRepetitiveness * 100, 100)}%` }}
+                      />
                     </div>
-                    <div className="flex items-start gap-1.5 rounded-lg bg-amber-50 px-3 py-2 text-[11.5px] text-amber-700">
-                      <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-                      {analysis.offTarget.disclaimer}
-                    </div>
+                  </div>
+                  <div className="flex items-start gap-1.5 rounded-lg bg-amber-50 px-3 py-2 text-[11.5px] text-amber-700">
+                    <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                    {analysis.offTarget.disclaimer}
                   </div>
                 </Card>
 
                 {/* Secondary Structure */}
-                <Card>
-                  <div className="flex items-center gap-2 px-6 pt-5 pb-3">
+                <Card className="p-5">
+                  <div className="flex items-center gap-2 mb-3">
                     <Thermometer className="h-4 w-4 text-slate-500" />
-                    <h3 className="text-[14px] font-semibold text-slate-800">Secondary Structure</h3>
+                    <p className="text-[14px] font-semibold text-slate-800">Secondary Structure</p>
                   </div>
-                  <div className="px-6 pb-5 space-y-3">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="rounded-lg bg-slate-50 p-3 text-center">
-                        <p className="text-[10px] uppercase text-slate-400">Est. ΔG</p>
-                        <p className="text-[16px] font-bold text-slate-800 mt-0.5">
-                          {analysis.secondaryStructure.estimatedMfe} kcal/mol
-                        </p>
-                      </div>
-                      <div className="rounded-lg bg-slate-50 p-3 text-center">
-                        <p className="text-[10px] uppercase text-slate-400">Palindromes</p>
-                        <p className="text-[16px] font-bold text-slate-800 mt-0.5">
-                          {analysis.secondaryStructure.palindromicRegions}
-                        </p>
-                      </div>
+                  <div className="grid grid-cols-2 gap-3 mb-3">
+                    <div className="rounded-lg bg-slate-50 p-3 text-center">
+                      <p className="text-[10px] uppercase text-slate-400">Est. ΔG</p>
+                      <p className="text-[16px] font-bold text-slate-800 mt-0.5">{analysis.secondaryStructure.estimatedMfe} kcal/mol</p>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-slate-400">Hairpin risk:</span>
-                      <span
-                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                          analysis.secondaryStructure.hairpinRisk === "Low"
-                            ? "bg-emerald-100 text-emerald-700"
-                            : analysis.secondaryStructure.hairpinRisk === "Medium"
-                            ? "bg-amber-100 text-amber-700"
-                            : "bg-red-100 text-red-700"
-                        }`}
-                      >
-                        {analysis.secondaryStructure.hairpinRisk}
-                      </span>
+                    <div className="rounded-lg bg-slate-50 p-3 text-center">
+                      <p className="text-[10px] uppercase text-slate-400">Palindromes</p>
+                      <p className="text-[16px] font-bold text-slate-800 mt-0.5">{analysis.secondaryStructure.palindromicRegions}</p>
                     </div>
+                  </div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-[11px] text-slate-400">Hairpin risk:</span>
+                    <span
+                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                        analysis.secondaryStructure.hairpinRisk === "Low"
+                          ? "bg-emerald-100 text-emerald-700"
+                          : analysis.secondaryStructure.hairpinRisk === "Medium"
+                          ? "bg-amber-100 text-amber-700"
+                          : "bg-red-100 text-red-700"
+                      }`}
+                    >
+                      {analysis.secondaryStructure.hairpinRisk}
+                    </span>
+                  </div>
+                  <div className="flex items-start gap-1.5 rounded-lg bg-slate-50 px-3 py-2 text-[11.5px] text-slate-500">
+                    <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                    Composition-based MFE estimate, not a real folding prediction (e.g. RNAfold). Treat as a rough proxy only.
                   </div>
                 </Card>
 
                 {/* Immune Screen */}
-                <Card>
-                  <div className="flex items-center gap-2 px-6 pt-5 pb-3">
+                <Card className="p-5">
+                  <div className="flex items-center gap-2 mb-3">
                     <Syringe className="h-4 w-4 text-slate-500" />
-                    <h3 className="text-[14px] font-semibold text-slate-800">Immune / Toxicity Screen</h3>
+                    <p className="text-[14px] font-semibold text-slate-800">Immune Sensing Patterns</p>
                   </div>
-                  <div className="px-6 pb-5">
-                    {analysis.immuneScreen.length === 0 ? (
-                      <div className="flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2.5">
-                        <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                        <p className="text-[12px] text-emerald-600">
-                          No immunostimulatory motifs detected
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        {analysis.immuneScreen.map((m, i) => (
-                          <div
-                            key={i}
-                            className="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2"
-                          >
-                            <AlertCircle className="h-3.5 w-3.5 shrink-0 text-amber-500" />
-                            <div>
-                              <p className="text-[12px] font-medium text-amber-700">{m.label}</p>
-                              <p className="text-[11px] font-mono text-amber-600">{m.motif}</p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                  {analysis.immuneScreen.length === 0 ? (
+                    <div className="flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2.5">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                      <p className="text-[12px] text-emerald-600">No immunostimulatory motifs detected</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                      {analysis.immuneScreen.map((m, i) => (
+                        <div key={i} className="flex items-center gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-1.5 text-[11px]">
+                          <span className="font-mono font-semibold text-amber-700 shrink-0">{m.motif}</span>
+                          <span className="text-amber-600 shrink-0">@ {m.start}–{m.end}</span>
+                          <span className="text-slate-500 truncate">{m.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="mt-3 flex items-start gap-1.5 rounded-lg bg-amber-50 px-3 py-2 text-[11.5px] text-amber-700">
+                    <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                    Pattern-matching against a short literature-informed list, not a validated immunogenicity assay. Positions are exact regex matches; biological labels are literature-informed guesses.
                   </div>
                 </Card>
 
-                {/* Modality-Specific Recommendations */}
-                <Card>
-                  <div className="flex items-center gap-2 px-6 pt-5 pb-3">
+                {/* Modality Recommendations */}
+                <Card className="p-5">
+                  <div className="flex items-center gap-2 mb-3">
                     <BarChart3 className="h-4 w-4 text-slate-500" />
-                    <h3 className="text-[14px] font-semibold text-slate-800">
+                    <p className="text-[14px] font-semibold text-slate-800">
                       {MODALITIES.find((m) => m.id === selectedModality)?.name ?? "Modality"} Recommendations
-                    </h3>
+                    </p>
                   </div>
-                  <div className="px-6 pb-5 space-y-2">
+                  <div className="space-y-2">
                     {analysis.modality.recommendations.map((rec, i) => (
                       <div key={i} className="flex items-start gap-2 rounded-lg bg-slate-50 px-3 py-2">
                         <Star className="h-3 w-3 mt-0.5 shrink-0 text-brand" />
                         <p className="text-[12px] text-slate-600">{rec}</p>
                       </div>
                     ))}
-                    {analysis.modality.optimalLength && (
-                      <div className="mt-2 flex items-center gap-2 text-[12px] text-slate-500">
-                        <span className="font-medium">Optimal length:</span>
-                        <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-600">
-                          {analysis.modality.optimalLength}
-                        </span>
-                      </div>
-                    )}
-                    {analysis.modality.recommendedChemistry && (
-                      <div className="flex items-center gap-2 text-[12px] text-slate-500">
-                        <span className="font-medium">Recommended chemistry:</span>
-                        <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-600">
-                          {analysis.modality.recommendedChemistry}
-                        </span>
-                      </div>
-                    )}
-                    {analysis.modality.nucleosideModifications && (
-                      <div className="mt-2">
-                        <p className="text-[11px] font-medium text-slate-500 mb-1">Suggested modifications:</p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {analysis.modality.nucleosideModifications.map((mod) => (
-                            <span key={mod} className="rounded-full bg-blue-50 px-2.5 py-0.5 text-[10px] font-medium text-blue-600">
-                              {mod}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {analysis.modality.casProtein && (
-                      <div className="flex items-center gap-2 text-[12px] text-slate-500">
-                        <span className="font-medium">Cas protein:</span>
-                        <span className="rounded-md bg-purple-50 px-2 py-0.5 text-[11px] font-medium text-purple-600">
-                          {analysis.modality.casProtein}
-                        </span>
-                      </div>
-                    )}
                   </div>
+                  {analysis.modality.optimalLength && (
+                    <div className="mt-3 flex items-center gap-2 text-[12px] text-slate-500">
+                      <span className="font-medium">Optimal length:</span>
+                      <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-600">{analysis.modality.optimalLength}</span>
+                    </div>
+                  )}
+                  {analysis.modality.recommendedChemistry && (
+                    <div className="flex items-center gap-2 text-[12px] text-slate-500 mt-1">
+                      <span className="font-medium">Chemistry:</span>
+                      <span className="rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-600">{analysis.modality.recommendedChemistry}</span>
+                    </div>
+                  )}
+                  {analysis.modality.casProtein && (
+                    <div className="flex items-center gap-2 text-[12px] text-slate-500 mt-1">
+                      <span className="font-medium">Cas protein:</span>
+                      <span className="rounded-md bg-purple-50 px-2 py-0.5 text-[11px] font-medium text-purple-600">{analysis.modality.casProtein}</span>
+                    </div>
+                  )}
+                  {analysis.modality.nucleosideModifications && (
+                    <div className="mt-3">
+                      <p className="text-[11px] font-medium text-slate-500 mb-1">Suggested modifications:</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {analysis.modality.nucleosideModifications.map((mod) => (
+                          <span key={mod} className="rounded-full bg-blue-50 px-2.5 py-0.5 text-[10px] font-medium text-blue-600">{mod}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </Card>
               </div>
 

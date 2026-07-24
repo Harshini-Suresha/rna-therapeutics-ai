@@ -33,7 +33,7 @@ export default function Sidebar() {
     <aside className="hidden lg:flex lg:w-64 shrink-0 flex-col bg-gradient-to-b from-navy-950 to-navy-900 text-white h-screen sticky top-0">
       {/* Logo */}
       <div className="px-4 py-4 border-b border-white/10">
-        <div className="flex items-center gap-3 rounded-xl bg-white/[0.06] border border-white/[0.08] px-3.5 py-3">
+        <div className="flex items-center justify-center gap-3 rounded-xl bg-white/[0.06] border border-white/[0.08] px-3.5 py-3">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-400 to-blue-600 shadow-md shadow-indigo-500/20">
             <Dna className="h-5 w-5 text-white" strokeWidth={2.25} />
           </div>
