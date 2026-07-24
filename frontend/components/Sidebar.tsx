@@ -38,6 +38,7 @@ const PIPELINE_NAV: { section: string; items: NavItem[] }[] = [
     items: [
       { label: "Target Discovery", icon: Crosshair, href: "/targets" },
       { label: "ASO Design", icon: PenSquare, href: "/designs" },
+      { label: "Upload Sequence", icon: UploadCloud, href: "/upload-sequence" },
       { label: "Computational Analysis", icon: BarChart3, href: "/analysis" },
       { label: "Experimental Validation", icon: FlaskConical, href: "/validation" },
     ],
