@@ -87,4 +87,33 @@ export interface AnalyzeResponse {
   gcCurve: GcCurvePoint[];
   composition: NucleotideComposition;
   orfs: OrfHit[];
+  meltingTemp?: {
+    tmNearestNeighbor: number;
+    tmBasicGC: number;
+    length: number;
+    gcContent?: number;
+    method: string;
+    note: string;
+  };
+  complexity?: {
+    dinucRepeats: { pattern: string; start: number; end: number; repeats: number }[];
+    trinucRepeats: { pattern: string; count: number; positions: number[] }[];
+    gcRichRegions: { start: number; end: number; length: number }[];
+    atRichRegions: { start: number; end: number; length: number }[];
+    selfComplementarity: { sequence: string; position: number; size: number }[];
+    complexityScore: number;
+  };
+  codonUsage?: {
+    codons: { codon: string; position: number; adaptiveness: number; isRare: boolean }[];
+    cai: number;
+    rareCodons: { codon: string; position: number; adaptiveness: number }[];
+    totalCodons: number;
+    note: string;
+  };
+  modificationScores?: {
+    modality: string;
+    scores: Record<string, { score: number; rationale: string }>;
+    overallScore: number;
+  };
+  energyProfile?: { position: number; energy: number }[];
 }

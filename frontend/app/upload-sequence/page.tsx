@@ -34,6 +34,11 @@ import SequenceTrackViewer from "@/components/SequenceTrackViewer";
 import GcContentChart from "@/components/GcContentChart";
 import NucleotideCompositionChart from "@/components/NucleotideCompositionChart";
 import ExportMenu from "@/components/ExportMenu";
+import MeltingTemperatureCard from "@/components/MeltingTemperatureCard";
+import CodonUsageCard from "@/components/CodonUsageCard";
+import SequenceComplexityCard from "@/components/SequenceComplexityCard";
+import ModificationScorecard from "@/components/ModificationScorecard";
+import StackingEnergyChart from "@/components/StackingEnergyChart";
 
 type Step = "upload" | "validate" | "modality" | "analysis";
 
@@ -170,7 +175,8 @@ export default function UploadSequencePage() {
   }
 
   function clientSideAnalyze(seq: string, modality: string) {
-    const gc = seq.length > 0 ? Math.round((seq.split("").filter((b) => "GC".includes(b)).length / seq.length) * 1000) / 10 : 0;
+    const _gc = (s: string) => s.length > 0 ? Math.round((s.split("").filter((b) => "GC".includes(b)).length / s.length) * 1000) / 10 : 0;
+    const gc = _gc(seq);
     const length = seq.length;
     const offRisk = length < 18 ? "High" : length < 20 ? "Medium" : "Low";
     const k = 6;
@@ -278,6 +284,116 @@ export default function UploadSequencePage() {
       if (/TTTT/.test(seq)) modRecs.push("Poly-T tract detected — may cause premature transcription termination");
       modDetails = { ...modDetails, casProtein: "SpCas9 (NGG PAM)", optimalLength: "20 nt spacer + PAM" };
     }
+
+    // --- Melting temperature (nearest-neighbor simplified) ---
+    const DNA_NN: Record<string, [number, number]> = {
+      "AA": [-7.9, -22.2], "TT": [-7.9, -22.2], "AT": [-7.2, -20.4], "TA": [-7.2, -21.3],
+      "CA": [-8.5, -22.7], "TG": [-8.5, -22.7], "GT": [-8.4, -22.4], "AC": [-8.4, -22.4],
+      "CT": [-7.8, -21.0], "AG": [-7.8, -21.0], "GA": [-8.2, -22.2], "TC": [-8.2, -22.2],
+      "CG": [-10.6, -27.2], "GC": [-9.8, -24.4], "GG": [-8.0, -19.9], "CC": [-8.0, -19.9],
+    };
+    const nnSeq = seq.replace(/U/g, "T");
+    let dH = 0, dS = 0, nnCount = 0;
+    for (let i = 0; i < nnSeq.length - 1; i++) {
+      const dinuc = nnSeq.slice(i, i + 2);
+      if (DNA_NN[dinuc]) { dH += DNA_NN[dinuc][0]; dS += DNA_NN[dinuc][1]; nnCount++; }
+    }
+    let tmNN = 0;
+    if (nnCount > 0 && dS !== 0) {
+      const R = 1.987, C = 250e-6;
+      tmNN = Math.round((dH * 1000 / (dS + R * Math.log(C / 4)) - 273.15) * 10) / 10;
+    }
+    const tmBasicGC = length > 0 ? Math.round((64.9 + 41 * (gc - 16.4) / length) * 10) / 10 : 0;
+
+    // --- Sequence complexity ---
+    const dinucRepeats: { pattern: string; start: number; end: number; repeats: number }[] = [];
+    for (let i = 0; i < length - 3; i++) {
+      const dinuc = seq.slice(i, i + 2);
+      let run = 1, j = i + 2;
+      while (j <= length - 2 && seq.slice(j, j + 2) === dinuc) { run++; j += 2; }
+      if (run >= 3) { dinucRepeats.push({ pattern: dinuc, start: i + 1, end: i + run * 2, repeats: run }); if (dinucRepeats.length >= 20) break; }
+    }
+    const gcRichRegions: { start: number; end: number; length: number }[] = [];
+    const atRichRegions: { start: number; end: number; length: number }[] = [];
+    let m2: RegExpExecArray | null;
+    const gcRichRe = /[GC]{5,}/g;
+    while ((m2 = gcRichRe.exec(seq)) !== null && gcRichRegions.length < 10) gcRichRegions.push({ start: m2.index + 1, end: m2.index + m2[0].length, length: m2[0].length });
+    const atRichRe = /[AT]{5,}/g;
+    while ((m2 = atRichRe.exec(seq)) !== null && atRichRegions.length < 10) atRichRegions.push({ start: m2.index + 1, end: m2.index + m2[0].length, length: m2[0].length });
+    const complexityScore = Math.round((1 - dinucRepeats.length / Math.max(length, 1)) * 1000) / 1000;
+
+    // --- Codon usage ---
+    const HUMAN_CODON_ADAPT: Record<string, number> = {
+      "UUU": 0.52, "UUC": 0.48, "UUA": 0.07, "UUG": 0.13, "CUU": 0.13, "CUC": 0.20, "CUA": 0.07, "CUG": 0.40,
+      "AUU": 0.36, "AUC": 0.47, "AUA": 0.18, "AUG": 1.00, "GUU": 0.18, "GUC": 0.24, "GUA": 0.12, "GUG": 0.46,
+      "UCU": 0.19, "UCC": 0.22, "UCA": 0.15, "UCG": 0.06, "CCU": 0.19, "CCC": 0.20, "CCA": 0.20, "CCG": 0.06,
+      "ACU": 0.25, "ACC": 0.36, "ACA": 0.28, "ACG": 0.11, "GCU": 0.21, "GCC": 0.27, "GCA": 0.23, "GCG": 0.09,
+      "UAU": 0.44, "UAC": 0.56, "UAA": 0.30, "UAG": 0.24, "CAU": 0.42, "CAC": 0.58, "CAA": 0.27, "CAG": 0.73,
+      "AAU": 0.47, "AAC": 0.53, "AAA": 0.43, "AAG": 0.57, "GAU": 0.46, "GAC": 0.54, "GAA": 0.42, "GAG": 0.58,
+      "UGU": 0.45, "UGC": 0.55, "UGA": 0.26, "UGG": 1.00, "CGU": 0.08, "CGC": 0.19, "CGA": 0.06, "CGG": 0.21,
+      "AGU": 0.15, "AGC": 0.22, "AGA": 0.21, "AGG": 0.20, "GGU": 0.16, "GGC": 0.34, "GGA": 0.25, "GGG": 0.25,
+    };
+    const codonRna = seq.replace(/T/g, "U");
+    const codons: { codon: string; position: number; adaptiveness: number; isRare: boolean }[] = [];
+    const rareCodons: { codon: string; position: number; adaptiveness: number }[] = [];
+    let caiSum = 0, caiCount = 0;
+    let codingStart: number | null = null;
+    for (let i = 0; i < length - 2; i++) { if (codonRna.slice(i, i + 3) === "AUG") { codingStart = i; break; } }
+    if (codingStart !== null) {
+      let ci = codingStart;
+      while (ci < length - 2) {
+        const codon = codonRna.slice(ci, ci + 3);
+        if (codon === "UAA" || codon === "UAG" || codon === "UGA") break;
+        const adapt = HUMAN_CODON_ADAPT[codon] ?? 0.5;
+        const isRare = adapt < 0.2;
+        codons.push({ codon, position: ci + 1, adaptiveness: adapt, isRare });
+        if (isRare) rareCodons.push({ codon, position: ci + 1, adaptiveness: adapt });
+        caiSum += adapt; caiCount++;
+        ci += 3;
+      }
+    }
+
+    // --- Modification scores ---
+    const modScores: Record<string, { score: number; rationale: string }> = {};
+    if (modality === "aso") {
+      modScores.lnaBoosting = { score: Math.max(0, Math.min(100, Math.round((70 - gc) * 1.5))), rationale: gc < 40 ? "Low GC benefits most from LNA-mediated Tm boost" : "GC already adequate — fewer LNA substitutions needed" };
+      modScores.gapmerSuitability = { score: Math.max(0, Math.min(100, length >= 18 ? Math.round(80 + (gc - 40) * 0.5) : 30)), rationale: length >= 18 ? "Central gap of DNA flanked by modified wings" : "Too short for typical gapmer design" };
+      modScores.psBackbone = { score: Math.max(0, Math.min(100, Math.round(length >= 12 ? 50 + length * 1.5 : 20))), rationale: "PS bonds increase nuclease resistance and protein binding" };
+      modScores.cellUptake = { score: Math.max(0, Math.min(100, Math.round(90 - Math.abs(length - 20) * 3))), rationale: "18-22 nt optimal for cellular uptake of ASOs" };
+    } else if (modality === "sirna") {
+      const fgc = _gc(seq.slice(0, Math.floor(length / 2)));
+      const sgc = _gc(seq.slice(Math.floor(length / 2)));
+      modScores.thermodynamicBias = { score: Math.max(0, Math.min(100, Math.round(50 + Math.abs(fgc - sgc) * 2))), rationale: fgc < sgc ? "5'-end less stable — favors guide strand loading" : "Consider strand polarity" };
+      modScores.riscLoading = { score: 30 <= gc && gc <= 52 ? 90 : 50, rationale: "GC 30-52% optimal for RISC loading efficiency" };
+      modScores.specificity = { score: Math.max(0, Math.min(100, Math.round(length * 4))), rationale: "19-25 nt length balances potency and specificity" };
+    } else if (modality === "mrna") {
+      modScores.capEfficiency = { score: 70, rationale: "5' cap required for ribosome recruitment" };
+      modScores.polyAStability = { score: /A{10,}$/.test(seq) ? 85 : 30, rationale: /A{10,}$/.test(seq) ? "Poly-A tail present" : "No poly-A tail detected" };
+      modScores.mrnaStability = { score: 40 <= gc && gc <= 60 ? 80 : 50, rationale: "GC 40-60% optimal for mRNA half-life" };
+      modScores.nucleosideMod = { score: 90, rationale: "m1Ψ and m5C modifications reduce innate immune activation" };
+    } else if (modality === "sgrna") {
+      modScores.gcOptimal = { score: 40 <= gc && gc <= 80 ? 90 : 40, rationale: "GC 40-80% optimal for sgRNA on-target activity" };
+      modScores.pamProximity = { score: seq.slice(-5).includes("GG") ? 80 : 50, rationale: "NGG PAM motif detected near 3' end" };
+      modScores.offTargetScore = { score: Math.max(0, Math.min(100, Math.round(length * 5))), rationale: "20 nt spacer optimal for specificity" };
+    }
+    const overallScore = Math.round(Object.values(modScores).reduce((s, v) => s + v.score, 0) / Math.max(Object.keys(modScores).length, 1));
+
+    // --- Stacking energy profile ---
+    const STACK_ENERGY: Record<string, number> = {
+      "AA": -1.0, "TT": -1.0, "AT": -0.88, "TA": -0.58, "CA": -1.45, "TG": -1.45,
+      "GT": -1.44, "AC": -1.44, "CT": -1.28, "AG": -1.28, "GA": -1.30, "TC": -1.30,
+      "CG": -2.17, "GC": -2.24, "GG": -1.84, "CC": -1.84,
+    };
+    const nnSeq2 = seq.replace(/U/g, "T");
+    const energyProfile: { position: number; energy: number }[] = [];
+    const eWindow = 10, eStep = 2;
+    for (let i = 0; i <= length - eWindow; i += eStep) {
+      const chunk = nnSeq2.slice(i, i + eWindow);
+      let sum = 0;
+      for (let j = 0; j < chunk.length - 1; j++) sum += STACK_ENERGY[chunk.slice(j, j + 2)] ?? -1.0;
+      energyProfile.push({ position: i + 1, energy: Math.round(sum / (chunk.length - 1) * 1000) / 1000 });
+    }
+
     return {
       sequence: seq,
       sequenceType: length > 0 ? (hasT ? "dna" : "rna") : "unknown",
@@ -296,6 +412,11 @@ export default function UploadSequencePage() {
       gcCurve,
       composition,
       orfs: orfs.slice(0, 20),
+      meltingTemp: { tmNearestNeighbor: tmNN, tmBasicGC, length, gcContent: gc, method: "Nearest-neighbor (SantaLucia 1998) at 50 mM Na+, 250 µM oligo", note: "Estimates only — actual Tm depends on salt, DMSO, and oligo concentration. Validate experimentally." },
+      complexity: { dinucRepeats, trinucRepeats: [], gcRichRegions, atRichRegions, selfComplementarity: [], complexityScore },
+      codonUsage: { codons: codons.slice(0, 50), cai: caiCount > 0 ? Math.round(caiSum / caiCount * 1000) / 1000 : 0, rareCodons: rareCodons.slice(0, 20), totalCodons: caiCount, note: "CAI ranges 0-1; higher = more optimized for human expression." },
+      modificationScores: { modality, scores: modScores, overallScore },
+      energyProfile,
     };
   }
 
@@ -910,6 +1031,47 @@ export default function UploadSequencePage() {
                   )}
                 </Card>
               </div>
+
+              {/* ===== NEW ANALYSIS CARDS ===== */}
+
+              {/* Melting Temperature */}
+              {analysis.meltingTemp && (
+                <Card className="p-5">
+                  <MeltingTemperatureCard tm={analysis.meltingTemp} />
+                </Card>
+              )}
+
+              {/* Modification Scores */}
+              {analysis.modificationScores && (
+                <Card className="p-5">
+                  <ModificationScorecard scores={analysis.modificationScores} />
+                </Card>
+              )}
+
+              <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                {/* Stacking Energy Profile */}
+                {analysis.energyProfile && analysis.energyProfile.length > 0 && (
+                  <Card className="p-5">
+                    <p className="text-[14px] font-semibold text-slate-800 mb-1">Base-Stacking Energy Profile</p>
+                    <p className="text-[11px] text-slate-400 mb-3">10 nt sliding window average nearest-neighbor ΔG (kcal/mol)</p>
+                    <StackingEnergyChart data={analysis.energyProfile} seqLength={analysis.length} />
+                  </Card>
+                )}
+
+                {/* Sequence Complexity */}
+                {analysis.complexity && (
+                  <Card className="p-5">
+                    <SequenceComplexityCard complexity={analysis.complexity} />
+                  </Card>
+                )}
+              </div>
+
+              {/* Codon Usage (relevant for mRNA, show for all) */}
+              {analysis.codonUsage && analysis.codonUsage.totalCodons > 0 && (
+                <Card className="p-5">
+                  <CodonUsageCard codonUsage={analysis.codonUsage} />
+                </Card>
+              )}
 
               {/* Action buttons */}
               <div className="flex justify-end gap-3">

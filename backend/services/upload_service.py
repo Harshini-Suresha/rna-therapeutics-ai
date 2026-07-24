@@ -259,6 +259,13 @@ def analyze_sequence(seq: str, modality: str) -> Dict[str, Any]:
     composition = _nucleotide_composition(seq)
     orfs = _find_orfs(seq)
 
+    # New analysis modules
+    tm_data = _melting_temperature(seq)
+    complexity = _sequence_complexity(seq)
+    codon_data = _codon_usage(seq)
+    mod_scores = _modification_scorecard(seq, modality)
+    energy_profile = _stacking_energy_profile(seq)
+
     return {
         "sequence": seq,
         "sequenceType": seq_type,
@@ -271,6 +278,11 @@ def analyze_sequence(seq: str, modality: str) -> Dict[str, Any]:
         "gcCurve": gc_curve,
         "composition": composition,
         "orfs": orfs[:20],
+        "meltingTemp": tm_data,
+        "complexity": complexity,
+        "codonUsage": codon_data,
+        "modificationScores": mod_scores,
+        "energyProfile": energy_profile,
     }
 
 
@@ -422,3 +434,377 @@ def _sgrna_analysis(seq: str, seq_type: str, gc: float, length: int) -> Dict[str
         "optimalLength": "20 nt spacer + PAM",
         "offTargetMitigation": "Consider truncated sgRNAs (17-18 nt) for improved specificity",
     }
+
+
+# ---------------------------------------------------------------------------
+# Melting temperature (nearest-neighbor simplified)
+# ---------------------------------------------------------------------------
+
+# DNA nearest-neighbor parameters (SantaLucia 1998) kcal/mol
+_DNA_NN: Dict[str, Tuple[float, float]] = {
+    "AA": (-7.9, -22.2), "TT": (-7.9, -22.2),
+    "AT": (-7.2, -20.4),
+    "TA": (-7.2, -21.3),
+    "CA": (-8.5, -22.7), "TG": (-8.5, -22.7),
+    "GT": (-8.4, -22.4), "AC": (-8.4, -22.4),
+    "CT": (-7.8, -21.0), "AG": (-7.8, -21.0),
+    "GA": (-8.2, -22.2), "TC": (-8.2, -22.2),
+    "CG": (-10.6, -27.2),
+    "GC": (-9.8, -24.4),
+    "GG": (-8.0, -19.9), "CC": (-8.0, -19.9),
+}
+
+
+def _melting_temperature(seq: str) -> Dict[str, Any]:
+    """
+    Nearest-neighbor Tm estimate for short oligos (< 50 nt) at 50 mM Na+.
+    For longer sequences, a basic GC% formula is also provided as a
+    secondary reference. Neither replaces experimental Tm measurement.
+    """
+    seq = seq.upper().replace("U", "T")
+    length = len(seq)
+    if length < 6:
+        return {
+            "tmNearestNeighbor": 0,
+            "tmBasicGC": 0,
+            "length": length,
+            "method": "Sequence too short for reliable Tm estimation",
+            "note": "Tm < 6 nt is not meaningful for most oligonucleotide applications",
+        }
+
+    # Nearest-neighbor (simplified, assumes 50 mM Na+)
+    dH = 0.0
+    dS = 0.0
+    n = 0
+    for i in range(length - 1):
+        dinuc = seq[i:i+2]
+        if dinuc in _DNA_NN:
+            h, s = _DNA_NN[dinuc]
+            dH += h
+            dS += s
+            n += 1
+
+    if n > 0:
+        # Tm = dH / (dS + R * ln(C/4)) - 273.15  (simplified)
+        import math
+        R = 1.987  # cal/(mol·K)
+        C = 250e-6  # 250 µM typical oligo concentration
+        tm_nn = round(dH * 1000 / (dS + R * math.log(C / 4)) - 273.15, 1) if dS != 0 else 0
+    else:
+        tm_nn = 0
+
+    # Basic GC% formula (Bolton & McCarthy, modified)
+    gc = _gc_content(seq)
+    tm_basic = round(64.9 + 41 * (gc - 16.4) / length, 1) if length > 0 else 0
+
+    return {
+        "tmNearestNeighbor": tm_nn,
+        "tmBasicGC": tm_basic,
+        "length": length,
+        "gcContent": gc,
+        "method": "Nearest-neighbor (SantaLucia 1998) at 50 mM Na+, 250 µM oligo",
+        "note": "Estimates only — actual Tm depends on salt, DMSO, and oligo concentration. Validate experimentally.",
+    }
+
+
+# ---------------------------------------------------------------------------
+# Sequence complexity / repeats
+# ---------------------------------------------------------------------------
+
+def _sequence_complexity(seq: str) -> Dict[str, Any]:
+    """
+    Detect repetitive elements, low-complexity regions, and polymeric runs.
+    Used to flag problematic regions for oligonucleotide design.
+    """
+    seq_upper = seq.upper()
+    length = len(seq)
+
+    # Dinucleotide repeats
+    dinuc_repeats = []
+    for i in range(length - 3):
+        dinuc = seq_upper[i:i+2]
+        run = 1
+        j = i + 2
+        while j <= length - 2 and seq_upper[j:j+2] == dinuc:
+            run += 1
+            j += 2
+        if run >= 3:
+            dinuc_repeats.append({
+                "pattern": dinuc,
+                "start": i + 1,
+                "end": i + run * 2,
+                "repeats": run,
+            })
+            if len(dinuc_repeats) >= 20:
+                break
+
+    # Trinucleotide repeats
+    trinuc_repeats = []
+    seen = set()
+    for i in range(length - 5):
+        trinuc = seq_upper[i:i+3]
+        if trinuc in seen:
+            continue
+        seen.add(trinuc)
+        run = seq_upper.count(trinuc)
+        if run >= 4:
+            positions = [m.start() for m in re.finditer(re.escape(trinuc), seq_upper)]
+            trinuc_repeats.append({
+                "pattern": trinuc,
+                "count": run,
+                "positions": positions[:10],
+            })
+            if len(trinuc_repeats) >= 10:
+                break
+
+    # GC-rich / AT-rich stretches (runs of 5+)
+    gc_rich = [{"start": m.start() + 1, "end": m.end(), "length": m.end() - m.start()}
+               for m in re.finditer(r"[GC]{5,}", seq_upper)][:10]
+    at_rich = [{"start": m.start() + 1, "end": m.end(), "length": m.end() - m.start()}
+               for m in re.finditer(r"[AT]{5,}", seq_upper)][:10]
+
+    # Self-complementarity regions (simple: reversed complement matches)
+    self_comp = []
+    is_rna = "U" in seq_upper and "T" not in seq_upper
+    rc = _reverse_complement(seq_upper, is_rna)
+    for size in [6, 8, 10]:
+        for i in range(length - size + 1):
+            fragment = seq_upper[i:i+size]
+            if fragment in rc and i > size:
+                self_comp.append({
+                    "sequence": fragment,
+                    "position": i + 1,
+                    "size": size,
+                })
+                if len(self_comp) >= 10:
+                    break
+        if len(self_comp) >= 10:
+            break
+
+    return {
+        "dinucRepeats": dinuc_repeats,
+        "trinucRepeats": trinuc_repeats,
+        "gcRichRegions": gc_rich,
+        "atRichRegions": at_rich,
+        "selfComplementarity": self_comp,
+        "complexityScore": round(1 - len(dinuc_repeats) / max(length, 1), 3),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Codon usage analysis (mRNA)
+# ---------------------------------------------------------------------------
+
+# Human codon usage (relative adaptiveness, simplified from codon usage tables)
+_HUMAN_CODON_ADAPT: Dict[str, float] = {
+    "UUU": 0.52, "UUC": 0.48, "UUA": 0.07, "UUG": 0.13,
+    "CUU": 0.13, "CUC": 0.20, "CUA": 0.07, "CUG": 0.40,
+    "AUU": 0.36, "AUC": 0.47, "AUA": 0.18, "AUG": 1.00,
+    "GUU": 0.18, "GUC": 0.24, "GUA": 0.12, "GUG": 0.46,
+    "UCU": 0.19, "UCC": 0.22, "UCA": 0.15, "UCG": 0.06,
+    "CCU": 0.19, "CCC": 0.20, "CCA": 0.20, "CCG": 0.06,
+    "ACU": 0.25, "ACC": 0.36, "ACA": 0.28, "ACG": 0.11,
+    "GCU": 0.21, "GCC": 0.27, "GCA": 0.23, "GCG": 0.09,
+    "UAU": 0.44, "UAC": 0.56, "UAA": 0.30, "UAG": 0.24,
+    "CAU": 0.42, "CAC": 0.58, "CAA": 0.27, "CAG": 0.73,
+    "AAU": 0.47, "AAC": 0.53, "AAA": 0.43, "AAG": 0.57,
+    "GAU": 0.46, "GAC": 0.54, "GAA": 0.42, "GAG": 0.58,
+    "UGU": 0.45, "UGC": 0.55, "UGA": 0.26, "UGG": 1.00,
+    "CGU": 0.08, "CGC": 0.19, "CGA": 0.06, "CGG": 0.21,
+    "AGU": 0.15, "AGC": 0.22, "AGA": 0.21, "AGG": 0.20,
+    "GGU": 0.16, "GGC": 0.34, "GGA": 0.25, "GGG": 0.25,
+}
+
+
+def _codon_usage(seq: str) -> Dict[str, Any]:
+    """
+    Codon usage analysis for mRNA design. Reports the codon adaptation
+    index (CAI) and flags rare codons that may cause translational issues.
+    """
+    seq = seq.upper().replace("T", "U")
+    length = len(seq)
+    if length < 3:
+        return {"codons": [], "cai": 0, "rareCodons": [], "totalCodons": 0}
+
+    codons = []
+    rare = []
+    adapt_sum = 0
+    adapt_count = 0
+
+    # Find longest ORF first
+    is_rna = "U" in seq and "T" not in seq
+    start_codons = {"AUG"}
+    stop_codons = {"UAA", "UAG", "UGA"}
+
+    # Scan forward for coding region
+    coding_start = None
+    for i in range(length - 2):
+        if seq[i:i+3] in start_codons:
+            coding_start = i
+            break
+
+    if coding_start is not None:
+        i = coding_start
+        while i < length - 2:
+            codon = seq[i:i+3]
+            if codon in stop_codons:
+                break
+            adapt = _HUMAN_CODON_ADAPT.get(codon, 0.5)
+            count = seq.count(codon)
+            is_rare = adapt < 0.2
+            codons.append({
+                "codon": codon,
+                "position": i + 1,
+                "adaptiveness": round(adapt, 2),
+                "isRare": is_rare,
+            })
+            if is_rare:
+                rare.append({"codon": codon, "position": i + 1, "adaptiveness": round(adapt, 2)})
+            adapt_sum += adapt
+            adapt_count += 1
+            i += 3
+
+    cai = round(adapt_sum / adapt_count, 3) if adapt_count > 0 else 0
+
+    return {
+        "codons": codons[:50],  # cap payload
+        "cai": cai,
+        "rareCodons": rare[:20],
+        "totalCodons": adapt_count,
+        "note": "CAI ranges 0-1; higher = more optimized for human expression. Rare codons (<0.2) may cause ribosomal stalling.",
+    }
+
+
+# ---------------------------------------------------------------------------
+# Modification scoring
+# ---------------------------------------------------------------------------
+
+def _modification_scorecard(seq: str, modality: str) -> Dict[str, Any]:
+    """
+    Chemistry-specific scoring for the given modality. Not a substitute
+    for medicinal chemistry expertise — simplified heuristic flags only.
+    """
+    gc = _gc_content(seq)
+    length = len(seq)
+
+    scores = {}
+
+    if modality == "aso":
+        # LNA boosting potential
+        scores["lnaBoosting"] = {
+            "score": max(0, min(100, round((70 - gc) * 1.5))),
+            "rationale": "Low GC benefits most from LNA-mediated Tm boost" if gc < 40 else "GC already adequate — fewer LNA substitutions needed",
+        }
+        # Gapmer design suitability
+        scores["gapmerSuitability"] = {
+            "score": max(0, min(100, round(80 + (gc - 40) * 0.5 if 30 < gc < 60 else 30))),
+            "rationale": "Central gap of DNA flanked by modified wings" if length >= 18 else "Too short for typical gapmer design",
+        }
+        # Phosphorothioate backbone
+        scores["psBackbone"] = {
+            "score": max(0, min(100, round(50 + length * 1.5 if length < 25 else 85))),
+            "rationale": "PS bonds increase nuclease resistance and protein binding" if length >= 12 else "Very short — PS backbone may not suffice for stability",
+        }
+        # Uptake
+        scores["cellUptake"] = {
+            "score": max(0, min(100, round(90 - abs(length - 20) * 3))),
+            "rationale": "18-22 nt optimal for cellular uptake of ASOs",
+        }
+
+    elif modality == "sirna":
+        # Guide strand thermodynamic bias
+        first_half_gc = _gc_content(seq[:len(seq)//2]) if len(seq) >= 4 else gc
+        second_half_gc = _gc_content(seq[len(seq)//2:]) if len(seq) >= 4 else gc
+        bias = abs(first_half_gc - second_half_gc)
+        scores["thermodynamicBias"] = {
+            "score": max(0, min(100, round(50 + bias * 2))),
+            "rationale": f"5'-end less stable (GC {first_half_gc}%) → 3' more stable (GC {second_half_gc}%) favors guide strand loading" if first_half_gc < second_half_gc else "Consider strand polarity — guide strand should have lower 5' stability",
+        }
+        # RISC loading
+        scores["riscLoading"] = {
+            "score": max(0, min(100, round(70 + (30 if 30 <= gc <= 52 else -20)))),
+            "rationale": "GC 30-52% optimal for RISC loading efficiency" if 30 <= gc <= 52 else "GC outside optimal range for RISC loading",
+        }
+        # Specificity
+        scores["specificity"] = {
+            "score": max(0, min(100, round(length * 4 if length <= 25 else 75))),
+            "rationale": "19-25 nt length balances potency and specificity" if 19 <= length <= 25 else "Length outside typical siRNA range",
+        }
+
+    elif modality == "mrna":
+        # Cap efficiency
+        scores["capEfficiency"] = {
+            "score": 70,
+            "rationale": "5' cap required for ribosome recruitment; ARCA or CleanCap recommended",
+        }
+        # PolyA tail
+        scores["polyAStability"] = {
+            "score": 85 if seq.endswith("A" * 10) else 30,
+            "rationale": "Poly-A tail present — contributes to mRNA stability" if seq.endswith("A" * 10) else "No poly-A tail detected — essential for mRNA stability",
+        }
+        # GC balance for mRNA stability
+        scores["mrnaStability"] = {
+            "score": max(0, min(100, round(60 + (10 if 40 <= gc <= 60 else -20)))),
+            "rationale": "GC 40-60% optimal for mRNA half-life" if 40 <= gc <= 60 else "GC outside optimal range for mRNA stability",
+        }
+        # Nucleoside modification
+        scores["nucleosideMod"] = {
+            "score": 90,
+            "rationale": "m1Ψ and m5C modifications reduce innate immune activation",
+        }
+
+    elif modality == "sgrna":
+        # GC content for sgRNA
+        scores["gcOptimal"] = {
+            "score": max(0, min(100, round(70 + (20 if 40 <= gc <= 80 else -30)))),
+            "rationale": "GC 40-80% optimal for sgRNA on-target activity" if 40 <= gc <= 80 else "GC outside optimal range for CRISPR activity",
+        }
+        # PAM proximity
+        scores["pamProximity"] = {
+            "score": 80 if "GG" in seq[-5:] else 50,
+            "rationale": "NGG PAM motif detected near 3' end" if "GG" in seq[-5:] else "No obvious NGG PAM — verify PAM is adjacent to target",
+        }
+        # Off-target
+        scores["offTargetScore"] = {
+            "score": max(0, min(100, round(length * 5 if length <= 20 else 70))),
+            "rationale": "20 nt spacer optimal for specificity" if 17 <= length <= 21 else "Length outside standard sgRNA range",
+        }
+
+    return {
+        "modality": modality,
+        "scores": scores,
+        "overallScore": round(sum(s["score"] for s in scores.values()) / max(len(scores), 1)),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Base-stacking energy profile
+# ---------------------------------------------------------------------------
+
+# Simplified nearest-neighbor free energy (kcal/mol) for DNA at 37°C
+_STACK_ENERGY: Dict[str, float] = {
+    "AA": -1.0, "TT": -1.0, "AT": -0.88, "TA": -0.58,
+    "CA": -1.45, "TG": -1.45, "GT": -1.44, "AC": -1.44,
+    "CT": -1.28, "AG": -1.28, "GA": -1.30, "TC": -1.30,
+    "CG": -2.17, "GC": -2.24, "GG": -1.84, "CC": -1.84,
+}
+
+
+def _stacking_energy_profile(seq: str, window: int = 10, step: int = 2) -> List[Dict[str, Any]]:
+    """
+    Per-window average stacking energy across the sequence. Negative
+    values indicate more stable (favorable) stacking.
+    """
+    seq = seq.upper().replace("U", "T")
+    length = len(seq)
+    if length < window:
+        avg = sum(_STACK_ENERGY.get(seq[i:i+2], -1.0) for i in range(length - 1)) / max(length - 1, 1)
+        return [{"position": 1, "energy": round(avg, 3)}]
+
+    points = []
+    for i in range(0, length - window + 1, step):
+        chunk = seq[i:i+window]
+        energies = [_STACK_ENERGY.get(chunk[j:j+2], -1.0) for j in range(len(chunk) - 1)]
+        avg = sum(energies) / len(energies) if energies else 0
+        points.append({"position": i + 1, "energy": round(avg, 3)})
+    return points

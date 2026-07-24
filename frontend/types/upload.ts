@@ -73,6 +73,65 @@ export interface NucleotideComposition {
   U: number;
 }
 
+export interface MeltingTemp {
+  tmNearestNeighbor: number;
+  tmBasicGC: number;
+  length: number;
+  gcContent?: number;
+  method: string;
+  note: string;
+}
+
+export interface ComplexityRegion {
+  start: number;
+  end: number;
+  length: number;
+  pattern?: string;
+  repeats?: number;
+  count?: number;
+  positions?: number[];
+}
+
+export interface SequenceComplexity {
+  dinucRepeats: (ComplexityRegion & { pattern: string; repeats: number })[];
+  trinucRepeats: (ComplexityRegion & { pattern: string; count: number; positions: number[] })[];
+  gcRichRegions: ComplexityRegion[];
+  atRichRegions: ComplexityRegion[];
+  selfComplementarity: { sequence: string; position: number; size: number }[];
+  complexityScore: number;
+}
+
+export interface CodonInfo {
+  codon: string;
+  position: number;
+  adaptiveness: number;
+  isRare: boolean;
+}
+
+export interface CodonUsage {
+  codons: CodonInfo[];
+  cai: number;
+  rareCodons: { codon: string; position: number; adaptiveness: number }[];
+  totalCodons: number;
+  note: string;
+}
+
+export interface ModScore {
+  score: number;
+  rationale: string;
+}
+
+export interface ModificationScores {
+  modality: string;
+  scores: Record<string, ModScore>;
+  overallScore: number;
+}
+
+export interface EnergyPoint {
+  position: number;
+  energy: number;
+}
+
 export interface AnalysisReport {
   sequence: string;
   sequenceType: string;
@@ -85,6 +144,11 @@ export interface AnalysisReport {
   gcCurve: GcWindow[];
   composition: NucleotideComposition;
   orfs: OrfInfo[];
+  meltingTemp?: MeltingTemp;
+  complexity?: SequenceComplexity;
+  codonUsage?: CodonUsage;
+  modificationScores?: ModificationScores;
+  energyProfile?: EnergyPoint[];
 }
 
 export type Modality = "aso" | "sirna" | "mrna" | "sgrna";
