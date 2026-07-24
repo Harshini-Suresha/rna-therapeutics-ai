@@ -1339,6 +1339,143 @@ export default function UploadSequencePage() {
                         </div>
                       </Card>
 
+                      {/* Secondary Structure Summary */}
+                      <Card className="p-5">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Thermometer className="h-4 w-4 text-slate-500" />
+                          <p className="text-[14px] font-semibold text-slate-800">Secondary Structure Summary</p>
+                        </div>
+                        <div className="grid grid-cols-3 gap-3 mb-3">
+                          <div className="rounded-lg bg-slate-50 p-3 text-center">
+                            <p className="text-[10px] uppercase text-slate-400">ΔG</p>
+                            <p className="text-[14px] font-bold text-slate-800 mt-0.5">{analysis.secondaryStructure.estimatedMfe}</p>
+                            <p className="text-[9px] text-slate-400">kcal/mol</p>
+                          </div>
+                          <div className="rounded-lg bg-slate-50 p-3 text-center">
+                            <p className="text-[10px] uppercase text-slate-400">Hairpins</p>
+                            <p className="text-[14px] font-bold text-slate-800 mt-0.5">{analysis.hairpins?.length ?? 0}</p>
+                            <p className="text-[9px] text-slate-400">detected</p>
+                          </div>
+                          <div className="rounded-lg bg-slate-50 p-3 text-center">
+                            <p className="text-[10px] uppercase text-slate-400">Palindrome</p>
+                            <p className="text-[14px] font-bold text-slate-800 mt-0.5">{analysis.secondaryStructure.palindromicRegions}</p>
+                            <p className="text-[9px] text-slate-400">regions</p>
+                          </div>
+                        </div>
+                        {analysis.thermoProfile && (
+                          <div className="flex items-center gap-3 text-[11px] text-slate-500">
+                            <span className="font-medium">Stability:</span>
+                            <span
+                              className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                                analysis.thermoProfile.stabilityClass === "stable"
+                                  ? "bg-emerald-100 text-emerald-700"
+                                  : analysis.thermoProfile.stabilityClass === "moderate"
+                                  ? "bg-amber-100 text-amber-700"
+                                  : "bg-red-100 text-red-700"
+                              }`}
+                            >
+                              {analysis.thermoProfile.stabilityClass}
+                            </span>
+                            <span>ΔG free energy: {analysis.thermoProfile.freeEnergy37} kcal/mol</span>
+                          </div>
+                        )}
+                      </Card>
+
+                      {/* Sequence Risk Summary */}
+                      <Card className="p-5">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Shield className="h-4 w-4 text-slate-500" />
+                          <p className="text-[14px] font-semibold text-slate-800">Sequence Risk Summary</p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="rounded-lg bg-slate-50 p-2.5">
+                            <p className="text-[9px] uppercase text-slate-400">Specificity</p>
+                            <div className="flex items-center gap-1.5 mt-1">
+                              <div className="h-1.5 flex-1 rounded-full bg-slate-200">
+                                <div className="h-full rounded-full bg-blue-400" style={{ width: `${analysis.riskScores?.specificity ?? 50}%` }} />
+                              </div>
+                              <span className="text-[10px] font-bold text-slate-700">{analysis.riskScores?.specificity ?? "—"}</span>
+                            </div>
+                          </div>
+                          <div className="rounded-lg bg-slate-50 p-2.5">
+                            <p className="text-[9px] uppercase text-slate-400">Stability</p>
+                            <div className="flex items-center gap-1.5 mt-1">
+                              <div className="h-1.5 flex-1 rounded-full bg-slate-200">
+                                <div className="h-full rounded-full bg-emerald-400" style={{ width: `${analysis.riskScores?.stability ?? 50}%` }} />
+                              </div>
+                              <span className="text-[10px] font-bold text-slate-700">{analysis.riskScores?.stability ?? "—"}</span>
+                            </div>
+                          </div>
+                          <div className="rounded-lg bg-slate-50 p-2.5">
+                            <p className="text-[9px] uppercase text-slate-400">Immunogenicity</p>
+                            <div className="flex items-center gap-1.5 mt-1">
+                              <div className="h-1.5 flex-1 rounded-full bg-slate-200">
+                                <div className="h-full rounded-full bg-amber-400" style={{ width: `${analysis.riskScores?.immunogenicity ?? 50}%` }} />
+                              </div>
+                              <span className="text-[10px] font-bold text-slate-700">{analysis.riskScores?.immunogenicity ?? "—"}</span>
+                            </div>
+                          </div>
+                          <div className="rounded-lg bg-slate-50 p-2.5">
+                            <p className="text-[9px] uppercase text-slate-400">Delivery</p>
+                            <div className="flex items-center gap-1.5 mt-1">
+                              <div className="h-1.5 flex-1 rounded-full bg-slate-200">
+                                <div className="h-full rounded-full bg-purple-400" style={{ width: `${analysis.riskScores?.delivery ?? 50}%` }} />
+                              </div>
+                              <span className="text-[10px] font-bold text-slate-700">{analysis.riskScores?.delivery ?? "—"}</span>
+                            </div>
+                          </div>
+                        </div>
+                        {analysis.riskScores && (
+                          <div className="mt-3 flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
+                            <span className="text-[11px] font-medium text-slate-500">Overall Risk Score</span>
+                            <span className={`text-[14px] font-bold ${
+                              analysis.riskScores.overall >= 70 ? "text-emerald-600" : analysis.riskScores.overall >= 40 ? "text-amber-600" : "text-red-600"
+                            }`}>
+                              {analysis.riskScores.overall}/100
+                            </span>
+                          </div>
+                        )}
+                        <div className="mt-2 flex items-start gap-1.5 rounded-lg bg-blue-50 px-3 py-2 text-[11px] text-blue-700">
+                          <Info className="h-3 w-3 shrink-0 mt-0.5" />
+                          Composite heuristic scores based on sequence composition, length, and motif analysis. Not a clinical risk assessment.
+                        </div>
+                      </Card>
+
+                      {/* Modification Recommendations Summary */}
+                      <Card className="p-5">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Star className="h-4 w-4 text-slate-500" />
+                          <p className="text-[14px] font-semibold text-slate-800">Modification Recommendations</p>
+                        </div>
+                        {analysis.modificationLandscape && analysis.modificationLandscape.length > 0 ? (
+                          <div className="space-y-2">
+                            {(() => {
+                              const modCounts: Record<string, number> = {};
+                              analysis.modificationLandscape.forEach((m) => {
+                                modCounts[m.recommendedModification] = (modCounts[m.recommendedModification] ?? 0) + 1;
+                              });
+                              const sorted = Object.entries(modCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+                              const total = analysis.modificationLandscape.length;
+                              return sorted.map(([mod, count]) => (
+                                <div key={mod} className="flex items-center gap-2">
+                                  <span className="text-[11px] font-mono text-slate-600 w-32 truncate">{mod}</span>
+                                  <div className="flex-1 h-1.5 rounded-full bg-slate-200">
+                                    <div className="h-full rounded-full bg-brand" style={{ width: `${(count / total) * 100}%` }} />
+                                  </div>
+                                  <span className="text-[10px] text-slate-400 w-10 text-right">{count}×</span>
+                                </div>
+                              ));
+                            })()}
+                          </div>
+                        ) : (
+                          <p className="text-[12px] text-slate-400">No modification landscape data available.</p>
+                        )}
+                        <div className="mt-3 flex items-start gap-1.5 rounded-lg bg-slate-50 px-3 py-2 text-[11px] text-slate-500">
+                          <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                          Recommendations based on local GC content and modality-specific guidelines. See Properties tab for full landscape.
+                        </div>
+                      </Card>
+
                       {/* Modality Recommendations */}
                       <Card className="p-5">
                         <div className="flex items-center gap-2 mb-3">
@@ -1392,6 +1529,181 @@ export default function UploadSequencePage() {
                         <MeltingTemperatureCard tm={analysis.meltingTemp} />
                       </Card>
                     )}
+
+                    {/* Modification Scores */}
+                    {analysis.modificationScores && (
+                      <Card className="p-5">
+                        <ModificationScorecard scores={analysis.modificationScores} />
+                      </Card>
+                    )}
+
+                    <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                      {/* Stacking Energy Profile */}
+                      {analysis.energyProfile && analysis.energyProfile.length > 0 && (
+                        <Card className="p-5">
+                          <p className="text-[14px] font-semibold text-slate-800 mb-1">Base-Stacking Energy Profile</p>
+                          <p className="text-[11px] text-slate-400 mb-3">10 nt sliding window average nearest-neighbor ΔG (kcal/mol)</p>
+                          <StackingEnergyChart data={analysis.energyProfile} seqLength={analysis.length} />
+                        </Card>
+                      )}
+
+                      {/* Sequence Complexity */}
+                      {analysis.complexity && (
+                        <Card className="p-5">
+                          <SequenceComplexityCard complexity={analysis.complexity} />
+                        </Card>
+                      )}
+                    </div>
+
+                    {/* Codon Usage (relevant for mRNA, show for all) */}
+                    {analysis.codonUsage && analysis.codonUsage.totalCodons > 0 && (
+                      <Card className="p-5">
+                        <CodonUsageCard codonUsage={analysis.codonUsage} />
+                      </Card>
+                    )}
+
+                    {/* Risk Score Dashboard */}
+                    {analysis.riskScores && (
+                      <Card className="p-5">
+                        <RiskScoreDashboard riskScores={analysis.riskScores} />
+                      </Card>
+                    )}
+
+                    <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                      {/* Restriction Enzyme Map */}
+                      {analysis.restrictionSites && analysis.restrictionSites.length > 0 && (
+                        <Card className="p-5">
+                          <RestrictionSiteMap
+                            sites={analysis.restrictionSites}
+                            seqLength={analysis.length}
+                          />
+                        </Card>
+                      )}
+
+                      {/* miRNA Targeting */}
+                      {analysis.mirnaTargets && analysis.mirnaTargets.length > 0 && (
+                        <Card className="p-5">
+                          <MiRNATargetingCard
+                            targets={analysis.mirnaTargets}
+                            seqLength={analysis.length}
+                          />
+                        </Card>
+                      )}
+
+                      {/* Thermodynamic Profile */}
+                      {analysis.thermoProfile && (
+                        <Card className="p-5">
+                          <ThermodynamicProfile profile={analysis.thermoProfile} />
+                        </Card>
+                      )}
+
+                      {/* Kmer Frequency */}
+                      {analysis.kmerFrequency && (
+                        <Card className="p-5">
+                          <KmerFrequencyChart kmerData={analysis.kmerFrequency} />
+                        </Card>
+                      )}
+                    </div>
+
+                    {/* Hairpin Diagram */}
+                    {analysis.hairpins && analysis.hairpins.length > 0 && (
+                      <Card className="p-5">
+                        <HairpinDiagram
+                          hairpins={analysis.hairpins}
+                          seqLength={analysis.length}
+                        />
+                      </Card>
+                    )}
+
+                    <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                      {/* Modification Landscape */}
+                      {analysis.modificationLandscape && analysis.modificationLandscape.length > 0 && (
+                        <Card className="p-5">
+                          <ModificationLandscapeCard
+                            landscape={analysis.modificationLandscape}
+                            seqLength={analysis.length}
+                          />
+                        </Card>
+                      )}
+
+                      {/* Base Pair Dot Plot */}
+                      {analysis.dotPlot && analysis.dotPlot.length > 0 && (
+                        <Card className="p-5">
+                          <BasePairDotPlot
+                            points={analysis.dotPlot}
+                            seqLength={analysis.length}
+                          />
+                        </Card>
+                      )}
+
+                      {/* Physicochemical Properties */}
+                      {analysis.physicochemical && (
+                        <Card className="p-5">
+                          <PhysicochemicalCard profile={analysis.physicochemical} />
+                        </Card>
+                      )}
+
+                      {/* Stability Index */}
+                      {analysis.stabilityIndex && analysis.stabilityIndex.length > 0 && (
+                        <Card className="p-5">
+                          <StabilityIndexChart
+                            data={analysis.stabilityIndex}
+                            seqLength={analysis.length}
+                          />
+                        </Card>
+                      )}
+                    </div>
+
+                    {/* Sequence Annotation Bar (full width) */}
+                    <Card className="p-5">
+                      <SequenceAnnotationBar
+                        annotations={[
+                          ...(analysis.restrictionSites ?? []).map((s, i) => ({
+                            id: `restr-${i}`,
+                            label: s.enzyme,
+                            start: s.cutPosition,
+                            end: s.cutPosition,
+                            type: "restriction" as const,
+                          })),
+                          ...(analysis.mirnaTargets ?? []).map((t, i) => ({
+                            id: `mirna-${i}`,
+                            label: t.mirnaId,
+                            start: t.start,
+                            end: t.end,
+                            type: "mirna" as const,
+                          })),
+                          ...(analysis.immuneScreen ?? []).slice(0, 15).map((m, i) => ({
+                            id: `imm-${i}`,
+                            label: m.motif,
+                            start: m.start,
+                            end: m.end,
+                            type: "immune" as const,
+                          })),
+                          ...(analysis.orfs ?? []).map((o, i) => ({
+                            id: `orf-${i}`,
+                            label: `ORF ${o.strand} f${o.frame}`,
+                            start: o.start,
+                            end: o.end,
+                            type: "orfs" as const,
+                          })),
+                          ...(analysis.complexity?.gcRichRegions ?? []).map((r, i) => ({
+                            id: `gc-${i}`,
+                            label: `GC-rich`,
+                            start: r.start,
+                            end: r.end,
+                            type: "complexity" as const,
+                          })),
+                          ...(analysis.hairpins ?? []).map((h, i) => ({
+                            id: `hp-${i}`,
+                            label: h.type.replace("_", " "),
+                            start: h.start,
+                            end: h.end,
+                            type: "structure" as const,
+                          })),
+                        ]}
+                        seqLength={analysis.length}
+                      />
+                    </Card>
                   </div>
                 )}
 
