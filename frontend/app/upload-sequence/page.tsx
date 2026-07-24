@@ -873,7 +873,7 @@ export default function UploadSequencePage() {
                     </p>
                   </div>
                   <div className="space-y-2">
-                    {analysis.modality.recommendations.map((rec, i) => (
+                    {(analysis.modality.recommendations ?? []).map((rec, i) => (
                       <div key={i} className="flex items-start gap-2 rounded-lg bg-slate-50 px-3 py-2">
                         <Star className="h-3 w-3 mt-0.5 shrink-0 text-brand" />
                         <p className="text-[12px] text-slate-600">{rec}</p>

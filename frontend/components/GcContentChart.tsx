@@ -25,8 +25,8 @@ export default function GcContentChart({
   const plotW = W - PAD.left - PAD.right;
   const plotH = H - PAD.top - PAD.bottom;
 
-  const minGc = Math.max(0, Math.min(...data.map((d) => d.gc)) - 5);
-  const maxGc = Math.min(100, Math.max(...data.map((d) => d.gc)) + 5);
+  const minGc = Math.max(0, data.reduce((min, d) => Math.min(min, d.gc), Infinity) - 5);
+  const maxGc = Math.min(100, data.reduce((max, d) => Math.max(max, d.gc), -Infinity) + 5);
   const gcRange = maxGc - minGc || 1;
 
   const xScale = (pos: number) => PAD.left + (pos / seqLength) * plotW;
