@@ -106,6 +106,7 @@ export default function StatsRow({ gene }: { gene: GeneTargetObject }) {
           { label: "pLI (gnomAD)", value: isHuman ? (gene.intolerantToLossScore ?? DASH) : "Human only" },
           { label: "Recessive Constraint (Z)", value: isHuman ? (gene.recessiveConstraintZ ?? DASH) : "Human only" },
           { label: "Composite Constraint", value: isHuman ? (gene.compositeConstraintIndex ?? DASH) : "Human only" },
+          { label: "Het Excess (Z)", value: isHuman ? (gene.hetExcessZ ?? DASH) : "Human only" },
           { label: "DepMap Dependency", value: gene.depmapDependency ?? DASH },
           { label: "Essential Gene", value: gene.essentialGene ?? DASH },
         ]}
