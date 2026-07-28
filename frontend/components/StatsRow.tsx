@@ -103,6 +103,9 @@ export default function StatsRow({ gene }: { gene: GeneTargetObject }) {
         sourcesColumns={2}
         rows={[
           { label: "LOEUF Decile", value: isHuman ? (gene.loeufDecile ?? DASH) : "Human only" },
+          { label: "pLI (gnomAD)", value: isHuman ? (gene.intolerantToLossScore ?? DASH) : "Human only" },
+          { label: "Recessive Constraint (Z)", value: isHuman ? (gene.recessiveConstraintZ ?? DASH) : "Human only" },
+          { label: "Composite Constraint", value: isHuman ? (gene.compositeConstraintIndex ?? DASH) : "Human only" },
           { label: "DepMap Dependency", value: gene.depmapDependency ?? DASH },
           { label: "Essential Gene", value: gene.essentialGene ?? DASH },
         ]}
