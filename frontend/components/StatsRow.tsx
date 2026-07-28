@@ -102,17 +102,12 @@ export default function StatsRow({ gene }: { gene: GeneTargetObject }) {
         title="Target Vulnerability"
         sourcesColumns={2}
         rows={[
-          { label: "pHaplo Score", value: isHuman ? (gene.haploinsufficiencyScore ?? DASH) : "Human only" },
           { label: "LOEUF Decile", value: isHuman ? (gene.loeufDecile ?? DASH) : "Human only" },
-          { label: "Triplosensitivity", value: isHuman ? (gene.triplosensitivity ?? DASH) : "Human only" },
-          { label: "RNA Half-Life (t₁/₂)", value: isHuman ? (gene.rnaHalflife ?? DASH) : "Human only" },
           { label: "DepMap Dependency", value: gene.depmapDependency ?? DASH },
           { label: "Essential Gene", value: gene.essentialGene ?? DASH },
         ]}
         sources={isHuman ? [
-          { label: "Source: ClinGen", url: "https://search.clinicalgenome.org/kb/gene-dosage" },
           { label: "Source: gnomAD v2.1.1", url: `https://gnomad.broadinstitute.org/gene/${gene.geneId}?dataset=gnomad_r2_1` },
-          { label: "Source: RNAdecayCafe", url: "https://zenodo.org/records/15785218" },
           { label: "Source: FAVOR", url: "https://xionglab.org/favor/" },
         ] : []}
       />
