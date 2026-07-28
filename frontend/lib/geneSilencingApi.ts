@@ -31,6 +31,7 @@ export async function fetchDesignOptions(): Promise<DesignOptions> {
 
 export async function generateCandidates(params: {
   ensemblGeneId: string;
+  mechanismId: string;
   targetExonIndices?: number[] | null;
   asoLength: number;
   chemistry: string;
@@ -41,6 +42,7 @@ export async function generateCandidates(params: {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       ensembl_gene_id: params.ensemblGeneId,
+      mechanism_id: params.mechanismId,
       target_exon_indices: params.targetExonIndices ?? null,
       aso_length: params.asoLength,
       chemistry: params.chemistry,

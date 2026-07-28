@@ -1,51 +1,54 @@
 "use client";
 
 import { useState } from "react";
-import { HelpCircle, Bell } from "lucide-react";
-import HelpAssistant from "@/components/HelpAssistant";
-import Notifications from "@/components/Notifications";
+import { Bell, Search } from "lucide-react";
+import HelpMenu from "@/components/HelpMenu";
+import NotificationPanel from "@/components/NotificationPanel";
+import AccountMenu from "@/components/AccountMenu";
 
 export default function Topbar() {
-  const [showHelp, setShowHelp] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
 
   return (
-    <header className="sticky top-0 z-10 flex items-center justify-end gap-4 border-b border-slate-200 bg-white/80 backdrop-blur px-6 py-3">
-      {/* Help / Research Assistant */}
-      <div className="relative">
-        <button
-          aria-label="Help"
-          onClick={() => { setShowHelp(!showHelp); setShowNotifications(false); }}
-          className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors ${
-            showHelp ? "bg-brand text-white" : "text-slate-500 hover:bg-slate-100"
-          }`}
-        >
-          <HelpCircle className="h-[18px] w-[18px]" />
-        </button>
-        {showHelp && <HelpAssistant onClose={() => setShowHelp(false)} />}
+    <header className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-slate-200 bg-white/95 px-6 backdrop-blur" style={{ height: "74px" }}>
+      <div className="min-w-0">
+        <h1 className="text-[16px] font-bold leading-tight text-[#101d46]">Dashboard</h1>
+        <p className="mt-0.5 text-[12px] font-medium text-[#4a5d8a]">Overview of your RNA therapeutics workspace</p>
       </div>
 
-      {/* Notifications */}
-      <div className="relative">
-        <button
-          aria-label="Notifications"
-          onClick={() => { setShowNotifications(!showNotifications); setShowHelp(false); }}
-          className={`relative flex h-9 w-9 items-center justify-center rounded-full transition-colors ${
-            showNotifications ? "bg-brand text-white" : "text-slate-500 hover:bg-slate-100"
-          }`}
-        >
-          <Bell className="h-[18px] w-[18px]" />
-          <span className="absolute top-1.5 right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-semibold text-white">
-            3
-          </span>
-        </button>
-        {showNotifications && <Notifications onClose={() => setShowNotifications(false)} />}
-      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <label className="relative hidden w-[313px] md:block">
+          <span className="sr-only">Search targets, genes, projects</span>
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0d2b64]" />
+          <input
+            type="search"
+            placeholder="Search targets, genes, projects..."
+            className="h-9 w-full rounded-md border border-slate-200 bg-white pl-9 pr-3 text-[11px] text-slate-700 outline-none placeholder:text-slate-400 focus:border-brand focus:ring-2 focus:ring-brand/15"
+          />
+        </label>
+        <HelpMenu />
 
-      {/* Avatar */}
-      <button className="flex h-9 w-9 items-center justify-center rounded-full bg-brand text-xs font-semibold text-white">
-        HS
-      </button>
+        <div className="relative">
+          <button
+            aria-label="Notifications"
+            onClick={() => setShowNotifications(!showNotifications)}
+            className={`relative flex h-8 w-8 items-center justify-center rounded transition-colors ${
+              showNotifications ? "bg-brand text-white" : "text-slate-500 hover:bg-slate-100"
+            }`}
+          >
+            <Bell className="h-4 w-4" />
+          </button>
+          <NotificationPanel open={showNotifications} onClose={() => setShowNotifications(false)} />
+        </div>
+
+        <AccountMenu
+          initials="HS"
+          name="Harshini Suresha"
+          email="researcher@platform.dev"
+          role="Research Scientist"
+          institution="KoshKey Sciences"
+        />
+      </div>
     </header>
   );
 }

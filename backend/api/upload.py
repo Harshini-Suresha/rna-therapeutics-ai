@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from typing import Optional
 
 from services.upload_service import validate_sequence, analyze_sequence
+from services.notification_service import add_notification
 
 router = APIRouter()
 
@@ -41,4 +42,11 @@ async def analyze(payload: AnalyzeRequest):
         )
 
     result = analyze_sequence(cleaned, payload.modality.lower())
+
+    add_notification(
+        "analysis",
+        "Sequence analysis completed",
+        f"{payload.modality.upper()} analysis finished for a {len(cleaned)} nt sequence.",
+    )
+
     return result

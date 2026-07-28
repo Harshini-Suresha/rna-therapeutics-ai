@@ -116,14 +116,18 @@ export default function GeneSilencingPage() {
 
   async function handleGenerate() {
     if (!gene?.geneId) return;
+    if (!mechanism?.id) {
+      setGenError("Select a mechanism before generating candidates.");
+      return;
+    }
     setGenLoading(true);
     setGenError(null);
     setResults(null);
     try {
-      const isTotalKnockdown = silencingScope === "total_knockdown";
       const res = await generateCandidates({
         ensemblGeneId: gene.geneId,
-        targetExonIndices: isTotalKnockdown ? null : selectedExons.length > 0 ? selectedExons : null,
+        mechanismId: mechanism.id,
+        targetExonIndices: isTotalKnockdown ? null : selectedExons,
         asoLength,
         chemistry,
         modifications: selectedMods,
@@ -194,9 +198,12 @@ export default function GeneSilencingPage() {
           {/* Step 4: Gene Silencing — ASO Design */}
           <Card>
             <SectionHeader step="4" title="Gene Silencing — ASO Design" />
-            <p className="px-6 pb-3 text-[12.5px] text-slate-500">
-              Design antisense oligonucleotides targeting the confirmed gene.
-              Select an exon, choose chemistry and modifications, then generate candidates.
+              <p className="px-6 pb-3 text-[12.5px] text-slate-500">
+              {mechanism?.id === "A2"
+                ? "Translation-blocking candidates are restricted to the 5′ translation-initiation region."
+                : mechanism?.id === "A21"
+                  ? "siRNA candidates use 21-nt duplex guide design for RISC-mediated silencing."
+                  : "Design antisense oligonucleotides targeting the confirmed gene. Select an exon, choose chemistry and modifications, then generate candidates."}
             </p>
           </Card>
 

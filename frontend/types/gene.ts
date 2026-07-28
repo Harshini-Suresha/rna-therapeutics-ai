@@ -218,7 +218,13 @@ export interface GeneTargetObject {
   proteinMass: string | null;      // molecularWeight from UniProt (Da)
 
   // FDA-approved ASO therapies (live from FDA Orange Book / ClinicalTrials.gov)
-  fdaApprovedTherapies: { name: string; indication: string; approvalYear: string | null; source: string }[];
+  fdaApprovedTherapies: {
+    name: string;
+    indication: string;
+    approvalYear: string | null;
+    source: string;
+    modality?: string;
+  }[];
   targetableExons: number | null;  // computed from transcript CDS exons
 
   // Incidence and Orphanet / ICD-11

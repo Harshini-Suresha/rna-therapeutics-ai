@@ -44,6 +44,9 @@ export default function MechanismCard({
                   Poor fit
                 </span>
               )}
+              <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500">
+                Match score: {mechanism.score}
+              </span>
               {rating && <Pill tone={tone}>{rating} evidence</Pill>}
             </div>
             <h3 className="mt-1 text-[15px] font-semibold text-slate-800">{mechanism.name}</h3>

@@ -98,6 +98,8 @@ CHEMISTRY_OPTIONS = [
      "detail": "A DNA gapmer where the flanking wings contain Locked Nucleic Acids (LNA) \u2014 bicyclic RNA analogues with a methylene bridge locking the ribose in a C3\u2032-endo conformation. Each LNA substitution raises Tm by ~2\u2032-8\u2032C, dramatically increasing target affinity. LNA gapmers also have enhanced nuclease resistance. Used in miravirsen (anti-miR-122) and bepetamers. Higher off-target risk due to increased potency."},
     {"id": "2ome", "label": "2\u2032-O-Methoxyethyl (2\u2032-OMe)", "description": "Steric blocker; splicing modulation and miRNA inhibition.",
      "detail": "A ribose-modified oligonucleotide where the 2\u2032-OH is replaced with a methoxyethyl group. 2\u2032-OMe ASOs sterically block RNA interactions and are commonly used for splice-switching and miRNA inhibition. They have good nuclease resistance, low toxicity, and are often used in combination (e.g., morpholino-2\u2032-OMe mixmers). Lower binding affinity than LNA but fewer off-target effects."},
+    {"id": "sirna", "label": "siRNA duplex", "description": "Duplex RNA guide/passenger design for RISC-mediated mRNA cleavage.",
+     "detail": "A 21\u201323 nt duplex in which the antisense guide strand is loaded into RISC to direct AGO2-mediated cleavage of the complementary mRNA target."},
 ]
 
 MODIFICATION_OPTIONS = [
@@ -166,23 +168,58 @@ def _polyg_score(seq: str) -> int:
     return len(re.findall(r"G{3,}", seq.upper()))
 
 
+def _reverse_complement(seq: str) -> str:
+    """Return the antisense oligonucleotide sequence for an RNA target site."""
+    return seq.upper().translate(str.maketrans("ATGC", "TACG"))[::-1]
+
+
+def _mechanism_design_constraints(mechanism_id: str, aso_length: int, chemistry: str) -> tuple[int, str, str]:
+    """Validate mechanism-specific inputs and return effective design settings.
+
+    Some mechanisms cannot be designed from a coding mRNA sequence alone.
+    Refusing those requests is intentional: returning a CDS-derived sequence for
+    a microRNA or promoter-associated-RNA mechanism would be biologically wrong.
+    """
+    if mechanism_id == "A1":
+        return aso_length, chemistry, "mrna"
+    if mechanism_id == "A2":
+        return aso_length, chemistry, "translation_start"
+    if mechanism_id == "A21":
+        return 21, "sirna", "mrna"
+    if mechanism_id == "A12":
+        raise ValueError(
+            "Anti-miR design requires the mature pathogenic miRNA sequence; a target gene CDS cannot be used as its substitute."
+        )
+    if mechanism_id == "A15":
+        raise ValueError(
+            "Promoter-targeting ASO design requires a validated promoter-associated RNA sequence; a coding mRNA sequence cannot be used as its substitute."
+        )
+    raise ValueError(f"Unsupported gene-silencing mechanism: {mechanism_id}")
+
+
 def generate_candidates(
-    target_exon_index: int | None,
+    target_exon_indices: list[int] | None,
     aso_length: int,
     chemistry: str,
     modifications: list[str],
     mrna_sequence: str | None,
     exons: list[dict],
+    mechanism_id: str,
 ) -> list[dict]:
-    """Generate candidate ASOs targeting the selected exon's splice junctions.
+    """Generate candidate ASOs for the selected mechanism and target region.
 
     Uses real exon coordinates (start/end/length) from Ensembl rather than
-    splitting the CDS evenly, so a candidate labeled "Exon 5" actually
-    targets real exon 5.
+    splitting the CDS evenly, so a candidate labeled "Exon 5" targets that
+    exon. When no exon list is supplied, candidates are generated across all
+    exons for total-transcript knockdown.
     """
     candidates = []
     if not mrna_sequence or len(exons) < 2:
         return candidates
+
+    aso_length, chemistry, targeting_mode = _mechanism_design_constraints(
+        mechanism_id, aso_length, chemistry
+    )
 
     seq = mrna_sequence.upper()
     seq_len = len(seq)
@@ -215,65 +252,90 @@ def generate_candidates(
 
     exon_count = len(exons)
 
-    # Determine the CDS region for the target exon
-    if target_exon_index is not None and 0 < target_exon_index <= exon_count:
-        exon_start, exon_end = exon_cds_map[target_exon_index - 1]
+    # A2 sterically blocks translation, so it must cover the 5′ initiation
+    # region rather than scanning arbitrary exons. The other supported
+    # mechanisms use selected exon(s), or the whole transcript when none is
+    # specified.
+    if targeting_mode == "translation_start":
+        search_ranges = [(0, min(seq_len - aso_length, 90), "5′ translation-initiation region")]
     else:
-        # Default to middle of CDS
-        exon_start = seq_len // 3
-        exon_end = 2 * seq_len // 3
+        search_ranges = []
 
-    # Generate candidates with sliding window across exon + flanking region.
-    # Flank 10 nt into adjacent exons to capture splice junctions.
-    flank = min(10, aso_length // 2)
-    search_start = max(0, exon_start - flank)
-    search_end = min(seq_len - aso_length, exon_end + flank)
+    # A missing list means total-transcript knockdown. Invalid exon numbers
+    # are ignored rather than silently using an unrelated default region.
+    requested_exons = (
+        list(range(1, exon_count + 1))
+        if target_exon_indices is None
+        else target_exon_indices
+    )
+    target_indices = sorted({index for index in requested_exons if 0 < index <= exon_count})
+    if not target_indices and targeting_mode != "translation_start":
+        return candidates
 
     seen = set()
-    for offset in range(search_start, search_end, max(1, aso_length // 3)):
-        candidate_seq = seq[offset : offset + aso_length]
-        if len(candidate_seq) < aso_length:
+    # Generate candidates with a small flanking window. Each selected exon is
+    # scanned independently for mRNA-targeting mechanisms.
+    flank = min(10, aso_length // 2)
+    step = max(1, aso_length // 3)
+    if targeting_mode != "translation_start":
+        for target_exon_index in target_indices:
+            exon_start, exon_end = exon_cds_map[target_exon_index - 1]
+            search_ranges.append((
+                max(0, exon_start - flank),
+                min(seq_len - aso_length, exon_end + flank),
+                f"Exon {target_exon_index}",
+            ))
+
+    for search_start, search_end, target_label in search_ranges:
+        if search_end < search_start:
             continue
-        if candidate_seq in seen:
-            continue
-        seen.add(candidate_seq)
 
-        gc = _calc_gc(candidate_seq)
-        if gc < MIN_GC or gc > MAX_GC:
-            continue
+        for offset in range(search_start, search_end + 1, step):
+            candidate_seq = seq[offset : offset + aso_length]
+            if len(candidate_seq) < aso_length or candidate_seq in seen:
+                continue
+            seen.add(candidate_seq)
 
-        tm = _calc_tm(candidate_seq)
-        sc = _self_complement_score(candidate_seq)
-        pg = _polyg_score(candidate_seq)
+            gc = _calc_gc(candidate_seq)
+            if gc < MIN_GC or gc > MAX_GC:
+                continue
 
-        # Composite quality score (0-100)
-        gc_score = max(0, 100 - abs(gc - 0.50) * 400)
-        tm_score = max(0, 100 - abs(tm - 52) * 3)
-        sc_penalty = sc * 200
-        pg_penalty = pg * 15
-        quality = max(0, min(100, gc_score * 0.35 + tm_score * 0.45 - sc_penalty - pg_penalty))
+            tm = _calc_tm(candidate_seq)
+            sc = _self_complement_score(candidate_seq)
+            pg = _polyg_score(candidate_seq)
 
-        # Describe which part of the exon this candidate targets
-        relative_pos = offset - exon_start
-        if relative_pos < 0:
-            region_label = f"Exon {target_exon_index or '?'} 5' flank {relative_pos}"
-        elif relative_pos >= (exon_end - exon_start - aso_length):
-            region_label = f"Exon {target_exon_index or '?'} 3' flank +{relative_pos}"
-        else:
-            region_label = f"Exon {target_exon_index or '?'} offset +{relative_pos}"
+            # Composite quality score (0-100)
+            gc_score = max(0, 100 - abs(gc - 0.50) * 400)
+            tm_score = max(0, 100 - abs(tm - 52) * 3)
+            sc_penalty = sc * 200
+            pg_penalty = pg * 15
+            quality = max(0, min(100, gc_score * 0.35 + tm_score * 0.45 - sc_penalty - pg_penalty))
 
-        candidates.append({
-            "sequence": candidate_seq,
-            "length": aso_length,
-            "gcContent": round(gc * 100, 1),
-            "meltingTemp": tm,
-            "selfComplementScore": round(sc, 4),
-            "polygTracts": pg,
-            "qualityScore": round(quality, 1),
-            "targetRegion": region_label,
-            "chemistry": chemistry,
-            "modifications": modifications,
-        })
+            if targeting_mode == "translation_start":
+                region_label = f"{target_label} offset +{offset}"
+            else:
+                target_exon_index = int(target_label.removeprefix("Exon "))
+                exon_start, exon_end = exon_cds_map[target_exon_index - 1]
+                relative_pos = offset - exon_start
+                if relative_pos < 0:
+                    region_label = f"{target_label} 5' flank {relative_pos}"
+                elif offset + aso_length > exon_end:
+                    region_label = f"{target_label} 3' flank +{relative_pos}"
+                else:
+                    region_label = f"{target_label} offset +{relative_pos}"
+
+            candidates.append({
+                "sequence": _reverse_complement(candidate_seq),
+                "length": aso_length,
+                "gcContent": round(gc * 100, 1),
+                "meltingTemp": tm,
+                "selfComplementScore": round(sc, 4),
+                "polygTracts": pg,
+                "qualityScore": round(quality, 1),
+                "targetRegion": region_label,
+                "chemistry": chemistry,
+                "modifications": modifications,
+            })
 
     # Sort by quality descending, return top 10
     candidates.sort(key=lambda c: c["qualityScore"], reverse=True)

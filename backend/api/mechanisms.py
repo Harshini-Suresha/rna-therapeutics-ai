@@ -20,6 +20,7 @@ from services.mechanism_service import (
     DELIVERY_CONTEXTS,
     SPLICE_DEFECT_TYPES,
 )
+from services.notification_service import add_notification
 
 router = APIRouter()
 
@@ -69,6 +70,12 @@ async def gene_silencing_mechanisms(payload: GeneSilencingRequest):
         known_variant=payload.known_variant,
     )
 
+    add_notification(
+        "analysis",
+        f"Ranked mechanisms for {payload.gene_symbol.upper()}",
+        f"{len(results)} mechanisms scored for gene silencing.",
+    )
+
     return {
         "geneSymbol": payload.gene_symbol.strip().upper(),
         "therapeuticGoal": "Gene Silencing",
@@ -95,6 +102,12 @@ async def rna_processing_mechanisms(payload: RnaProcessingRequest):
         target_exon=payload.target_exon,
         delivery_context=payload.delivery_context,
         known_variant=payload.known_variant,
+    )
+
+    add_notification(
+        "analysis",
+        f"Ranked mechanisms for {payload.gene_symbol.upper()}",
+        f"{len(results)} mechanisms scored for RNA processing modulation.",
     )
 
     return {

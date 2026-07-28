@@ -9,7 +9,7 @@ export function Card({
 }) {
   return (
     <div
-      className={`rounded-2xl border border-slate-200 bg-white shadow-card ${className}`}
+      className={`border border-slate-200 bg-white rounded-xl ${className}`}
     >
       {children}
     </div>
@@ -26,8 +26,8 @@ export function SectionHeader({
   right?: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between px-6 pt-5 pb-4">
-      <h2 className="text-[15px] font-semibold text-slate-800">
+    <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-slate-100">
+      <h2 className="text-[14px] font-semibold text-slate-800">
         {step ? `${step}. ${title}` : title}
       </h2>
       {right}
@@ -43,7 +43,7 @@ export function FieldLabel({
   hint?: string;
 }) {
   return (
-    <label className="mb-1.5 flex items-center gap-1.5 text-[13px] font-medium text-slate-600">
+    <label className="mb-1 flex items-center gap-1.5 text-[12px] font-medium text-slate-600">
       {children}
       {hint && (
         <span
@@ -68,8 +68,8 @@ export function InfoField({
 }) {
   return (
     <div>
-      <p className="text-[12px] text-slate-400">{label}</p>
-      <p className={`text-[13.5px] font-medium text-slate-800 mt-0.5 ${valueClassName}`}>
+      <p className="text-[11px] text-slate-400">{label}</p>
+      <p className={`text-[12.5px] font-medium text-slate-800 mt-0.5 ${valueClassName}`}>
         {value}
       </p>
     </div>
@@ -93,7 +93,7 @@ export function Pill({
   };
   return (
     <span
-      className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[11px] font-medium ${tones[tone]}`}
+      className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10.5px] font-medium ${tones[tone]}`}
     >
       {children}
     </span>
@@ -129,14 +129,14 @@ export function MiniCardHeader({
   title: string;
 }) {
   return (
-    <div className="flex items-center gap-2 px-4 pt-2.5">
+    <div className="flex items-center gap-2 px-4 pt-3 pb-2 border-b border-slate-100">
       <span
-        className="flex h-5 w-5 items-center justify-center rounded-md"
+        className="flex h-5 w-5 items-center justify-center rounded"
         style={{ backgroundColor: iconBg }}
       >
         <Icon className="h-3 w-3" style={{ color: iconColor }} />
       </span>
-      <p className="text-[12px] font-semibold text-slate-700">{title}</p>
+      <p className="text-[11.5px] font-semibold text-slate-700">{title}</p>
     </div>
   );
 }

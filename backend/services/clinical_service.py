@@ -73,6 +73,24 @@ NOISE_PATTERNS = [
     r"\b(mice|mouse|murine|rat|rodent|zebrafish|xenograft|animal\s+model|in\s+vitro|in\s+vivo|cell\s+line|cell\s+culture|primary\s+cells|transgenic|knockout|irradiation|organoid|nonhuman|monkey|macaque|rabbit|dog|pig)\b",
     r"^(here|our\s+(results|findings)|to\s+address\s+this|since\s+these|infection\s+of|in\s+fresh)",
     r"\b(odds\s+ratio|p\s*[=<]|p\(|fdr|genotyp|resequencing)\b",
+    # Case-report-specific detail (individual patient, not general knowledge)
+    r"\d+[- ]year[- ]old",                    # "43-year-old", "11-year-old girl"
+    r"we\s+report\s+(the\s+)?(case|here)",    # "we report the case of"
+    r"this\s+case\s+report",                   # "this case report"
+    r"the\s+patient\s+presented\s+with",       # individual patient presentation
+    r"we\s+describe\s+a\s+case",               # case descriptions
+    r"retrospectively\s+analyz",               # retrospective analysis
+    r"was\s+initially\s+misdiagnos",            # misdiagnosis of an individual
+    r"a\s+\d+[-\s]month\s+history",            # "a 6-month history"
+    r"(led|lead)\s+to\s+partial\s+regression", # specific treatment outcomes
+    r"at\s+\d+\s+weeks?\s+(,|and|post|after)", # time-specific outcomes
+    r"prior\s+treatment\s+for\s+\w+\s+was\s+ineffective",  # specific treatment failure
+    r"herein\s+we\s+report",                   # "herein we report"
+    r"we\s+present\s+(a|the)\s+case",          # "we present a case"
+    r"we\s+report\s+\d+\s+(case|patient)",     # "we report 3 cases"
+    r"present\s+the\s+case\s+of\s+a",           # "present the case of a"
+    r"had\s+been\s+treated\s+(for|with)",       # individual treatment history
+    r"was\s+diagnosed\s+as\s+having",           # individual diagnosis
 ]
 
 SYMPTOM_KEYWORDS = [
@@ -210,6 +228,39 @@ SYMPTOM_DISQUALIFIERS = [
     r"\bsurvey\b", r"\bquestionnaire\b", r"\brespondent(s)?\b",
     r"\bparticipants?\b", r"\bcaregiver(s)?\b", r"\bincidence\b",
     r"\bprevalence\b", r"\bawareness\b", r"\bimprove[d]?\s+medical\s+care\b",
+]
+
+DIAGNOSTIC_DISQUALIFIERS = [
+    r"\bclinical trial\b", r"\bphase\s+[ivx]+\b",
+    r"\bsurgery\b", r"\brehabilitation\b",
+    r"\bpatient\s+(with|presenting|had|was|received)\b",
+    r"\bcourse\s+of\s+treatment\b", r"\bfollow[- ]?up\b",
+    r"\bin\s+this\s+study\b", r"\bthis\s+research\b",
+    r"\bquestionnaire\b", r"\bparticipants?\b",
+    r"\breported\s+(herein|previously)\b",
+    r"\breported\s+elsewhere\b", r"\bof\s+\d+\s+patients\b",
+    r"\bsix\s+to\s+eight\b", r"\boften\s+requires\b",
+    r"\bhigh\s+index\s+of\s+suspicion\b",
+    r"\bawareness\s+is\s+needed\b",
+]
+
+THERAPY_DISQUALIFIERS = [
+    r"\bdifferential\s+diagnos", r"\bcase\s+report\b",
+    r"\bmisdiagnos", r"\bclinical\s+distinction",
+    r"\bearly\s+diagnosis\b", r"\bdiagnostic\s+accuracy\b",
+    r"\bthree[- ]tier\b", r"\bdiagnostic\s+system\b",
+    r"\breduce\s+long[- ]term\s+malignant\s+risk\b",
+    r"\bretrospective\b", r"\bwas\s+ineffective\b",
+    r"\bhad\s+no\s+effect\b",
+    r"\bwe\s+present\b", r"\bwe\s+discuss\b",
+    r"\bfragile\s+health\s+systems?\b",
+    r"\bhigh\s+solar\s+gradients?\b",
+    r"\bpreventive\s+measures\b",
+    r"\bsub[- ]?Saharan\s+Africa\b",
+    r"\bclose\s+communication\s+between\b",
+    r"\boptimal\s+management\b",
+    r"\biatrogenic\s+immunosuppressive\s+therapy\b",
+    r"\bquality\s+of\s+life\b", r"\bpsychosocial\b",
 ]
 
 SYMPTOM_CONTEXT_PATTERNS = [
@@ -417,7 +468,9 @@ def _extract_diagnostic_terms(
     Looks for the DIAGNOSTIC_KEYWORDS in text and returns concise descriptions.
     """
     return _extract_matching_terms(
-        text, DIAGNOSTIC_KEYWORDS, max_items, disease_terms=disease_terms
+        text, DIAGNOSTIC_KEYWORDS, max_items,
+        disqualifiers=DIAGNOSTIC_DISQUALIFIERS,
+        disease_terms=disease_terms,
     )
 
 
@@ -429,7 +482,9 @@ def _extract_therapy_terms(
     Looks for the THERAPY_KEYWORDS in text and returns concise descriptions.
     """
     return _extract_matching_terms(
-        text, THERAPY_KEYWORDS, max_items, disease_terms=disease_terms
+        text, THERAPY_KEYWORDS, max_items,
+        disqualifiers=THERAPY_DISQUALIFIERS,
+        disease_terms=disease_terms,
     )
 
 

@@ -28,7 +28,7 @@ export default function BasicInfoForm({
   return (
     <Card>
       <SectionHeader step="1" title="Basic Information" />
-      <div className="grid grid-cols-1 gap-4 px-6 pb-3 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 px-5 pb-2 md:grid-cols-3">
         {/* Organism */}
         <div>
           <FieldLabel hint="Grouped by clinical, model, veterinary, plant, viral, and bacterial species">
@@ -47,7 +47,7 @@ export default function BasicInfoForm({
               value={diseaseName}
               onChange={(e) => setDiseaseName(e.target.value)}
               placeholder="e.g. Duchenne Muscular Dystrophy"
-              className="w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-3 pr-9 text-[13.5px] text-slate-700 placeholder:text-slate-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+              className="w-full rounded border border-slate-300 bg-white py-2 pl-3 pr-9 text-[12.5px] text-slate-700 placeholder:text-slate-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
             />
             {diseaseName && (
               <button
@@ -55,7 +55,7 @@ export default function BasicInfoForm({
                 aria-label="Clear disease name"
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
               >
-                <X className="h-4 w-4" />
+                <X className="h-3.5 w-3.5" />
               </button>
             )}
           </div>
@@ -72,7 +72,7 @@ export default function BasicInfoForm({
               onChange={(e) => setGeneSymbol(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && onLoadGene()}
               placeholder="e.g. DMD"
-              className="w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-3 pr-16 text-[13.5px] font-medium text-slate-700 placeholder:font-normal placeholder:text-slate-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+              className="w-full rounded border border-slate-300 bg-white py-2 pl-3 pr-14 text-[12.5px] font-medium text-slate-700 placeholder:font-normal placeholder:text-slate-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
             />
             <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1">
               {geneSymbol && (
@@ -81,28 +81,25 @@ export default function BasicInfoForm({
                   aria-label="Clear gene symbol"
                   className="text-slate-400 hover:text-slate-600"
                 >
-                  <X className="h-4 w-4" />
+                  <X className="h-3.5 w-3.5" />
                 </button>
               )}
-              <Search className="h-4 w-4 text-slate-400" />
+              <Search className="h-3.5 w-3.5 text-slate-400" />
             </div>
           </div>
         </div>
       </div>
 
-      <div className="flex items-center justify-between px-6 pb-5 pt-2">
-        <p className="text-[12.5px] text-slate-400">
-          Please select an organism and enter a gene symbol to retrieve live gene data.
-        </p>
+      <div className="flex items-center justify-end px-5 pb-3 pt-2">
         <button
           onClick={onLoadGene}
           disabled={loading || !geneSymbol.trim()}
-          className="flex items-center gap-2 rounded-lg bg-brand px-5 py-2.5 text-[13.5px] font-medium text-white shadow-sm transition-colors hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex items-center gap-1.5 rounded bg-[#061b49] px-4 py-2 text-[12.5px] font-medium text-white transition-colors hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-50"
         >
           {loading ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
           ) : (
-            <Dna className="h-4 w-4" />
+            <Dna className="h-3.5 w-3.5" />
           )}
           {loading ? "Loading Gene..." : "Load Gene"}
         </button>

@@ -1,0 +1,398 @@
+[
+  {
+    "id": "n1785218205979",
+    "category": "analysis",
+    "title": "Ranked mechanisms for SPON2",
+    "detail": "5 mechanisms scored for gene silencing.",
+    "timestamp": 1785218205.979817,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785218316153",
+    "category": "analysis",
+    "title": "Generated 10 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000159674.",
+    "timestamp": 1785218316.1530821,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785218365159",
+    "category": "analysis",
+    "title": "Generated 10 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000159674.",
+    "timestamp": 1785218365.159756,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785218386061",
+    "category": "analysis",
+    "title": "Generated 10 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000159674.",
+    "timestamp": 1785218386.061491,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785218433973",
+    "category": "analysis",
+    "title": "Generated 10 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000159674.",
+    "timestamp": 1785218433.973512,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785218469208",
+    "category": "analysis",
+    "title": "Generated 10 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000159674.",
+    "timestamp": 1785218469.208173,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785218481431",
+    "category": "analysis",
+    "title": "Generated 10 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000159674.",
+    "timestamp": 1785218481.4317682,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785218492238",
+    "category": "analysis",
+    "title": "Generated 10 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000159674.",
+    "timestamp": 1785218492.23865,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785218541189",
+    "category": "analysis",
+    "title": "Ranked mechanisms for SPON2",
+    "detail": "5 mechanisms scored for RNA processing modulation.",
+    "timestamp": 1785218541.189399,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785218597839",
+    "category": "analysis",
+    "title": "Generated 10 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000159674.",
+    "timestamp": 1785218597.839374,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785218613924",
+    "category": "analysis",
+    "title": "Generated 10 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000159674.",
+    "timestamp": 1785218613.924195,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785219212449",
+    "category": "analysis",
+    "title": "Sequence analysis completed",
+    "detail": "ASO analysis finished for a 31 nt sequence.",
+    "timestamp": 1785219212.4491441,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785219381794",
+    "category": "analysis",
+    "title": "Ranked mechanisms for SPON2",
+    "detail": "5 mechanisms scored for gene silencing.",
+    "timestamp": 1785219381.794785,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785219414064",
+    "category": "analysis",
+    "title": "Generated 10 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000159674.",
+    "timestamp": 1785219414.0648499,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785219463460",
+    "category": "analysis",
+    "title": "Generated 10 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000159674.",
+    "timestamp": 1785219463.460466,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785219803159",
+    "category": "analysis",
+    "title": "Ranked mechanisms for SPON2",
+    "detail": "5 mechanisms scored for gene silencing.",
+    "timestamp": 1785219803.159643,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785219881577",
+    "category": "analysis",
+    "title": "Generated 10 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000159674.",
+    "timestamp": 1785219881.5775518,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785226508268",
+    "category": "analysis",
+    "title": "Ranked mechanisms for DMD",
+    "detail": "5 mechanisms scored for gene silencing.",
+    "timestamp": 1785226508.268065,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785226523021",
+    "category": "analysis",
+    "title": "Generated 10 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000198947.",
+    "timestamp": 1785226523.021633,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785226538904",
+    "category": "analysis",
+    "title": "Generated 10 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000198947.",
+    "timestamp": 1785226538.904526,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785226637544",
+    "category": "analysis",
+    "title": "Ranked mechanisms for FOXP3",
+    "detail": "5 mechanisms scored for gene silencing.",
+    "timestamp": 1785226637.544864,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785226645929",
+    "category": "analysis",
+    "title": "Ranked mechanisms for FOXP3",
+    "detail": "5 mechanisms scored for gene silencing.",
+    "timestamp": 1785226645.929087,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785226651895",
+    "category": "analysis",
+    "title": "Ranked mechanisms for FOXP3",
+    "detail": "5 mechanisms scored for gene silencing.",
+    "timestamp": 1785226651.895287,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785226656311",
+    "category": "analysis",
+    "title": "Ranked mechanisms for FOXP3",
+    "detail": "5 mechanisms scored for gene silencing.",
+    "timestamp": 1785226656.3113348,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785226661044",
+    "category": "analysis",
+    "title": "Ranked mechanisms for FOXP3",
+    "detail": "5 mechanisms scored for gene silencing.",
+    "timestamp": 1785226661.0441759,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785233217560",
+    "category": "analysis",
+    "title": "Gene lookup completed for il7",
+    "detail": "Retrieved data for il7 in homo sapiens.",
+    "timestamp": 1785233217.5608761,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785233282132",
+    "category": "analysis",
+    "title": "Gene lookup completed for il2ra",
+    "detail": "Retrieved data for il2ra in homo sapiens.",
+    "timestamp": 1785233282.132852,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785233513200",
+    "category": "analysis",
+    "title": "Gene lookup completed for il7",
+    "detail": "Retrieved data for il7 in homo sapiens.",
+    "timestamp": 1785233513.200187,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785233885208",
+    "category": "analysis",
+    "title": "Gene lookup completed for il7",
+    "detail": "Retrieved data for il7 in homo sapiens.",
+    "timestamp": 1785233885.208357,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785233911847",
+    "category": "analysis",
+    "title": "Gene lookup completed for il2ra",
+    "detail": "Retrieved data for il2ra in homo sapiens.",
+    "timestamp": 1785233911.847444,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785234001567",
+    "category": "analysis",
+    "title": "Gene lookup completed for col1a1",
+    "detail": "Retrieved data for col1a1 in homo sapiens.",
+    "timestamp": 1785234001.567992,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785234261882",
+    "category": "analysis",
+    "title": "Gene lookup completed for il2",
+    "detail": "Retrieved data for il2 in homo sapiens.",
+    "timestamp": 1785234261.882234,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785234309304",
+    "category": "analysis",
+    "title": "Gene lookup completed for gapdh",
+    "detail": "Retrieved data for gapdh in homo sapiens.",
+    "timestamp": 1785234309.304526,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785234804670",
+    "category": "analysis",
+    "title": "Gene lookup completed for foxp3",
+    "detail": "Retrieved data for foxp3 in homo sapiens.",
+    "timestamp": 1785234804.670061,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785234852244",
+    "category": "analysis",
+    "title": "Gene lookup completed for dmd",
+    "detail": "Retrieved data for dmd in homo sapiens.",
+    "timestamp": 1785234852.244192,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785239589368",
+    "category": "analysis",
+    "title": "Gene lookup completed for foxp3",
+    "detail": "Retrieved data for foxp3 in homo sapiens.",
+    "timestamp": 1785239589.368106,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785239662960",
+    "category": "analysis",
+    "title": "Ranked mechanisms for FOXP3",
+    "detail": "5 mechanisms scored for gene silencing.",
+    "timestamp": 1785239662.9600582,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785239677138",
+    "category": "analysis",
+    "title": "Ranked mechanisms for FOXP3",
+    "detail": "5 mechanisms scored for gene silencing.",
+    "timestamp": 1785239677.138528,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785239689736",
+    "category": "analysis",
+    "title": "Ranked mechanisms for FOXP3",
+    "detail": "5 mechanisms scored for gene silencing.",
+    "timestamp": 1785239689.7362292,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785239706665",
+    "category": "analysis",
+    "title": "Generated 10 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000049768.",
+    "timestamp": 1785239706.665932,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785239708526",
+    "category": "analysis",
+    "title": "Generated 10 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000049768.",
+    "timestamp": 1785239708.526099,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785265443728",
+    "category": "analysis",
+    "title": "Gene lookup completed for il7",
+    "detail": "Retrieved data for il7 in homo sapiens.",
+    "timestamp": 1785265443.728485,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785266437732",
+    "category": "analysis",
+    "title": "Gene lookup completed for il7",
+    "detail": "Retrieved data for il7 in homo sapiens.",
+    "timestamp": 1785266437.7326038,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785266664825",
+    "category": "analysis",
+    "title": "Gene lookup completed for il7",
+    "detail": "Retrieved data for il7 in homo sapiens.",
+    "timestamp": 1785266664.8253372,
+    "read": false,
+    "meta": {}
+  }
+]

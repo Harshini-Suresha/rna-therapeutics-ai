@@ -27,6 +27,7 @@ interface StatCardProps {
   title: string;
   rows: { label: string; value: React.ReactNode }[];
   sources?: { label: string; url: string }[];
+  sourcesColumns?: number;
   notConnected?: boolean;
   extra?: React.ReactNode;
 }
@@ -37,7 +38,7 @@ function formatValue(value: React.ReactNode): React.ReactNode {
   return value;
 }
 
-function StatCard({ icon: Icon, iconBg, iconColor, title, rows, sources, notConnected, extra }: StatCardProps) {
+function StatCard({ icon: Icon, iconBg, iconColor, title, rows, sources, sourcesColumns, notConnected, extra }: StatCardProps) {
   return (
     <Card className="flex flex-col rounded-xl">
       <div className="flex items-center gap-2 px-4 pt-4 pb-2">
@@ -58,7 +59,11 @@ function StatCard({ icon: Icon, iconBg, iconColor, title, rows, sources, notConn
             ))
         )}
         {sources && sources.length > 0 && (
-          <div className="mt-2 space-y-1 border-t border-slate-100 pt-2">
+          <div
+            className={`mt-2 border-t border-slate-100 pt-2 ${
+              (typeof (sourcesColumns ?? 1) === "number" && (sourcesColumns ?? 1) > 1) ? "grid grid-cols-2 gap-2" : "space-y-1"
+            }`}
+          >
             {sources.map((s) => (
               <a key={s.label} href={s.url} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-[10px] text-brand hover:underline">
                 {s.label} <ExternalLink className="h-2.5 w-2.5" />
@@ -84,6 +89,7 @@ export default function StatsRow({ gene }: { gene: GeneTargetObject }) {
   const hasMutations = gene.knownPathogenicVariants !== null;
   const hasFda = gene.fdaApprovedTherapies.length > 0;
   const hasOrphanet = gene.orphanetCode !== null || gene.icd11Code !== null || gene.incidence !== null || (gene.orphanetDiseaseNames?.length ?? 0) > 0;
+  const clinVarGeneSearch = `https://www.ncbi.nlm.nih.gov/clinvar/?term=${encodeURIComponent(`${gene.geneSymbol}[gene]`)}`;
 
   return (
     <div className="grid grid-cols-2 gap-4 py-6 md:grid-cols-4">
@@ -94,6 +100,7 @@ export default function StatsRow({ gene }: { gene: GeneTargetObject }) {
         iconBg="#FEF2F2"
         iconColor="#DC2626"
         title="Target Vulnerability"
+        sourcesColumns={2}
         rows={[
           { label: "pHaplo Score", value: isHuman ? (gene.haploinsufficiencyScore ?? DASH) : "Human only" },
           { label: "LOEUF Decile", value: isHuman ? (gene.loeufDecile ?? DASH) : "Human only" },
@@ -248,14 +255,14 @@ export default function StatsRow({ gene }: { gene: GeneTargetObject }) {
         title="Mutation Distribution"
         notConnected={!hasMutations && !gene.mutationBreakdown}
         rows={[
-          { label: "Pathogenic Variants", value: gene.knownPathogenicVariants ?? DASH },
+          { label: "Pathogenic / likely pathogenic", value: gene.knownPathogenicVariants ?? DASH },
           { label: "Large Exon Deletions", value: gene.mutationBreakdown?.largeExonDeletions ?? DASH },
           { label: "Large Exon Duplications", value: gene.mutationBreakdown?.largeExonDuplications ?? DASH },
           { label: "Nonsense / Point", value: gene.mutationBreakdown?.nonsensePointMutations ?? DASH },
           { label: "Frameshift", value: gene.mutationBreakdown?.frameshiftMutations ?? DASH },
           { label: "Splice Site", value: gene.mutationBreakdown?.spliceSiteMutations ?? DASH },
         ]}
-        sources={isHuman ? [{ label: "Source: ClinVar", url: links.clinvar ?? "#" }] : []}
+        sources={isHuman ? [{ label: "Source: NCBI ClinVar", url: links.clinvar ?? clinVarGeneSearch }] : []}
       />
 
       {/* 10. FDA Therapies */}
@@ -264,11 +271,17 @@ export default function StatsRow({ gene }: { gene: GeneTargetObject }) {
         iconBg="#ECFDF5"
         iconColor="#059669"
         title="FDA-Approved Oligonucleotide Therapies"
+        sourcesColumns={2}
         rows={
           hasFda
-            ? gene.fdaApprovedTherapies.slice(0, 5).map((t) => ({
+            ? gene.fdaApprovedTherapies.map((t) => ({
                 label: t.name,
-                value: `${t.indication}${t.approvalYear ? ` (${t.approvalYear})` : " (Investigational)"}`,
+                value: [
+                  t.indication,
+                  t.modality ?? "Oligonucleotide",
+                  t.approvalYear ? `FDA approved ${t.approvalYear}` : "Investigational",
+                  t.source,
+                ].join(" · "),
               }))
             : isHuman
               ? [
@@ -279,8 +292,11 @@ export default function StatsRow({ gene }: { gene: GeneTargetObject }) {
         }
         sources={
           hasFda
-            ? [{ label: "Source: FDA", url: "https://www.fda.gov/drugs/nucleic-acid-therapies-and-gene-therapies-approved-and-regulated-fda" }]
-            : []
+            ? [
+                { label: "FDA nucleic-acid therapies", url: "https://www.fda.gov/drugs/nucleic-acid-therapies-and-gene-therapies-approved-and-regulated-fda" },
+                { label: "ClinicalTrials.gov studies", url: `https://clinicaltrials.gov/search?term=${encodeURIComponent(gene.geneSymbol)}` },
+              ]
+            : [{ label: "Search ClinicalTrials.gov", url: `https://clinicaltrials.gov/search?term=${encodeURIComponent(gene.geneSymbol)}` }]
         }
       />
 
@@ -317,6 +333,7 @@ export default function StatsRow({ gene }: { gene: GeneTargetObject }) {
         iconBg="#FFF7ED"
         iconColor="#EA580C"
         title="Literature"
+        sourcesColumns={2}
         notConnected={!hasLiterature}
         rows={[
           { label: "PubMed Articles", value: gene.pubmedArticleCount ?? DASH },

@@ -51,7 +51,7 @@ export default function OrganismSelect({ value, onChange }: Props) {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center justify-between rounded-lg border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-left text-[13.5px] text-slate-700 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+        className="flex w-full items-center justify-between rounded border border-slate-300 bg-white py-2 pl-9 pr-3 text-left text-[12.5px] text-slate-700 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
       >
         <span className="relative flex-1 truncate">
           <Dna className="pointer-events-none absolute -left-[26px] top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -68,7 +68,7 @@ export default function OrganismSelect({ value, onChange }: Props) {
       </button>
 
       {open && (
-        <div className="absolute z-20 mt-1.5 w-full min-w-[340px] rounded-xl border border-slate-200 bg-white shadow-lg overflow-hidden">
+        <div className="absolute z-20 mt-1 w-full min-w-[340px] border border-slate-200 bg-white shadow-lg overflow-hidden">
           <div className="border-b border-slate-100 bg-white p-2">
             <div className="relative">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
@@ -77,7 +77,7 @@ export default function OrganismSelect({ value, onChange }: Props) {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search organisms..."
-                className="w-full rounded-md border border-slate-200 bg-slate-50 py-1.5 pl-8 pr-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-brand/20"
+                className="w-full rounded border border-slate-200 bg-slate-50 py-1.5 pl-8 pr-2 text-[12px] focus:outline-none focus:ring-2 focus:ring-brand/20"
               />
             </div>
           </div>

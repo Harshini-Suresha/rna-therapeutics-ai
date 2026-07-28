@@ -14,13 +14,15 @@ from services.gene_silencing_service import (
     LENGTH_RANGE,
 )
 from services.variant_details_service import get_clinvar_variants
+from services.notification_service import add_notification
 
 router = APIRouter()
 
 
 class CandidateRequest(BaseModel):
     ensembl_gene_id: str
-    target_exon_index: Optional[int] = None
+    mechanism_id: str
+    target_exon_indices: Optional[list[int]] = None
     aso_length: int = 18
     chemistry: str = "gapmer"
     modifications: list[str] = []
@@ -47,26 +49,37 @@ async def design_options():
 
 @router.post("/api/gene-silencing/generate")
 async def generate_aso_candidates(payload: CandidateRequest):
-    """Generate ranked ASO candidates for the selected exon."""
+    """Generate ranked candidates using the selected mechanism's design rules."""
     target = get_target_analysis(payload.ensembl_gene_id)
     if not target.get("mrnaSequence"):
         raise HTTPException(status_code=404, detail="Could not fetch mRNA sequence.")
 
-    candidates = generate_candidates(
-        target_exon_index=payload.target_exon_index,
-        aso_length=payload.aso_length,
-        chemistry=payload.chemistry,
-        modifications=payload.modifications,
-        mrna_sequence=target["mrnaSequence"],
-        exons=target.get("exons", []),
+    try:
+        candidates = generate_candidates(
+            target_exon_indices=payload.target_exon_indices,
+            aso_length=payload.aso_length,
+            chemistry=payload.chemistry,
+            modifications=payload.modifications,
+            mrna_sequence=target["mrnaSequence"],
+            exons=target.get("exons", []),
+            mechanism_id=payload.mechanism_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    add_notification(
+        "analysis",
+        f"Generated {len(candidates)} ASO candidates",
+        f"Candidate design completed for {payload.ensembl_gene_id}.",
     )
 
     return {
         "geneId": payload.ensembl_gene_id,
-        "targetExon": payload.target_exon_index,
-        "chemistry": payload.chemistry,
+        "mechanismId": payload.mechanism_id,
+        "targetExons": None if payload.mechanism_id == "A2" else payload.target_exon_indices,
+        "chemistry": candidates[0]["chemistry"] if candidates else payload.chemistry,
         "modifications": payload.modifications,
-        "asoLength": payload.aso_length,
+        "asoLength": candidates[0]["length"] if candidates else payload.aso_length,
         "totalExons": len(target.get("exons", [])),
         "cdsLength": target.get("cdsLength"),
         "candidates": candidates,
