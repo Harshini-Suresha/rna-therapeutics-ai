@@ -84,6 +84,11 @@ export default function MechanismSelectionPage() {
     setKnownVariant("");
   }
 
+  function clearRanking() {
+    setRanking(null);
+    setSelectedId(null);
+  }
+
   async function handleRank() {
     if (!gene || !selectedGoal) return;
     setLoading(true);
@@ -236,7 +241,10 @@ export default function MechanismSelectionPage() {
                     </FieldLabel>
                     <select
                       value={defectType}
-                      onChange={(e) => setDefectType(e.target.value)}
+                      onChange={(e) => {
+                        setDefectType(e.target.value);
+                        clearRanking();
+                      }}
                       className="w-full rounded-lg border border-slate-300 bg-white py-2.5 px-3 text-[13.5px] text-slate-700 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
                     >
                       <option value="">Select defect type</option>
@@ -254,7 +262,10 @@ export default function MechanismSelectionPage() {
                     </FieldLabel>
                     <select
                       value={silencingScope}
-                      onChange={(e) => setSilencingScope(e.target.value)}
+                      onChange={(e) => {
+                        setSilencingScope(e.target.value);
+                        clearRanking();
+                      }}
                       className="w-full rounded-lg border border-slate-300 bg-white py-2.5 px-3 text-[13.5px] text-slate-700 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
                     >
                       <option value="">Select scope</option>
@@ -272,7 +283,10 @@ export default function MechanismSelectionPage() {
                     </FieldLabel>
                     <select
                       value={deliveryContext}
-                      onChange={(e) => setDeliveryContext(e.target.value)}
+                      onChange={(e) => {
+                        setDeliveryContext(e.target.value);
+                        clearRanking();
+                      }}
                       className="w-full rounded-lg border border-slate-300 bg-white py-2.5 px-3 text-[13.5px] text-slate-700 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
                     >
                       <option value="">Not specified</option>
@@ -290,7 +304,10 @@ export default function MechanismSelectionPage() {
                     </FieldLabel>
                     <input
                       value={knownVariant}
-                      onChange={(e) => setKnownVariant(e.target.value)}
+                      onChange={(e) => {
+                        setKnownVariant(e.target.value);
+                        clearRanking();
+                      }}
                       placeholder="e.g. c.1521_1523delCTT / p.Phe508del"
                       className="w-full rounded-lg border border-slate-300 bg-white py-2.5 px-3 text-[13.5px] text-slate-700 placeholder:text-slate-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
                     />
@@ -306,7 +323,10 @@ export default function MechanismSelectionPage() {
                     </FieldLabel>
                     <select
                       value={spliceDefectType}
-                      onChange={(e) => setSpliceDefectType(e.target.value)}
+                      onChange={(e) => {
+                        setSpliceDefectType(e.target.value);
+                        clearRanking();
+                      }}
                       className="w-full rounded-lg border border-slate-300 bg-white py-2.5 px-3 text-[13.5px] text-slate-700 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
                     >
                       <option value="">Select splice defect type</option>
@@ -324,7 +344,10 @@ export default function MechanismSelectionPage() {
                     </FieldLabel>
                     <input
                       value={targetExon}
-                      onChange={(e) => setTargetExon(e.target.value)}
+                      onChange={(e) => {
+                        setTargetExon(e.target.value);
+                        clearRanking();
+                      }}
                       placeholder="e.g. exon 51"
                       className="w-full rounded-lg border border-slate-300 bg-white py-2.5 px-3 text-[13.5px] text-slate-700 placeholder:text-slate-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
                     />
@@ -336,7 +359,10 @@ export default function MechanismSelectionPage() {
                     </FieldLabel>
                     <select
                       value={deliveryContext}
-                      onChange={(e) => setDeliveryContext(e.target.value)}
+                      onChange={(e) => {
+                        setDeliveryContext(e.target.value);
+                        clearRanking();
+                      }}
                       className="w-full rounded-lg border border-slate-300 bg-white py-2.5 px-3 text-[13.5px] text-slate-700 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
                     >
                       <option value="">Not specified</option>
@@ -354,7 +380,10 @@ export default function MechanismSelectionPage() {
                     </FieldLabel>
                     <input
                       value={knownVariant}
-                      onChange={(e) => setKnownVariant(e.target.value)}
+                      onChange={(e) => {
+                        setKnownVariant(e.target.value);
+                        clearRanking();
+                      }}
                       placeholder="e.g. c.1521_1523delCTT / p.Phe508del"
                       className="w-full rounded-lg border border-slate-300 bg-white py-2.5 px-3 text-[13.5px] text-slate-700 placeholder:text-slate-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
                     />
@@ -399,17 +428,46 @@ export default function MechanismSelectionPage() {
             <div className="space-y-3">
               <p className="text-[13px] text-slate-500">
                 Ranked {ranking.results.length} {ranking.therapeuticGoal} mechanisms for {ranking.geneSymbol}.
-                Eligibility is based on each mechanism&apos;s documented variant/scope compatibility;
-                delivery context is a soft tie-breaker only.
+                Eligible mechanisms match your selected defect type and scope; poor-fit mechanisms are shown below for reference.
               </p>
-              {ranking.results.map((m) => (
-                <MechanismCard
-                  key={m.id}
-                  mechanism={m}
-                  selected={selectedId === m.id}
-                  onSelect={() => handleSelectMechanism(m.id)}
-                />
-              ))}
+              {(() => {
+                const eligible = ranking.results.filter((m) => m.eligible);
+                const poorFit = ranking.results.filter((m) => !m.eligible);
+                return (
+                  <>
+                    {eligible.length > 0 && (
+                      <div className="space-y-3">
+                        <p className="text-[11px] font-semibold uppercase tracking-wider text-emerald-600">
+                          Eligible Mechanisms ({eligible.length})
+                        </p>
+                        {eligible.map((m) => (
+                          <MechanismCard
+                            key={m.id}
+                            mechanism={m}
+                            selected={selectedId === m.id}
+                            onSelect={() => handleSelectMechanism(m.id)}
+                          />
+                        ))}
+                      </div>
+                    )}
+                    {poorFit.length > 0 && (
+                      <div className="space-y-3 rounded-xl border border-dashed border-slate-200 bg-slate-50/50 p-4">
+                        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                          Poor Fit ({poorFit.length})
+                        </p>
+                        {poorFit.map((m) => (
+                          <MechanismCard
+                            key={m.id}
+                            mechanism={m}
+                            selected={selectedId === m.id}
+                            onSelect={() => handleSelectMechanism(m.id)}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
           )}
 
