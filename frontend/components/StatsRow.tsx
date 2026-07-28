@@ -128,6 +128,8 @@ export default function StatsRow({ gene }: { gene: GeneTargetObject }) {
           { label: "Splicing Motif Density", value: gene.splicingMotifDensity ?? DASH },
           { label: "Preclinical Conservation", value: gene.preclinicalConservation ?? DASH },
           { label: "Splice Switches", value: gene.spliceSwitches ?? DASH },
+          { label: "Coding Length", value: gene.mrnaLength != null ? `${gene.mrnaLength.toLocaleString()} bp` : DASH },
+          { label: "Exon Count", value: gene.exonCount ?? DASH },
         ]}
         sources={[{ label: "Source: Ensembl", url: links.ensembl ?? "#" }]}
       />
