@@ -7,6 +7,11 @@ import {
   ExternalLink,
   Shield,
   BarChart3,
+  Stethoscope,
+  Dna,
+  Pill,
+  AlertTriangle,
+  Building2,
 } from "lucide-react";
 import { GeneTargetObject } from "@/types/gene";
 import { Card } from "./ui";
@@ -34,14 +39,14 @@ function formatValue(value: React.ReactNode): React.ReactNode {
 
 function StatCard({ icon: Icon, iconBg, iconColor, title, rows, sources, notConnected, extra }: StatCardProps) {
   return (
-    <Card className="flex flex-col">
+    <Card className="flex flex-col rounded-xl">
       <div className="flex items-center gap-2 px-4 pt-4 pb-2">
         <span className="flex h-6 w-6 items-center justify-center rounded-md" style={{ backgroundColor: iconBg }}>
           <Icon className="h-3.5 w-3.5" style={{ color: iconColor }} />
         </span>
         <p className="text-[12.5px] font-semibold text-slate-700">{title}</p>
       </div>
-      <div className="flex-1 space-y-1.5 px-4 pb-3 overflow-y-auto max-h-44 card-scroll">
+      <div className="flex-1 space-y-1.5 px-4 pb-3 overflow-y-auto max-h-60 card-scroll">
         {notConnected ? (
           <p className="text-[11.5px] text-slate-400">Not yet connected</p>
         ) : (
@@ -75,9 +80,14 @@ export default function StatsRow({ gene }: { gene: GeneTargetObject }) {
   const hasLiterature = gene.pubmedArticleCount !== null || gene.reviewCount !== null || gene.clinicalTrialsCount !== null || gene.preprintCount !== null || gene.caseReportsCount !== null;
   const hasPathways = gene.keggCount !== null || gene.reactomeCount !== null;
   const hasGoTerms = gene.goBiologicalProcess !== null || gene.goMolecularFunction !== null || gene.goCellularComponent !== null;
+  const hasClinical = gene.omimId !== null || gene.phenotypes.length > 0 || gene.therapeuticOptions.length > 0 || gene.diagnosticTests.length > 0 || gene.clinicalSymptoms.length > 0;
+  const hasMutations = gene.knownPathogenicVariants !== null;
+  const hasFda = gene.fdaApprovedTherapies.length > 0;
+  const hasOrphanet = gene.orphanetCode !== null || gene.icd11Code !== null || gene.incidence !== null || (gene.orphanetDiseaseNames?.length ?? 0) > 0;
 
   return (
-    <div className="grid grid-cols-3 gap-4 md:grid-cols-4 lg:grid-cols-7">
+    <div className="grid grid-cols-2 gap-4 py-6 md:grid-cols-4">
+      {/* Row 1 */}
       {/* 1. Target Vulnerability */}
       <StatCard
         icon={Shield}
@@ -152,7 +162,42 @@ export default function StatsRow({ gene }: { gene: GeneTargetObject }) {
         ].filter(Boolean) as { label: string; url: string }[]}
       />
 
-      {/* 5. GO Terms */}
+      {/* Row 2 */}
+      {/* 5. Genomic Overview */}
+      <StatCard
+        icon={Dna}
+        iconBg="#EFF6FF"
+        iconColor="#2563EB"
+        title="Genomic Overview"
+        rows={[
+          { label: "Genomic Size", value: gene.genomicSize !== null ? `${gene.genomicSize.toLocaleString()} bp` : DASH },
+          { label: "mRNA Length (CDS)", value: gene.mrnaLength !== null ? `${gene.mrnaLength.toLocaleString()} bp` : DASH },
+          { label: "Protein Mass", value: gene.proteinMass ?? DASH },
+          { label: "Exon Count", value: gene.exonCount ?? DASH },
+          { label: "Intron Count", value: gene.intronCount ?? DASH },
+          { label: "Targetable Exons", value: gene.targetableExons ?? DASH },
+        ]}
+        sources={[{ label: "Source: Ensembl", url: links.ensembl ?? "#" }]}
+      />
+
+      {/* 6. Clinical Profile */}
+      <StatCard
+        icon={Stethoscope}
+        iconBg="#FEF2F2"
+        iconColor="#DC2626"
+        title="Clinical Profile"
+        rows={[
+          { label: "OMIM", value: gene.omimId ?? DASH },
+          { label: "Phenotypes", value: gene.phenotypes.length > 0 ? gene.phenotypes.length : DASH },
+          { label: "Mechanism", value: gene.diseaseMechanism ?? DASH },
+          { label: "Diagnostic tests", value: gene.diagnosticTests.length > 0 ? gene.diagnosticTests.length : DASH },
+          { label: "Clinical symptoms", value: gene.clinicalSymptoms.length > 0 ? gene.clinicalSymptoms.length : DASH },
+          { label: "Therapeutic options", value: gene.therapeuticOptions.length > 0 ? gene.therapeuticOptions.length : DASH },
+        ]}
+        sources={links.omim && gene.omimId ? [{ label: "Source: OMIM", url: links.omim }] : []}
+      />
+
+      {/* 7. GO Terms */}
       <StatCard
         icon={Tags}
         iconBg="#FDF2F8"
@@ -170,7 +215,7 @@ export default function StatsRow({ gene }: { gene: GeneTargetObject }) {
         sources={links.go ? [{ label: "Source: Gene Ontology", url: links.go }] : []}
       />
 
-      {/* 6. Interactions */}
+      {/* 8. Interactions */}
       <StatCard
         icon={Network}
         iconBg="#EFF6FF"
@@ -194,7 +239,79 @@ export default function StatsRow({ gene }: { gene: GeneTargetObject }) {
         sources={links.string ? [{ label: "Source: STRING", url: links.string }] : []}
       />
 
-      {/* 7. Literature */}
+      {/* Row 3 */}
+      {/* 9. Mutation Distribution */}
+      <StatCard
+        icon={AlertTriangle}
+        iconBg="#FEF3C7"
+        iconColor="#D97706"
+        title="Mutation Distribution"
+        notConnected={!hasMutations && !gene.mutationBreakdown}
+        rows={[
+          { label: "Pathogenic Variants", value: gene.knownPathogenicVariants ?? DASH },
+          { label: "Large Exon Deletions", value: gene.mutationBreakdown?.largeExonDeletions ?? DASH },
+          { label: "Large Exon Duplications", value: gene.mutationBreakdown?.largeExonDuplications ?? DASH },
+          { label: "Nonsense / Point", value: gene.mutationBreakdown?.nonsensePointMutations ?? DASH },
+          { label: "Frameshift", value: gene.mutationBreakdown?.frameshiftMutations ?? DASH },
+          { label: "Splice Site", value: gene.mutationBreakdown?.spliceSiteMutations ?? DASH },
+        ]}
+        sources={isHuman ? [{ label: "Source: ClinVar", url: links.clinvar ?? "#" }] : []}
+      />
+
+      {/* 10. FDA Therapies */}
+      <StatCard
+        icon={Pill}
+        iconBg="#ECFDF5"
+        iconColor="#059669"
+        title="FDA-Approved Oligonucleotide Therapies"
+        rows={
+          hasFda
+            ? gene.fdaApprovedTherapies.slice(0, 5).map((t) => ({
+                label: t.name,
+                value: `${t.indication}${t.approvalYear ? ` (${t.approvalYear})` : " (Investigational)"}`,
+              }))
+            : isHuman
+              ? [
+                  { label: "Status", value: "No approved therapy for this gene" },
+                  { label: "Tip", value: "Check ClinicalTrials.gov for active trials" },
+                ]
+              : [{ label: "Status", value: "Human only" }]
+        }
+        sources={
+          hasFda
+            ? [{ label: "Source: FDA", url: "https://www.fda.gov/drugs/nucleic-acid-therapies-and-gene-therapies-approved-and-regulated-fda" }]
+            : []
+        }
+      />
+
+      {/* 11. Orphanet / Rare Disease */}
+      <StatCard
+        icon={Building2}
+        iconBg="#F5F3FF"
+        iconColor="#7C3AED"
+        title="Orphanet / Rare Disease"
+        rows={
+          isHuman
+            ? [
+                { label: "Orphanet Code", value: gene.orphanetCode ?? DASH },
+                { label: "ICD-11 Code", value: gene.icd11Code ?? DASH },
+                { label: "Incidence", value: gene.incidence ?? DASH },
+                { label: "Known Pathogenic", value: gene.knownPathogenicVariants ?? DASH },
+                ...(gene.orphanetDiseaseNames?.length > 0
+                  ? gene.orphanetDiseaseNames.slice(0, 2).map((name) => ({
+                      label: "Associated Disease",
+                      value: name,
+                    }))
+                  : []),
+              ]
+            : [{ label: "Status", value: "Human only" }]
+        }
+        sources={isHuman ? [
+          { label: "Source: Orphanet", url: "https://www.orpha.net" },
+        ] : []}
+      />
+
+      {/* 12. Literature */}
       <StatCard
         icon={BookMarked}
         iconBg="#FFF7ED"

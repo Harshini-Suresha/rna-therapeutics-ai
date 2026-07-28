@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, ArrowRight, BookOpen, ClipboardCheck, Cpu, Database, Dna, FileText, ChevronRight } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import Topbar from "@/components/Topbar";
 import BasicInfoForm from "@/components/BasicInfoForm";
@@ -15,6 +15,87 @@ import { fetchGene } from "@/lib/api";
 import { getOrganism } from "@/lib/organisms";
 import { findViralGene } from "@/lib/virusGenes";
 import { formatGeneSymbol } from "../shared/geneFormat";
+
+const ANALYSIS_MODULES = [
+  "Biological Information Retrieval",
+  "Therapeutic Mechanism Configuration",
+  "Molecular Defect Identification",
+  "Therapeutic Goal Prediction",
+  "Rulebook Execution",
+  "Mechanism-specific Target Discovery",
+  "Candidate Design",
+  "Candidate Optimization",
+  "Candidate Ranking",
+  "Biological Validation",
+  "Final Report Generation",
+];
+
+const MECHANISM_CATEGORIES = [
+  {
+    category: "Gene Silencing",
+    items: [
+      "RNase H-mediated Gapmer Knockdown",
+      "Steric-blocking Translation Inhibition",
+      "Anti-miR (AntagomiR)",
+      "Transcriptional Gene Silencing",
+      "RNA Interference (siRNA)",
+    ],
+  },
+  {
+    category: "Gene Upregulation",
+    items: [
+      "Poison Exon Blocking",
+      "AntagoNAT",
+      "uORF Blocking",
+      "Target Protector (BlockmiR)",
+      "miRNA Mimic Therapy",
+      "saRNA-mediated Transcriptional Activation",
+    ],
+  },
+  {
+    category: "RNA Editing / Correction",
+    items: [
+      "ADAR-mediated RNA Editing",
+      "Endogenous ADAR Recruitment",
+      "Human-derived Programmable RNA Editing",
+      "CRISPR-guided RNA Editing",
+      "RNA Trans-splicing (SMaRT)",
+    ],
+  },
+  {
+    category: "RNA Processing Modulation",
+    items: [
+      "Exon Skipping",
+      "Exon Inclusion",
+      "Pseudoexon Suppression",
+      "Cryptic Splice-site Blocking",
+      "Alternative Polyadenylation Modulation",
+    ],
+  },
+  {
+    category: "RNA Neutralization",
+    items: ["Toxic RNA Neutralization"],
+  },
+  {
+    category: "Protein Replacement",
+    items: [
+      "mRNA Replacement Therapy",
+      "circRNA-mediated Protein Replacement",
+    ],
+  },
+  {
+    category: "Protein Function Modulation",
+    items: ["RNA Aptamer Therapeutics"],
+  },
+];
+
+const ARCHITECTURE_STEPS = [
+  { label: "Biological Information", icon: Database },
+  { label: "Knowledge Retrieval", icon: BookOpen },
+  { label: "Mechanism Rulebooks", icon: FileText },
+  { label: "Computational Engine", icon: Cpu },
+  { label: "Validation & Output", icon: ClipboardCheck },
+];
 
 export default function NewProjectPage() {
   const router = useRouter();
@@ -40,7 +121,6 @@ export default function NewProjectPage() {
       return;
     }
 
-    // --- TIER 5 (viruses): curated reference data, no live connector ---
     if (selectedOrg.tier === 5) {
       const viralGene = findViralGene(organism, geneSymbol);
       if (!viralGene) {
@@ -52,7 +132,6 @@ export default function NewProjectPage() {
         return;
       }
 
-      // Apply organism-specific formatting to the curated symbol
       const formattedSymbol = formatGeneSymbol(viralGene.symbol, organism);
       setGeneSymbol(formattedSymbol);
 
@@ -76,15 +155,12 @@ export default function NewProjectPage() {
         synonyms: [],
         source: ["Curated reference (not a live connector)"],
         taxonId: "Viral Taxon",
-
         canonicalTranscript: null,
         canonicalTranscriptLabel: null,
         otherTranscripts: [],
         totalTranscripts: null,
-
         variantExamples: [],
         totalKnownVariantsClinvar: null,
-
         defaultTissue: null,
         tissueExpressionLevel: null,
         tissueTpm: null,
@@ -93,7 +169,6 @@ export default function NewProjectPage() {
         cellExpressionLevel: null,
         cellTpm: null,
         cellTypeAll: {},
-
         expressionStabilityCV: null,
         vitalOrganTpm: null,
         vitalOrganTissues: [],
@@ -106,7 +181,6 @@ export default function NewProjectPage() {
         developmentalExpression: null,
         alternativePolyadenylation: null,
         nuclearRetentionIndex: null,
-
         proteinId: null,
         proteinName: viralGene.product,
         proteinLength: viralGene.approxLengthAa,
@@ -130,7 +204,6 @@ export default function NewProjectPage() {
         pdbId: null,
         mutationRate: null,
         uniprotAccession: null,
-
         disease: diseaseName.trim() || null,
         diseaseAssociation: diseaseName.trim() || null,
         diseaseAssociationSource: [],
@@ -142,24 +215,19 @@ export default function NewProjectPage() {
         clinicalSymptoms: [],
         carrierManifestations: [],
         therapeuticOptions: [],
-
         exonCount: null,
         intronCount: null,
         cdsLength: viralGene.approxLengthAa ? viralGene.approxLengthAa * 3 + 3 : null,
         geneLength: viralGene.approxLengthAa ? viralGene.approxLengthAa * 3 + 3 : null,
-
         dbSnpCount: null,
         gnomadAvailable: false,
         clinvarVariantCount: null,
-
         topHgvsName: null,
         topRsId: null,
         populationFrequencyMaf: null,
-
         gtexAvailable: false,
         humanProteinAtlasLevel: null,
         gtexExpressionLevel: null,
-
         deepLinks: {
           ncbi: `https://www.ncbi.nlm.nih.gov/nuccore/${viralGene.referenceGenome}`,
           uniprot: `https://www.uniprot.org/uniprotkb?query=${encodeURIComponent(
@@ -170,7 +238,6 @@ export default function NewProjectPage() {
             `${selectedOrg.commonName} ${viralGene.symbol}`
           )}`,
         },
-
         keggCount: null,
         reactomeCount: null,
         pathwayCommonsCount: null,
@@ -213,6 +280,23 @@ export default function NewProjectPage() {
         depmapDependencyScore: null,
         essentialGene: null,
         depmapSource: null,
+        genomicSize: null,
+        mrnaLength: null,
+        proteinMass: null,
+        fdaApprovedTherapies: [],
+        targetableExons: null,
+        incidence: null,
+        orphanetCode: null,
+        icd11Code: null,
+        orphanetDiseaseNames: [],
+        knownPathogenicVariants: null,
+        mutationBreakdown: {
+          largeExonDeletions: null,
+          largeExonDuplications: null,
+          nonsensePointMutations: null,
+          frameshiftMutations: null,
+          spliceSiteMutations: null,
+        },
       };
 
       setGene(viralTargetPayload);
@@ -220,11 +304,9 @@ export default function NewProjectPage() {
       return;
     }
 
-    // --- Tier 1/2/3/4/6: live Ensembl + Open Targets/phenotype data ---
     try {
       const searchSpecies = selectedOrg.ensemblSpecies || "homo_sapiens";
       const result = await fetchGene(searchSpecies, diseaseName, geneSymbol);
-      // Apply organism-specific formatting to the official symbol returned by the server
       const formattedOfficial = formatGeneSymbol(result.geneSymbol, organism);
       setGeneSymbol(formattedOfficial);
       setGene(result);
@@ -255,236 +337,137 @@ export default function NewProjectPage() {
       <Sidebar />
       <div className="flex min-h-screen flex-1 flex-col">
         <Topbar />
-        <main className="flex-1 space-y-5 px-6 py-6">
-          <BasicInfoForm
-            organism={organism}
-            setOrganism={setOrganism}
-            diseaseName={diseaseName}
-            setDiseaseName={setDiseaseName}
-            geneSymbol={geneSymbol}
-            setGeneSymbol={setGeneSymbol}
-            onLoadGene={handleLoadGene}
-            loading={loading}
-          />
+        <main className="flex-1 space-y-4 px-4 py-4 lg:px-[18px]">
+          {(gene || loading) && (
+            <BasicInfoForm
+              organism={organism}
+              setOrganism={setOrganism}
+              diseaseName={diseaseName}
+              setDiseaseName={setDiseaseName}
+              geneSymbol={geneSymbol}
+              setGeneSymbol={setGeneSymbol}
+              onLoadGene={handleLoadGene}
+              loading={loading}
+            />
+          )}
           {error && (
-            <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-600">
-              <AlertCircle className="h-4 w-4 shrink-0" />
+            <div className="flex items-center gap-2 border border-red-200 bg-red-50 px-4 py-2 text-[12px] text-red-600">
+              <AlertCircle className="h-3.5 w-3.5 shrink-0" />
               {error}
             </div>
           )}
           {!gene && !loading && (
             <>
-              {/* Hero */}
-              <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-card">
-                <div className="flex items-start gap-4 mb-4">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand text-white text-[15px] font-bold">
-                    ASO
+              {/* Platform Overview */}
+              <section className="rounded-lg border border-slate-200 bg-white p-4">
+                <div className="flex flex-col gap-4 xl:flex-row xl:items-center">
+                  <div className="flex h-[119px] w-[110px] shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-[#f7f8fd] to-[#eef1f8]">
+                    <Dna className="h-16 w-16 text-[#162d6b]" strokeWidth={1.35} />
                   </div>
-                  <div>
-                    <h2 className="text-[18px] font-semibold text-slate-800">
-                      ASO Therapeutic Target Discovery Platform
-                    </h2>
-                    <p className="text-[13px] text-slate-500 mt-1 leading-relaxed max-w-3xl">
-                      An integrated computational platform for the design, optimization and
-                      validation of RNA therapeutics including antisense oligonucleotides,
-                      siRNA, miRNA therapeutics, mRNA replacement, circRNA therapeutics,
-                      RNA editing and splice modulation.
+                  <div className="min-w-0 flex-1">
+                    <h1 className="text-[16px] font-bold text-[#101d46]">RNA Therapeutics Platform</h1>
+                    <p className="mt-1.5 max-w-[640px] text-[11.5px] leading-[1.9] text-[#263d6d]">
+                      The RNA Therapeutics Platform is an integrated computational framework for the end-to-end design, optimization, and evaluation of RNA-based therapeutics. The platform combines automated biological information retrieval, mechanism-specific therapeutic rulebooks, molecular defect characterization, target discovery, candidate sequence design, computational optimization, and biological validation within a unified workflow.
                     </p>
                   </div>
-                </div>
-                <div className="flex flex-wrap gap-2 mt-4">
-                  {[
-                    "26 Mechanisms",
-                    "Integrated Databases",
-                    "Automated Discovery",
-                    "Candidate Optimization",
-                    "Validation Pipeline",
-                  ].map((tag) => (
-                    <span
-                      key={tag}
-                      className="inline-flex items-center rounded-full border border-brand/15 bg-brand/5 px-3 py-1 text-[11px] font-medium text-brand"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              {/* Platform Overview — 3 columns */}
-              <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-
-                {/* ABOUT */}
-                <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-card flex flex-col">
-                  <div className="mb-4 flex items-center gap-3">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                      </svg>
-                    </div>
-                    <h2 className="text-[15px] font-semibold text-slate-800">About the Platform</h2>
-                  </div>
-
-                  <p className="text-[12px] text-slate-500 leading-6 mb-5">
-                    An integrated computational platform for the design,
-                    optimization and validation of RNA therapeutics including
-                    antisense oligonucleotides, siRNA, miRNA therapeutics,
-                    mRNA replacement, circRNA therapeutics, RNA editing and
-                    splice modulation.
-                  </p>
-
-                  <div className="border-t border-slate-100 my-4" />
-
-                  <h3 className="text-[12px] font-semibold text-slate-700 uppercase tracking-wider mb-3">
-                    Platform Features
-                  </h3>
-
-                  <ul className="space-y-2.5">
+                  <div className="grid shrink-0 grid-cols-3 gap-3 xl:w-[465px]">
                     {[
-                      "26 Therapeutic Mechanisms",
-                      "Integrated Biological Databases",
-                      "Mechanism-specific Rulebooks",
-                      "Automated Target Discovery",
-                      "Multi-stage Candidate Optimization",
-                      "Biological Validation Pipeline",
-                      "Comprehensive Reporting",
-                    ].map((item) => (
-                      <li key={item} className="flex items-start gap-2 text-[12px] text-slate-600">
-                        <span className="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-brand" />
-                        {item}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                {/* WORKFLOW */}
-                <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-card flex flex-col">
-                  <div className="mb-5 flex items-center gap-3">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z" />
-                      </svg>
-                    </div>
-                    <h2 className="text-[15px] font-semibold text-slate-800">Platform Workflow</h2>
-                  </div>
-
-                  <div className="flex-1">
-                    {[
-                      "Biological Information",
-                      "Knowledge Retrieval",
-                      "User Verification",
-                      "Mechanism Selection",
-                      "Additional Information",
-                      "Molecular Defect Identification",
-                      "Therapeutic Goal Prediction",
-                      "Rulebook Execution",
-                      "Target Discovery",
-                      "Candidate Design",
-                      "Optimization",
-                      "Validation",
-                      "Final Report",
-                    ].map((step, index) => (
-                      <div key={step} className="flex items-center gap-3 py-1.5">
-                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brand/8 text-[11px] font-semibold text-brand">
-                          {index + 1}
-                        </div>
-                        <span className="text-[12px] text-slate-600">{step}</span>
+                      ["25", "Therapeutic Mechanisms"],
+                      ["7", "Therapeutic Goals"],
+                      ["11", "Computational Modules"],
+                    ].map(([value, label]) => (
+                      <div key={label} className="rounded-md border border-slate-200 px-3 py-3">
+                        <p className="text-[18px] font-bold text-[#15234c]">{value}</p>
+                        <p className="mt-1 text-[9.5px] font-medium text-slate-600">{label}</p>
                       </div>
                     ))}
                   </div>
                 </div>
+              </section>
 
-                {/* REQUIRED */}
-                <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-card flex flex-col">
-                  <div className="mb-5 flex items-center gap-3">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
-                      </svg>
-                    </div>
-                    <h2 className="text-[15px] font-semibold text-slate-800">Before You Start</h2>
+              <BasicInfoForm
+                organism={organism}
+                setOrganism={setOrganism}
+                diseaseName={diseaseName}
+                setDiseaseName={setDiseaseName}
+                geneSymbol={geneSymbol}
+                setGeneSymbol={setGeneSymbol}
+                onLoadGene={handleLoadGene}
+                loading={loading}
+              />
+
+              {/* Analysis Modules + Therapeutic Mechanisms */}
+              <section className="grid grid-cols-12 overflow-hidden rounded-lg border border-slate-200 bg-white">
+                {/* Analysis Modules - navigation tree style */}
+                <div className="col-span-12 xl:col-span-3 border-b border-slate-200 bg-white px-4 py-4 xl:border-b-0 xl:border-r">
+                  <div className="pb-2 mb-2 border-b border-slate-100">
+                    <h2 className="text-[11px] font-bold text-[#17264d] uppercase tracking-wide">
+                      Analysis Modules
+                    </h2>
                   </div>
-
-                  <h3 className="text-[12px] font-semibold text-slate-700 uppercase tracking-wider mb-2.5">
-                    Required Information
-                  </h3>
-
-                  <ul className="space-y-2 mb-5">
-                    {["Organism", "Disease Name", "Gene Symbol"].map((item) => (
-                      <li key={item} className="flex items-center gap-2 text-[12px] text-slate-600">
-                        <span className="flex h-5 w-5 items-center justify-center rounded-md bg-brand text-white text-[10px] font-bold">
-                          !
+                  <ul className="space-y-0">
+                    {ANALYSIS_MODULES.map((m, i) => (
+                      <li key={m} className="flex items-center gap-2 border-b border-slate-100 py-[5px] last:border-b-0">
+                        <span className="w-8 shrink-0 rounded bg-[#f1f4f9] py-0.5 text-center text-[10px] font-semibold text-[#304675] tabular-nums">
+                          {String(i + 1).padStart(2, "0")}
                         </span>
-                        {item}
-                      </li>
-                    ))}
-                  </ul>
-
-                  <div className="border-t border-slate-100 my-4" />
-
-                  <h3 className="text-[12px] font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                    May be requested later
-                  </h3>
-                  <p className="text-[11px] text-slate-400 mb-3">
-                    Depending on the selected therapeutic mechanism
-                  </p>
-
-                  <ul className="space-y-2">
-                    {[
-                      "HGVS Variant",
-                      "VCF File",
-                      "Deleted Exon(s)",
-                      "Transcript ID",
-                      "Custom Sequence",
-                      "Target Protein",
-                      "Target Tissue / Cell Type",
-                    ].map((item) => (
-                      <li key={item} className="flex items-center gap-2 text-[12px] text-slate-500">
-                        <span className="h-1 w-1 shrink-0 rounded-full bg-slate-300" />
-                        {item}
+                        <span className="flex-1 text-[10.5px] font-medium text-[#31466f]">{m}</span>
+                        <ChevronRight className="h-3.5 w-3.5 text-[#5b76ad]" />
                       </li>
                     ))}
                   </ul>
                 </div>
-              </div>
 
-              {/* OUTPUTS */}
-              <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-card">
-                <div className="mb-5 flex items-center gap-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-50 text-purple-600">
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-                    </svg>
+                {/* Therapeutic Mechanisms - database style */}
+                <div className="col-span-12 xl:col-span-9 bg-white px-5 py-4">
+                  <div className="pb-2 mb-3 border-b border-slate-100">
+                    <h2 className="text-[11px] font-bold text-[#17264d] uppercase tracking-wide">
+                      Therapeutic Mechanisms
+                    </h2>
                   </div>
-                  <h2 className="text-[15px] font-semibold text-slate-800">What You Will Get</h2>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                    {MECHANISM_CATEGORIES.map((cat, catIdx) => (
+                      <div key={cat.category} className="rounded-md border border-slate-200 px-3 py-2.5">
+                        <p className="mb-1 text-[10.5px] font-bold text-[#17264d]">
+                          {cat.category} <span className="ml-1 text-slate-400 font-normal">({cat.items.length})</span>
+                        </p>
+                        <ul className="space-y-0">
+                          {cat.items.map((item) => (
+                            <li key={item} className="py-[2px] text-[10px] leading-snug text-[#2c4375]">
+                              {item}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
                 </div>
+              </section>
 
-                <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
-                  {[
-                    { label: "Target Information", icon: "🎯" },
-                    { label: "Candidate Sequences", icon: "🧬" },
-                    { label: "Optimization Results", icon: "⚡" },
-                    { label: "Biological Validation", icon: "✅" },
-                    { label: "Final Report", icon: "📄" },
-                    { label: "Export Formats", icon: "📦" },
-                  ].map(({ label, icon }) => (
-                    <div
-                      key={label}
-                      className="group rounded-xl border border-slate-100 bg-slate-50/80 p-4 text-center transition-all hover:border-brand/20 hover:bg-brand/[0.03] hover:shadow-sm"
-                    >
-                      <div className="mb-2 text-[20px]">{icon}</div>
-                      <div className="text-[12px] font-medium text-slate-700">{label}</div>
+              {/* Architecture Diagram */}
+              <section className="rounded-lg border border-slate-200 bg-white px-4 py-4">
+                <div className="pb-2 mb-3 border-b border-slate-100">
+                    <h2 className="text-[11px] font-bold text-[#17264d] uppercase tracking-wide">
+                    Platform Architecture
+                  </h2>
+                </div>
+                <div className="flex flex-col items-center justify-center gap-3 md:flex-row md:gap-5">
+                  {ARCHITECTURE_STEPS.map((step, i) => (
+                    <div key={step.label} className="flex items-center gap-3 md:gap-5">
+                      <div className="flex min-w-[116px] flex-col items-center gap-2 text-center">
+                        <step.icon className="h-7 w-7 text-[#18366d]" strokeWidth={1.45} />
+                        <span className="text-[10px] font-medium text-[#344879]">{step.label}</span>
+                      </div>
+                      {i < ARCHITECTURE_STEPS.length - 1 && (
+                        <svg width="72" height="18" viewBox="0 0 72 18" className="hidden text-[#7590c4] md:block">
+                          <line x1="0" y1="9" x2="66" y2="9" stroke="currentColor" strokeWidth="1.2" />
+                          <polyline points="61,4 66,9 61,14" fill="none" stroke="currentColor" strokeWidth="1.2" />
+                        </svg>
+                      )}
                     </div>
                   ))}
                 </div>
-
-                <div className="mt-5 border-t border-slate-100 pt-4 text-[12px] text-slate-400 leading-relaxed">
-                  Start by providing the basic biological information above. The platform
-                  will automatically retrieve biological annotations, guide you through
-                  therapeutic mechanism selection, perform mechanism-specific design,
-                  optimize therapeutic candidates, and generate comprehensive
-                  downloadable reports.
-                </div>
-              </div>
+              </section>
             </>
           )}
           {gene && (

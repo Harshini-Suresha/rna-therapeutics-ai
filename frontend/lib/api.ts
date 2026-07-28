@@ -1,7 +1,9 @@
 import { GeneTargetObject } from "@/types/gene";
 import { lookupMockGene } from "@/lib/mockGene";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://rna-therapeutics-ai.onrender.com";
+// Use the backend running beside the local Next.js app by default. A deployed
+// environment can still override this with NEXT_PUBLIC_API_BASE_URL.
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 export async function fetchGene(
   organism: string, 
   diseaseName: string,
@@ -216,5 +218,26 @@ export async function fetchGene(
     clinicalTrialsCount: data.clinicalTrialsCount ?? null,
     preprintCount: data.preprintCount ?? null,
     caseReportsCount: data.caseReportsCount ?? null,
+
+    genomicSize: data.genomicSize ?? data.geneLength ?? null,
+    mrnaLength: data.mrnaLength ?? data.cdsLength ?? null,
+    proteinMass: data.proteinMass ?? data.molecularWeight ?? null,
+
+    fdaApprovedTherapies: Array.isArray(data.fdaApprovedTherapies) ? data.fdaApprovedTherapies : [],
+    targetableExons: data.targetableExons ?? null,
+
+    incidence: data.incidence ?? null,
+    orphanetCode: data.orphanetCode ?? null,
+    icd11Code: data.icd11Code ?? null,
+    orphanetDiseaseNames: data.orphanetDiseaseNames ?? [],
+
+    knownPathogenicVariants: data.knownPathogenicVariants ?? null,
+    mutationBreakdown: data.mutationBreakdown ?? {
+      largeExonDeletions: null,
+      largeExonDuplications: null,
+      nonsensePointMutations: null,
+      frameshiftMutations: null,
+      spliceSiteMutations: null,
+    },
   };
 }

@@ -14,6 +14,7 @@ from pydantic import BaseModel
 from typing import Optional
 
 try:  # ``uvicorn backend.main:app`` from the repository root
+    from .services.notification_service import add_notification as _add_notification
     from .services.gene_service import EnsemblLookupUnavailable, clean_synonyms, get_gene_metadata, get_gene_phenotypes, ensembl_gene_url
     from .services.enrichment_service import get_gene_enrichment, get_aso_analysis
     from .services.constraint_service import get_human_constraint_metrics
@@ -24,10 +25,16 @@ try:  # ``uvicorn backend.main:app`` from the repository root
     from .services.single_cell_service import get_single_cell_expression
     from .services.rna_halflife_service import get_rna_halflife
     from .services.dependency_service import get_gene_dependency
+    from .services.fda_therapies_service import get_fda_therapies
+    from .services.orphanet_service import get_orphanet_data
+    from .services.mutation_breakdown_service import get_mutation_breakdown
     from .api.mechanisms import router as mechanisms_router
     from .api.gene_silencing import router as gene_silencing_router
     from .api.upload import router as upload_router
+    from .api.assistant import router as assistant_router
+    from .api.notifications import router as notifications_router
 except ImportError:  # ``uvicorn main:app`` while working in backend/
+    from services.notification_service import add_notification as _add_notification
     from services.gene_service import EnsemblLookupUnavailable, clean_synonyms, get_gene_metadata, get_gene_phenotypes, ensembl_gene_url
     from services.enrichment_service import get_gene_enrichment, get_aso_analysis
     from services.constraint_service import get_human_constraint_metrics
@@ -38,9 +45,15 @@ except ImportError:  # ``uvicorn main:app`` while working in backend/
     from services.single_cell_service import get_single_cell_expression
     from services.rna_halflife_service import get_rna_halflife
     from services.dependency_service import get_gene_dependency
+    from services.fda_therapies_service import get_fda_therapies
+    from services.orphanet_service import get_orphanet_data
+    from services.mutation_breakdown_service import get_mutation_breakdown
     from api.mechanisms import router as mechanisms_router
     from api.gene_silencing import router as gene_silencing_router
     from api.upload import router as upload_router
+    from api.assistant import router as assistant_router
+    from api.notifications import router as notifications_router
+
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -69,6 +82,8 @@ app.add_middleware(
 app.include_router(mechanisms_router)
 app.include_router(gene_silencing_router)
 app.include_router(upload_router)
+app.include_router(assistant_router)
+app.include_router(notifications_router)
 
 SPECIES_TAXON_IDS = {
     "homo_sapiens": 9606,
@@ -404,13 +419,29 @@ async def fetch_disease_associations(session: aiohttp.ClientSession, symbol: str
     result = {"diseases": [], "omim_id": None, "source": []}
     is_human = species == "homo_sapiens"
 
+    def add_disease(name: str | None) -> None:
+        if not name:
+            return
+        cleaned = name.strip()
+        if cleaned and cleaned.casefold() not in {item.casefold() for item in result["diseases"]}:
+            result["diseases"].append(cleaned)
+
+    def capture_omim(value: object) -> None:
+        if result["omim_id"] or not isinstance(value, str):
+            return
+        normalized = value.strip()
+        if normalized.upper().startswith("OMIM:"):
+            result["omim_id"] = normalized.split(":", 1)[1].strip()
+        elif normalized.isdigit() and len(normalized) == 6:
+            result["omim_id"] = normalized
+
     if is_human and ensembl_id and ensembl_id.startswith("ENSG"):
         try:
             ot_url = "https://api.platform.opentargets.org/api/v4/graphql"
             query = """
             query targetInfo($ensemblId: String!) {
               target(ensemblId: $ensemblId) {
-                associatedDiseases(page: {index: 0, size: 5}) {
+                associatedDiseases(page: {index: 0, size: 20}) {
                   rows {
                     disease { name dbXRefs }
                   }
@@ -428,29 +459,33 @@ async def fetch_disease_associations(session: aiohttp.ClientSession, symbol: str
                     target_data = (ot_data.get("data") or {}).get("target")
                     if target_data:
                         rows = (target_data.get("associatedDiseases") or {}).get("rows", [])
-                        diseases, omim_id = [], None
                         for row in rows:
                             disease_node = row.get("disease") or {}
-                            d_name = disease_node.get("name")
-                            if d_name:
-                                diseases.append(d_name.strip())
-                            if not omim_id:
-                                for xref in disease_node.get("dbXRefs", []) or []:
-                                    if xref.startswith("OMIM:"):
-                                        omim_id = xref.replace("OMIM:", "").strip()
-                                        break
-                        if diseases:
-                            result["diseases"] = diseases
-                            result["omim_id"] = omim_id
-                            result["source"] = ["Open Targets Platform"]
-                            return result
+                            add_disease(disease_node.get("name"))
+                            for xref in disease_node.get("dbXRefs", []) or []:
+                                capture_omim(xref)
+                        if rows:
+                            result["source"].append("Open Targets Platform")
         except Exception as e:
             logger.warning(f"Open Targets lookup failed for {symbol}: {e}")
 
+    # Open Targets returns ranked disease associations, while Ensembl carries
+    # phenotype and model-organism annotations that often fill in gaps.  Merge
+    # them rather than treating the first successful provider as exhaustive.
     phenotypes = get_gene_phenotypes(symbol, species)
     if phenotypes:
-        result["diseases"] = [p.get("description", "") for p in phenotypes if p.get("description")][:6]
-        result["source"] = sorted({p.get("source", "Ensembl Phenotype") for p in phenotypes if p.get("source")})
+        phenotype_sources = set()
+        for phenotype in phenotypes:
+            add_disease(phenotype.get("description"))
+            source = phenotype.get("source")
+            if source:
+                phenotype_sources.add(source)
+            for key in ("accession", "id", "ontology_accession", "external_reference"):
+                capture_omim(phenotype.get(key))
+        result["source"].extend(sorted(phenotype_sources) or ["Ensembl Phenotype"])
+
+    result["diseases"] = result["diseases"][:20]
+    result["source"] = list(dict.fromkeys(result["source"]))
 
     return result
 
@@ -624,6 +659,44 @@ async def initialize_target(payload: TargetRequest):
         except Exception as e:
             logger.warning(f"Clinical details lookup failed for {official_symbol}: {e}")
             clinical_details = {}
+
+        # FDA-approved ASO therapies (human only)
+        fda_therapies = {}
+        if is_human:
+            try:
+                fda_therapies = get_fda_therapies(official_symbol, disease_resolved)
+            except Exception as e:
+                logger.warning(f"FDA therapies lookup failed for {official_symbol}: {e}")
+                fda_therapies = {}
+
+        # Orphanet / ICD-11 / incidence (human only)
+        orphanet_data = {}
+        if is_human:
+            try:
+                orphanet_data = get_orphanet_data(
+                    official_symbol,
+                    ensembl_id=gene_id,
+                    disease_name=disease_resolved,
+                    phenotypes=disease_info.get("diseases"),
+                )
+            except Exception as e:
+                logger.warning(f"Orphanet lookup failed for {official_symbol}: {e}")
+                orphanet_data = {}
+
+        # ClinVar mutation breakdown (human only)
+        mutation_data = {}
+        if is_human:
+            try:
+                mutation_data = get_mutation_breakdown(official_symbol)
+            except Exception as e:
+                logger.warning(f"Mutation breakdown failed for {official_symbol}: {e}")
+                mutation_data = {}
+
+            _add_notification(
+            "analysis",
+            f"Gene lookup completed for {symbol_upper}",
+            f"Retrieved data for {symbol_upper} in {species.replace('_', ' ')}.",
+        )
 
         raw_strand = meta.get("strand")
         if str(raw_strand) in ["-1", "-"]:
@@ -878,6 +951,31 @@ async def initialize_target(payload: TargetRequest):
             "clinicalTrialsCount": clinical_trial_count,
             "caseReportsCount": case_report_count,
             "preprintCount": biorxiv_count,
+
+            # New fields: genomic overview
+            "genomicSize": gene_length,
+            "mrnaLength": cds_length,
+            "proteinMass": protein_props.get("molecularWeight"),
+
+            # FDA-approved ASO therapies
+            "fdaApprovedTherapies": fda_therapies.get("fdaApprovedTherapies", []),
+            "targetableExons": fda_therapies.get("targetableExons"),
+
+            # Orphanet / ICD-11 / incidence
+            "incidence": orphanet_data.get("incidence"),
+            "orphanetCode": orphanet_data.get("orphanetCode"),
+            "icd11Code": orphanet_data.get("icd11Code"),
+            "orphanetDiseaseNames": orphanet_data.get("diseaseNames", []),
+
+            # Known pathogenic variants and mutation breakdown
+            "knownPathogenicVariants": mutation_data.get("knownPathogenicVariants"),
+            "mutationBreakdown": mutation_data.get("mutationBreakdown", {
+                "largeExonDeletions": None,
+                "largeExonDuplications": None,
+                "nonsensePointMutations": None,
+                "frameshiftMutations": None,
+                "spliceSiteMutations": None,
+            }),
         }
     except HTTPException:
         raise

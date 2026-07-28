@@ -211,4 +211,31 @@ export interface GeneTargetObject {
   clinicalTrialsCount: number | null;
   preprintCount: number | null;
   caseReportsCount: number | null;
+
+  // Genomic overview — already computed in backend, surfaced here for display
+  genomicSize: number | null;      // geneLength in bp
+  mrnaLength: number | null;       // cdsLength in bp (coding sequence)
+  proteinMass: string | null;      // molecularWeight from UniProt (Da)
+
+  // FDA-approved ASO therapies (live from FDA Orange Book / ClinicalTrials.gov)
+  fdaApprovedTherapies: { name: string; indication: string; approvalYear: string | null; source: string }[];
+  targetableExons: number | null;  // computed from transcript CDS exons
+
+  // Incidence and Orphanet / ICD-11
+  incidence: string | null;
+  orphanetCode: string | null;
+  icd11Code: string | null;
+  orphanetDiseaseNames: string[];
+
+  // Known pathogenic variants (ClinVar pathogenic + likely pathogenic count)
+  knownPathogenicVariants: number | null;
+
+  // Mutation distribution breakdown (from ClinVar)
+  mutationBreakdown: {
+    largeExonDeletions: number | null;
+    largeExonDuplications: number | null;
+    nonsensePointMutations: number | null;
+    frameshiftMutations: number | null;
+    spliceSiteMutations: number | null;
+  };
 }

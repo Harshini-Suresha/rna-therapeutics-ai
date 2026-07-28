@@ -235,6 +235,29 @@ export const MOCK_GENES: Record<string, GeneTargetObject> = {
     clinicalTrialsCount: 47,
     preprintCount: 23,
     caseReportsCount: 89,
+
+    genomicSize: 2220932,
+    mrnaLength: 11058,
+    proteinMass: "3668.7 kDa",
+    fdaApprovedTherapies: [
+      { name: "Eteplirsen (Exondys 51)", indication: "Duchenne muscular dystrophy (exon 51 skipping)", approvalYear: "2016", source: "FDA Orange Book" },
+      { name: "Golodirsen (Vyondys 53)", indication: "Duchenne muscular dystrophy (exon 53 skipping)", approvalYear: "2019", source: "FDA Orange Book" },
+      { name: "Viltolarsen (Viltepso)", indication: "Duchenne muscular dystrophy (exon 53 skipping)", approvalYear: "2020", source: "FDA Orange Book" },
+      { name: "Casimersen (Amondys 45)", indication: "Duchenne muscular dystrophy (exon 45 skipping)", approvalYear: "2021", source: "FDA Orange Book" },
+    ],
+    targetableExons: 4,
+    incidence: "1 in 3,500 male births",
+    orphanetCode: "ORPHA:98896",
+    icd11Code: "8C99",
+    orphanetDiseaseNames: ["Duchenne muscular dystrophy", "Becker muscular dystrophy"],
+    knownPathogenicVariants: 3200,
+    mutationBreakdown: {
+      largeExonDeletions: 2400,
+      largeExonDuplications: 180,
+      nonsensePointMutations: 280,
+      frameshiftMutations: 190,
+      spliceSiteMutations: 150,
+    },
   },
 };
 

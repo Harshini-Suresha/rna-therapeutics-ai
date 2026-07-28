@@ -18,6 +18,7 @@ from typing import Optional, List
 import requests
 
 NCBI_EUTILS = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
+HUMAN_FILTER = "humans[MeSH Terms] OR human[All Fields] OR patient[Title/Abstract]"
 
 NOISE_PATTERNS = [
     r"keywords?\s+included", r"boolean\s+operators", r"combined\s+with",
@@ -67,6 +68,11 @@ NOISE_PATTERNS = [
     r"the\s+proposed\s+XNNLM",
     r"the\s+viral\s+vector\s+was\s+tested",
     r"results\s+show\s+that\s+the\s+proposed",
+    # Experimental or association-study prose is not a patient symptom,
+    # diagnostic test, or treatment recommendation.
+    r"\b(mice|mouse|murine|rat|rodent|zebrafish|xenograft|animal\s+model|in\s+vitro|in\s+vivo|cell\s+line|cell\s+culture|primary\s+cells|transgenic|knockout|irradiation|organoid|nonhuman|monkey|macaque|rabbit|dog|pig)\b",
+    r"^(here|our\s+(results|findings)|to\s+address\s+this|since\s+these|infection\s+of|in\s+fresh)",
+    r"\b(odds\s+ratio|p\s*[=<]|p\(|fdr|genotyp|resequencing)\b",
 ]
 
 SYMPTOM_KEYWORDS = [
@@ -192,6 +198,33 @@ THERAPY_KEYWORDS = [
     "anticoagulant", "antiplatelet", "fibrinolytic",
 ]
 
+SYMPTOM_DISQUALIFIERS = [
+    r"\bclinical trial\b", r"\bphase\s+[ivx]+\b", r"\btrial(s)?\b",
+    r"\btherapy\b", r"\btreatment\b", r"\bmanagement\b",
+    r"\bmonitoring\b", r"\bdevice-based\b", r"\bgenetic testing\b",
+    r"\bmolecular diagnosis\b", r"\bnext[- ]generation sequencing\b",
+    r"\bNGS\b", r"\bMLPA\b", r"\bbiomarker\b", r"\bdiagnos(tic|is(es)?)\b",
+    r"\bCRISPR\b", r"\bgene therapy\b", r"\bAAV\b", r"\bartificial intelligence\b",
+    r"\bAI\b", r"\brehabilitation\b", r"\bassistive device\b",
+    r"\bclinical trial\b", r"\bstudy\b", r"\bcohort\b",
+    r"\bsurvey\b", r"\bquestionnaire\b", r"\brespondent(s)?\b",
+    r"\bparticipants?\b", r"\bcaregiver(s)?\b", r"\bincidence\b",
+    r"\bprevalence\b", r"\bawareness\b", r"\bimprove[d]?\s+medical\s+care\b",
+]
+
+SYMPTOM_CONTEXT_PATTERNS = [
+    r"characterized by",
+    r"present(?:s|ed|ing)? with",
+    r"manifest(?:s|ed|ation)",
+    r"symptom(?:s)? (?:include|are|is|such as)",
+    r"signs? of",
+    r"clinical feature(?:s)?",
+    r"clinical presentation",
+    r"reported (?:symptoms|features|manifestations)",
+    r"patients? (?:with|presenting with)",
+    r"characteristic(?:al)? of",
+]
+
 MECHANISM_KEYWORDS = [
     # Mutation types
     "mutation", "deletion", "duplication", "frameshift",
@@ -242,6 +275,14 @@ def _is_noise(sentence: str) -> bool:
     return False
 
 
+def _is_experimental_sentence(sentence: str) -> bool:
+    lower = sentence.lower()
+    return bool(re.search(
+        r"\b(mice|mouse|murine|rat|rodent|zebrafish|xenograft|animal\s+model|in\s+vitro|in\s+vivo|cell\s+line|cell\s+culture|primary\s+cells|transgenic|knockout|irradiation|organoid|nonhuman|monkey|macaque|rabbit|dog|pig)\b",
+        lower,
+    ))
+
+
 def _ncbi_search(query: str, db: str = "pubmed", retmax: int = 5) -> list:
     try:
         resp = requests.get(
@@ -274,33 +315,122 @@ def _ncbi_fetch_abstracts(pmids: list) -> str:
         texts = []
         for article in root.findall(".//Article"):
             for abstract_text in article.findall(".//AbstractText"):
-                texts.append(abstract_text.text or "")
+                # Abstract sections can contain nested XML tags (for example,
+                # gene names or italicized terms).  ``.text`` stops at the
+                # first nested tag and produces the incomplete fragments that
+                # were appearing in the Disease Association card.
+                texts.append("".join(abstract_text.itertext()).strip())
         return " ".join(texts)
     except Exception:
         return ""
 
 
-def _extract_matching_terms(text: str, keywords: list, max_items: int = 5) -> list:
-    sentences = re.split(r'(?<=[.!?])\s+', text)
+def _extract_matching_terms(
+    text: str,
+    keywords: list,
+    max_items: int = 5,
+    disqualifiers: Optional[list] = None,
+    require_context: bool = False,
+    disease_terms: Optional[list[str]] = None,
+) -> list:
+    """Extract relevant sentences from text that contain keyword matches.
+
+    Returns cleaned-up sentences or short phrases that are medically relevant.
+    """
     matched = []
     seen = set()
+    sentences = re.split(r'(?<=[.!?])\s+', text)
+
     for sentence in sentences:
-        cleaned = sentence.strip()
-        if not cleaned or len(cleaned) < 25 or cleaned in seen:
-            continue
-        if _is_noise(cleaned):
-            continue
-        if len(cleaned) > 250:
-            cleaned = cleaned[:247] + "..."
-        lower = cleaned.lower()
-        for kw in keywords:
-            if kw.lower() in lower:
-                seen.add(cleaned)
-                matched.append(cleaned)
-                break
         if len(matched) >= max_items:
             break
+        cleaned = sentence.strip()
+        if not cleaned or len(cleaned) < 15:
+            continue
+        if cleaned in seen:
+            continue
+
+        lower = cleaned.lower()
+
+        # A PubMed search can still return a paper that merely mentions a
+        # related gene. Do not present it as a disease manifestation unless
+        # the sentence itself names the selected disease/phenotype.
+        if disease_terms and not any(term.lower() in lower for term in disease_terms):
+            continue
+
+        # Check if any keyword matches
+        has_match = any(kw.lower() in lower for kw in keywords)
+        if not has_match:
+            continue
+
+        # Skip noisy sentences or sentences that are clearly experimental.
+        if _is_noise(cleaned) or _is_experimental_sentence(cleaned):
+            continue
+
+        if disqualifiers and any(re.search(pat, lower) for pat in disqualifiers):
+            continue
+
+        if require_context and not any(re.search(pat, lower) for pat in SYMPTOM_CONTEXT_PATTERNS):
+            continue
+        # Skip pure statistics
+        if re.match(r'^\d+[\s%(]', cleaned):
+            continue
+        # Skip very short fragments
+        if len(cleaned) < 20:
+            continue
+        # Skip sentences that are mostly numbers
+        if sum(c.isdigit() for c in cleaned) > len(cleaned) * 0.25:
+            continue
+
+        # Keep the complete sentence. The Disease Association card has its own
+        # scroll area, so shortening evidence text here loses useful context.
+        cleaned = cleaned.strip(".,;: ")
+
+        seen.add(cleaned)
+        matched.append(cleaned)
+
     return matched
+
+
+def _extract_symptom_terms(
+    text: str, max_items: int = 10, disease_terms: Optional[list[str]] = None
+) -> list:
+    """Extract specific clinical symptom terms from medical text.
+
+    Looks for the SYMPTOM_KEYWORDS in text and returns concise descriptions.
+    """
+    return _extract_matching_terms(
+        text,
+        SYMPTOM_KEYWORDS,
+        max_items,
+        disqualifiers=SYMPTOM_DISQUALIFIERS,
+        require_context=True,
+        disease_terms=disease_terms,
+    )
+
+
+def _extract_diagnostic_terms(
+    text: str, max_items: int = 8, disease_terms: Optional[list[str]] = None
+) -> list:
+    """Extract specific diagnostic test/biomarker names from medical text.
+
+    Looks for the DIAGNOSTIC_KEYWORDS in text and returns concise descriptions.
+    """
+    return _extract_matching_terms(
+        text, DIAGNOSTIC_KEYWORDS, max_items, disease_terms=disease_terms
+    )
+
+
+def _extract_therapy_terms(
+    text: str, max_items: int = 8, disease_terms: Optional[list[str]] = None
+) -> list:
+    """Extract specific therapy/drug names from medical text.
+
+    Looks for the THERAPY_KEYWORDS in text and returns concise descriptions.
+    """
+    return _extract_matching_terms(
+        text, THERAPY_KEYWORDS, max_items, disease_terms=disease_terms
+    )
 
 
 def _get_gene_summary(gene_symbol: str) -> dict:
@@ -348,20 +478,20 @@ def _get_gene_summary(gene_symbol: str) -> dict:
 
 def _extract_mechanism_from_summary(summary: str) -> Optional[str]:
     """Extract disease mechanism from gene summary.
-    
-    This function parses the NCBI gene summary to find sentences that describe
-    the disease mechanism, focusing on causal relationships and functional consequences.
-    
+
+    Combines multiple relevant sentences to give a complete picture
+    of the disease mechanism, without artificial truncation.
+
     Args:
         summary: NCBI gene summary text
-        
+
     Returns:
         Extracted mechanism text or None if not found
     """
     if not summary:
         return None
     sentences = re.split(r'(?<=[.!?])\s+', summary)
-    
+
     # Disease-related keywords
     disease_kw = [
         "disease", "disorder", "syndrome", "cancer", "tumor",
@@ -370,7 +500,7 @@ def _extract_mechanism_from_summary(summary: str) -> Optional[str]:
         "degeneration", "neurodegenerative", "disability", "condition",
         "lethal", "fatal", "severe", "progressive", "chronic",
     ]
-    
+
     # Mechanism-related keywords (causal relationships)
     mechanism_kw = [
         "cause", "causes", "caused", "results in", "leads to",
@@ -380,49 +510,109 @@ def _extract_mechanism_from_summary(summary: str) -> Optional[str]:
         "missense", "splicing", "reading frame", "premature",
         "haploinsufficiency", "dominant negative", "pathogenic",
     ]
-    
-    # Enhanced mechanism keywords for more comprehensive extraction
-    enhanced_mechanism_kw = [
-        "mutation", "variant", "alteration", "aberration",
-        "dysfunction", "impairment", "disruption", "defect",
-        "abnormal", "altered", "reduced", "increased", "loss",
-        "gain", "overexpression", "underexpression", "silencing",
-    ]
-    
-    # Strategy 1: Look for sentences with both disease and mechanism keywords
+
+    # Collect ALL sentences that match disease+mechanism criteria
+    mechanism_sentences = []
     for sentence in sentences:
         lower = sentence.lower()
         has_disease = any(dk in lower for dk in disease_kw)
         has_mechanism = any(mk in lower for mk in mechanism_kw)
         if has_disease and has_mechanism:
             cleaned = sentence.strip()
-            if len(cleaned) > 30:
-                if len(cleaned) > 250:
-                    cleaned = cleaned[:247] + "..."
-                return cleaned
-    
-    # Strategy 2: Look for sentences with mechanism keywords only
-    for sentence in sentences:
-        lower = sentence.lower()
-        for mk in mechanism_kw:
-            if mk in lower:
-                cleaned = sentence.strip()
-                if len(cleaned) > 30:
-                    if len(cleaned) > 250:
-                        cleaned = cleaned[:247] + "..."
-                    return cleaned
-    
-    # Strategy 3: Look for sentences with enhanced mechanism keywords
-    for sentence in sentences:
-        lower = sentence.lower()
-        for mk in enhanced_mechanism_kw:
-            if mk in lower:
-                cleaned = sentence.strip()
-                if len(cleaned) > 30:
-                    if len(cleaned) > 250:
-                        cleaned = cleaned[:247] + "..."
-                    return cleaned
-    
+            if len(cleaned) > 20:
+                mechanism_sentences.append(cleaned)
+
+    # If we found disease+mechanism sentences, combine them
+    if mechanism_sentences:
+        combined = " ".join(mechanism_sentences)
+        return combined if len(combined) <= 800 else combined[:797] + "..."
+
+    # A generic gene-function sentence (for example, one describing
+    # alternative splicing) is not a disease mechanism. Only return text when
+    # the source explicitly ties a pathogenic mechanism to a disease.
+    return None
+
+
+def _fetch_omim_mechanism(omim_id: str) -> Optional[str]:
+    """Fetch detailed disease mechanism from OMIM.
+
+    OMIM provides the most authoritative disease mechanism descriptions.
+    This fetches the OMIM entry page and extracts the mechanism text.
+    """
+    if not omim_id:
+        return None
+
+    # Clean up OMIM ID (remove # prefix)
+    clean_id = omim_id.strip().lstrip("#")
+    if not clean_id.isdigit():
+        return None
+
+    try:
+        # Fetch OMIM entry via NCBI EFetch (OMIM is indexed in NCBI)
+        resp = requests.get(
+            f"{NCBI_EUTILS}/esearch.fcgi",
+            params={
+                "db": "omim",
+                "term": f"{clean_id}[OMIM ID]",
+                "retmode": "json",
+            },
+            timeout=10,
+        )
+        if resp.status_code != 200:
+            return None
+
+        ids = (resp.json().get("esearchresult") or {}).get("idlist", [])
+        if not ids:
+            return None
+
+        # Fetch the OMIM entry summary
+        resp = requests.get(
+            f"{NCBI_EUTILS}/esummary.fcgi",
+            params={"db": "omim", "id": ids[0], "retmode": "json"},
+            timeout=10,
+        )
+        if resp.status_code != 200:
+            return None
+
+        data = resp.json().get("result", {}).get(ids[0], {})
+        if not data:
+            return None
+
+        # Extract the clinical description / mechanism from OMIM
+        # OMIM entries have a "titles" field and "text" field
+        titles = data.get("titles", {})
+        title = titles.get("preferredTitle", "") or titles.get("approvedTitle", "")
+
+        # Also check for clinical features
+        text = data.get("text", "")
+
+        # Build mechanism from available OMIM data
+        mechanism_parts = []
+        if title:
+            mechanism_parts.append(f"OMIM: {title}")
+        if text:
+            # Extract the first meaningful paragraph
+            paragraphs = text.split("\n\n")
+            for para in paragraphs:
+                para = para.strip()
+                if len(para) > 30 and any(kw in para.lower() for kw in [
+                    "cause", "caused", "mutation", "deletion", "deficiency",
+                    "loss of function", "pathogenic", "disease", "disorder",
+                    "syndrome", "mechanism", "results in", "leads to",
+                ]):
+                    # Clean up
+                    para = para.strip(".,;: ")
+                    if len(para) > 500:
+                        para = para[:497] + "..."
+                    mechanism_parts.append(para)
+                    break
+
+        if mechanism_parts:
+            return ". ".join(mechanism_parts)
+
+    except Exception as e:
+        logger.info(f"OMIM mechanism fetch failed for {omim_id}: {e}")
+
     return None
 
 
@@ -445,16 +635,16 @@ def _get_clinical_trials(gene_symbol: str, disease_name: Optional[str] = None) -
         url = "https://clinicaltrials.gov/api/v2/studies"
         params = {
             "query.term": search_term,
-            "pageSize": 5,
+            "pageSize": 15,
             "format": "json"
         }
         
-        resp = requests.get(url, params=params, timeout=5)  # Reduced timeout
+        resp = requests.get(url, params=params, timeout=10)
         resp.raise_for_status()
         data = resp.json()
         
         studies = data.get("studies", [])
-        for study in studies[:3]:
+        for study in studies[:10]:
             try:
                 protocol = study.get("protocolSection", {})
                 ident = protocol.get("identificationModule", {})
@@ -481,7 +671,7 @@ def _get_clinical_trials(gene_symbol: str, disease_name: Optional[str] = None) -
     except Exception:
         pass
     
-    return trials[:4]
+    return trials[:8]
 
 
 def get_clinical_details(
@@ -491,24 +681,24 @@ def get_clinical_details(
     phenotypes: Optional[List[str]] = None,
 ) -> dict:
     """Fetch comprehensive clinical details for a gene.
-    
+
     This function retrieves disease mechanism, diagnostic tests, clinical symptoms,
     therapeutic options, and carrier manifestations for a given gene by searching
     PubMed clinical literature.
-    
+
     Args:
         gene_symbol: Official gene symbol (e.g., "DMD", "TP53")
         disease_name: Associated disease name if known
         omim_id: OMIM identifier if available
         phenotypes: List of associated phenotype terms
-        
+
     Returns:
         Dictionary containing:
-        - diseaseMechanism: Text describing the disease mechanism
-        - diagnosticTests: List of diagnostic tests/biomarkers
-        - clinicalSymptoms: List of clinical symptoms
+        - diseaseMechanism: Full text describing the disease mechanism
+        - diagnosticTests: List of specific diagnostic tests/biomarkers
+        - clinicalSymptoms: List of specific clinical symptoms
         - carrierManifestations: List of carrier-related information
-        - therapeuticOptions: List of treatment options
+        - therapeuticOptions: List of specific treatment options
     """
     result = {
         "diseaseMechanism": None,
@@ -527,79 +717,86 @@ def get_clinical_details(
         if mech:
             result["diseaseMechanism"] = mech
 
-    # Build search terms: prefer disease name over gene symbol
-    search_terms = []
-    if disease_name:
-        search_terms.append(disease_name)
+    # Also try the NCBI gene description (shorter but often more direct)
+    if not result["diseaseMechanism"] and gene_info.get("description"):
+        desc = gene_info["description"]
+        if any(kw in desc.lower() for kw in ["cause", "associated", "linked", "disorder", "disease", "syndrome"]):
+            result["diseaseMechanism"] = desc
+
+    # Fetch detailed mechanism from OMIM if available
+    if omim_id and not result["diseaseMechanism"]:
+        omim_mech = _fetch_omim_mechanism(omim_id)
+        if omim_mech:
+            result["diseaseMechanism"] = omim_mech
+
+    # Only use disease-specific literature. Searching by gene symbol alone
+    # pulls in unrelated cell and animal experiments, which must not be shown
+    # as human clinical symptoms or diagnostics.
+    disease_terms = []
     if phenotypes:
-        search_terms.extend(phenotypes[:2])
-    search_terms.append(gene_symbol)
-    query_parts = " AND ".join(search_terms)
+        disease_terms.extend(phenotypes)
+    if disease_name:
+        disease_terms.extend(part.strip() for part in disease_name.split(";") if part.strip())
+    disease_terms = list(dict.fromkeys(term for term in disease_terms if term))[:3]
 
-    # Strategy 1: Disease-in-title PubMed search (most specific)
-    disease_for_title = disease_name or (phenotypes[0] if phenotypes else gene_symbol)
-    pmids = _ncbi_search(
-        f"({disease_for_title}[Title]) AND (diagnosis[Title] OR clinical[Title] OR "
-        f"treatment[Title] OR management[Title] OR phenotype[Title])",
-        retmax=12,  # Increased from 8 to 12
-    )
-    abstract_text = _ncbi_fetch_abstracts(pmids)
-
-    if abstract_text:
+    for disease_term in disease_terms:
+        pmids = _ncbi_search(
+            f'("{disease_term}"[Title/Abstract]) AND '
+            "(diagnosis[Title/Abstract] OR clinical[Title/Abstract] OR "
+            "treatment[Title/Abstract] OR management[Title/Abstract] OR phenotype[Title/Abstract]) AND "
+            f"({HUMAN_FILTER})",
+            retmax=20,
+        )
+        abstract_text = _ncbi_fetch_abstracts(pmids)
+        if not abstract_text:
+            continue
         if not result["clinicalSymptoms"]:
-            result["clinicalSymptoms"] = _extract_matching_terms(
-                abstract_text, SYMPTOM_KEYWORDS, max_items=8  # Increased from 5 to 8
-            )
+            result["clinicalSymptoms"] = _extract_symptom_terms(abstract_text, max_items=7)
         if not result["diagnosticTests"]:
-            result["diagnosticTests"] = _extract_matching_terms(
-                abstract_text, DIAGNOSTIC_KEYWORDS, max_items=6  # Increased from 4 to 6
-            )
+            result["diagnosticTests"] = _extract_diagnostic_terms(abstract_text, max_items=8)
         if not result["therapeuticOptions"]:
-            result["therapeuticOptions"] = _extract_matching_terms(
-                abstract_text, THERAPY_KEYWORDS, max_items=6  # Increased from 4 to 6
-            )
+            result["therapeuticOptions"] = _extract_therapy_terms(abstract_text, max_items=8)
+        if result["clinicalSymptoms"] and result["diagnosticTests"] and result["therapeuticOptions"]:
+            break
 
-    # Strategy 2: Broader PubMed with gene symbol + disease name
-    if not result["clinicalSymptoms"] or not result["therapeuticOptions"]:
-        pmids2 = _ncbi_search(
-            f"({query_parts}) AND (clinical review[Title] OR diagnosis[Title] OR "
-            f"management[Title] OR therapy[Title] OR treatment[Title])",
-            retmax=12,  # Increased from 8 to 12
-        )
-        abstract_text2 = _ncbi_fetch_abstracts(pmids2)
-        if abstract_text2:
-            if not result["clinicalSymptoms"]:
-                result["clinicalSymptoms"] = _extract_matching_terms(
-                    abstract_text2, SYMPTOM_KEYWORDS, max_items=8
-                )
-            if not result["diagnosticTests"]:
-                result["diagnosticTests"] = _extract_matching_terms(
-                    abstract_text2, DIAGNOSTIC_KEYWORDS, max_items=6
-                )
-            if not result["therapeuticOptions"]:
-                result["therapeuticOptions"] = _extract_matching_terms(
-                    abstract_text2, THERAPY_KEYWORDS, max_items=6
-                )
-
-    # Strategy 3: Gene-specific clinical features search
+    # Fallback: search by gene symbol + clinical keywords when no disease terms
+    # or when data is still missing. This ensures every gene gets some clinical data.
     if not result["clinicalSymptoms"] or not result["diagnosticTests"]:
-        pmids3 = _ncbi_search(
-            f"({gene_symbol}[Title]) AND (clinical features[Title] OR "
-            f"phenotype[Title] OR manifestations[Title])",
-            retmax=8,
+        gene_query = (
+            f'"{gene_symbol}"[Title/Abstract] AND '
+            "(genetic testing[Title/Abstract] OR diagnosis[Title/Abstract] OR "
+            "clinical features[Title/Abstract] OR phenotype[Title/Abstract] OR "
+            "mutation analysis[Title/Abstract] OR sequencing[Title/Abstract]) AND "
+            f"({HUMAN_FILTER})"
         )
-        abstract_text3 = _ncbi_fetch_abstracts(pmids3)
-        if abstract_text3:
+        pmids = _ncbi_search(gene_query, retmax=15)
+        abstract_text = _ncbi_fetch_abstracts(pmids)
+        if abstract_text:
             if not result["clinicalSymptoms"]:
-                result["clinicalSymptoms"] = _extract_matching_terms(
-                    abstract_text3, SYMPTOM_KEYWORDS, max_items=8
-                )
+                result["clinicalSymptoms"] = _extract_symptom_terms(abstract_text, max_items=7)
             if not result["diagnosticTests"]:
-                result["diagnosticTests"] = _extract_matching_terms(
-                    abstract_text3, DIAGNOSTIC_KEYWORDS, max_items=6
-                )
+                result["diagnosticTests"] = _extract_diagnostic_terms(abstract_text, max_items=8)
+            if not result["therapeuticOptions"]:
+                result["therapeuticOptions"] = _extract_therapy_terms(abstract_text, max_items=8)
 
-    # Strategy 4: Carrier manifestations (X-linked genes)
+    # Second fallback: broader gene + disease association search
+    if not result["clinicalSymptoms"] and not result["diagnosticTests"]:
+        broad_query = (
+            f'"{gene_symbol}"[Gene Name] AND '
+            "(human[Organism]) AND "
+            "(disease[Title/Abstract] OR disorder[Title/Abstract] OR syndrome[Title/Abstract] OR "
+            "pathogenic[Title/Abstract] OR variant[Title/Abstract]) AND "
+            f"({HUMAN_FILTER})"
+        )
+        pmids = _ncbi_search(broad_query, retmax=15)
+        abstract_text = _ncbi_fetch_abstracts(pmids)
+        if abstract_text:
+            if not result["clinicalSymptoms"]:
+                result["clinicalSymptoms"] = _extract_symptom_terms(abstract_text, max_items=7)
+            if not result["diagnosticTests"]:
+                result["diagnosticTests"] = _extract_diagnostic_terms(abstract_text, max_items=8)
+
+    # Strategy 5: Carrier manifestations (X-linked genes)
     if gene_info["summary"] and any(w in (gene_info["summary"] or "").lower()
                                      for w in ["x-linked", "x linked", "xlink"]):
         result["carrierManifestations"] = [
@@ -609,9 +806,9 @@ def get_clinical_details(
             "Variable expressivity in carriers depends on X-inactivation patterns.",
         ]
 
-    # Strategy 5: Fetch clinical trials information for therapeutic options
+    # Strategy 6: Fetch clinical trials information for therapeutic options
     if not result["therapeuticOptions"] or len(result["therapeuticOptions"]) < 3:
-        trial_therapies = _get_clinical_trials(gene_symbol, disease_name)
+        trial_therapies = _get_clinical_trials(gene_symbol, disease_terms[0] if disease_terms else disease_name)
         if trial_therapies:
             result["therapeuticOptions"].extend(trial_therapies)
 
@@ -621,10 +818,10 @@ def get_clinical_details(
     result["therapeuticOptions"] = list(dict.fromkeys(result["therapeuticOptions"]))
     result["carrierManifestations"] = list(dict.fromkeys(result["carrierManifestations"]))
 
-    # Limit final counts to reasonable numbers
-    result["clinicalSymptoms"] = result["clinicalSymptoms"][:8]
-    result["diagnosticTests"] = result["diagnosticTests"][:6]
-    result["therapeuticOptions"] = result["therapeuticOptions"][:8]
+    # Final limits
+    result["clinicalSymptoms"] = result["clinicalSymptoms"][:7]
+    result["diagnosticTests"] = result["diagnosticTests"][:8]
+    result["therapeuticOptions"] = result["therapeuticOptions"][:10]
     result["carrierManifestations"] = result["carrierManifestations"][:4]
 
     return result

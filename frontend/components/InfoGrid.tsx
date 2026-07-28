@@ -40,6 +40,17 @@ export default function InfoGrid({ gene }: { gene: GeneTargetObject }) {
   const links = gene.deepLinks ?? {};
   const variantExamples = Array.isArray(gene.variantExamples) ? gene.variantExamples : [];
   const expressionTissues = Array.isArray(gene.topTissues) ? gene.topTissues : [];
+  const hasExpressionContext = Boolean(
+    gene.gtexAvailable ||
+    gene.defaultTissue ||
+    gene.tissueTpm !== null ||
+    expressionTissues.length > 0 ||
+    gene.defaultCellType ||
+    gene.cellTpm !== null
+  );
+  const hasTissueExpression = Boolean(
+    expressionTissues.length > 0 || gene.defaultTissue || gene.tissueTpm !== null
+  );
 
   const rawSynonyms = Array.isArray(gene.synonyms)
     ? gene.synonyms
@@ -146,7 +157,7 @@ export default function InfoGrid({ gene }: { gene: GeneTargetObject }) {
               {isHuman && (
                 <div>
                   <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">ACMG Classification</p>
-                  <p className="mt-0.5 text-[12px] font-semibold text-slate-800">Pathogenic</p>
+                  <p className="mt-0.5 text-[12px] font-semibold text-slate-800">{DASH}</p>
                 </div>
               )}
               <div>
@@ -186,7 +197,7 @@ export default function InfoGrid({ gene }: { gene: GeneTargetObject }) {
         <Card className="flex h-[330px] flex-col overflow-hidden">
           <MiniCardHeader icon={Layers} iconBg="#ECFDF5" iconColor="#059669" title="Tissue Expression" />
           <div className="flex-1 overflow-y-auto px-4 py-3">
-            {gene.gtexAvailable && expressionTissues.length > 0 ? (
+            {hasTissueExpression ? (
               <>
                 <div className="mb-3 rounded-lg border border-emerald-100 bg-emerald-50/50 p-3">
                   <p className="text-[10px] font-medium uppercase tracking-wider text-emerald-500">Highest expression</p>
@@ -197,7 +208,9 @@ export default function InfoGrid({ gene }: { gene: GeneTargetObject }) {
                     <p className="mt-0.5 text-[11px] text-slate-500">{gene.tissueTpm} TPM</p>
                   )}
                 </div>
-                <TissueBarChart tissues={expressionTissues} maxBars={10} />
+                {expressionTissues.length > 0 && (
+                  <TissueBarChart tissues={expressionTissues} maxBars={10} />
+                )}
               </>
             ) : (
               <UnavailableNote>
@@ -207,7 +220,7 @@ export default function InfoGrid({ gene }: { gene: GeneTargetObject }) {
               </UnavailableNote>
             )}
           </div>
-          {links.gtex && gene.gtexAvailable && (
+          {links.gtex && hasTissueExpression && (
             <a
               href={links.gtex}
               target="_blank"
@@ -222,20 +235,20 @@ export default function InfoGrid({ gene }: { gene: GeneTargetObject }) {
       </div>
 
       {/* Row 2: Expression Context, Protein & Genetics, Disease Association */}
-      <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5 md:auto-rows-[520px] md:grid-cols-3">
         {/* Expression Context */}
-        <Card className="flex flex-col">
+        <Card className="flex flex-col overflow-hidden md:h-full">
           <MiniCardHeader icon={CircleDot} iconBg="#FDF2F8" iconColor="#DB2777" title="Expression Context" />
-          <div className="flex-1 px-4 py-2">
-            {gene.gtexAvailable && gene.defaultTissue ? (
+          <div className="card-scroll flex-1 overflow-y-auto px-4 py-2 pb-3">
+            {hasExpressionContext ? (
               <div className="space-y-2.5">
                 <DataRow label="Expression level" value={gene.tissueExpressionLevel ?? DASH} />
                 <DataRow label="Tissues profiled" value={gene.topTissues.length || DASH} />
                 <DataRow label="Expression Breadth" value={gene.topTissues.length > 0 ? `${gene.topTissues.length} tissues` : DASH} />
-                <DataRow label="Tau Specificity Score" value={gene.tissueTpm !== null ? `${gene.tissueTpm} TPM` : DASH} />
-                <DataRow label="Enrichment Level" value={gene.tissueExpressionLevel ?? DASH} />
+                <DataRow label="Top Tissue TPM" value={gene.tissueTpm !== null ? `${gene.tissueTpm} TPM` : DASH} />
+                <DataRow label="Expression Level" value={gene.tissueExpressionLevel ?? DASH} />
                 <DataRow label="Measurement" value="GTEx v8 RNA-seq" />
-                <DataRow label="Single-cell" value={gene.defaultCellType ?? "Standard Spectrum"} />
+                <DataRow label="Single-cell" value={gene.defaultCellType ?? DASH} />
                 <DataRow label="Cell concentration" value={gene.cellTpm !== null ? `${gene.cellTpm} TPM` : DASH} />
 
                 {(() => {
@@ -288,9 +301,9 @@ export default function InfoGrid({ gene }: { gene: GeneTargetObject }) {
         </Card>
 
         {/* Protein & Genetics */}
-        <Card className="flex flex-col">
+        <Card className="flex flex-col overflow-hidden md:h-full">
           <MiniCardHeader icon={Link2} iconBg="#F5F3FF" iconColor="#7C3AED" title="Protein & Genetics" />
-          <div className="flex-1 overflow-y-auto px-4 py-2 space-y-1.5">
+          <div className="card-scroll flex-1 overflow-y-auto px-4 py-2 pb-3 space-y-1.5">
             <DataRow label="Isoelectric Point (pI)" value={gene.isoelectricPoint ?? DASH} />
             <DataRow label="Secondary Structure" value={gene.secondaryStructureDistribution ?? DASH} />
             <DataRow label="Degradation / Ubiquitination" value={gene.ubiquitinationTarget ?? DASH} />
@@ -328,13 +341,27 @@ export default function InfoGrid({ gene }: { gene: GeneTargetObject }) {
         </Card>
 
         {/* Disease Association */}
-        <Card className="flex flex-col">
+        <Card className="flex flex-col overflow-hidden">
           <MiniCardHeader icon={HeartPulse} iconBg="#FEF2F2" iconColor="#DC2626" title="Disease Association" />
-          <div className="flex-1 px-4 py-2 space-y-1.5">
+          <div className="card-scroll flex-1 overflow-y-auto px-4 py-2 pb-3 space-y-1.5">
             {gene.diseaseName && (
               <div>
                 <p className="text-[11px] font-medium text-slate-400">Project Disease Label</p>
                 <p className="mt-0.5 text-[13px] text-slate-800">{gene.diseaseName}</p>
+              </div>
+            )}
+            {gene.diseaseAssociation && gene.diseaseAssociation !== "None identified" && (
+              <div className="rounded-lg border border-red-100 bg-red-50/50 p-2.5">
+                <p className="text-[10px] font-medium uppercase tracking-wider text-red-400">Reported Disease Association</p>
+                <p className="mt-1 text-[12px] font-medium leading-relaxed text-slate-700">
+                  {gene.diseaseAssociation}
+                </p>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {gene.associationStatus && <Pill tone="green">{gene.associationStatus}</Pill>}
+                  {gene.diseaseAssociationSource.map((source) => (
+                    <Pill key={source} tone="slate">{source}</Pill>
+                  ))}
+                </div>
               </div>
             )}
             {gene.omimId && (
@@ -345,11 +372,11 @@ export default function InfoGrid({ gene }: { gene: GeneTargetObject }) {
                 <p className="text-[11px] font-medium text-slate-400">
                   Phenotypic Association ({gene.phenotypes.length})
                 </p>
-                <ul className="mt-1 space-y-1 max-h-20 overflow-y-auto pr-1">
+                <ul className="mt-1 space-y-1">
                   {gene.phenotypes.map((p, i) => (
                     <li key={i} className="text-[12px] text-slate-600 leading-snug flex gap-1.5">
                       <span className="text-slate-400 shrink-0">&bull;</span>
-                      <span>{p}</span>
+                      <span className="min-w-0 break-words">{p}</span>
                     </li>
                   ))}
                 </ul>
@@ -364,11 +391,11 @@ export default function InfoGrid({ gene }: { gene: GeneTargetObject }) {
             {gene.diagnosticTests.length > 0 && (
               <div>
                 <p className="text-[11px] font-medium text-slate-400">Diagnostic Biomarkers</p>
-                <ul className="mt-1 space-y-1 max-h-20 overflow-y-auto pr-1">
+                <ul className="mt-1 space-y-1">
                   {gene.diagnosticTests.map((t, i) => (
                     <li key={i} className="text-[11px] text-slate-600 leading-snug flex gap-1.5">
                       <span className="text-slate-400 shrink-0">&bull;</span>
-                      <span>{t}</span>
+                      <span className="min-w-0 break-words">{t}</span>
                     </li>
                   ))}
                 </ul>
@@ -377,11 +404,11 @@ export default function InfoGrid({ gene }: { gene: GeneTargetObject }) {
             {gene.clinicalSymptoms.length > 0 && (
               <div>
                 <p className="text-[11px] font-medium text-slate-400">Clinical Symptoms</p>
-                <ul className="mt-1 space-y-1 max-h-20 overflow-y-auto pr-1">
+                <ul className="mt-1 space-y-1">
                   {gene.clinicalSymptoms.map((s, i) => (
                     <li key={i} className="text-[11px] text-slate-600 leading-snug flex gap-1.5">
                       <span className="text-slate-400 shrink-0">&bull;</span>
-                      <span>{s}</span>
+                      <span className="min-w-0 break-words">{s}</span>
                     </li>
                   ))}
                 </ul>
@@ -390,11 +417,11 @@ export default function InfoGrid({ gene }: { gene: GeneTargetObject }) {
             {gene.carrierManifestations.length > 0 && (
               <div>
                 <p className="text-[11px] font-medium text-slate-400">Carrier Manifestations</p>
-                <ul className="mt-1 space-y-1 max-h-16 overflow-y-auto pr-1">
+                <ul className="mt-1 space-y-1">
                   {gene.carrierManifestations.map((c, i) => (
                     <li key={i} className="text-[11px] text-slate-600 leading-snug flex gap-1.5">
                       <span className="text-slate-400 shrink-0">&bull;</span>
-                      <span>{c}</span>
+                      <span className="min-w-0 break-words">{c}</span>
                     </li>
                   ))}
                 </ul>
@@ -403,11 +430,11 @@ export default function InfoGrid({ gene }: { gene: GeneTargetObject }) {
             {gene.therapeuticOptions.length > 0 && (
               <div>
                 <p className="text-[11px] font-medium text-slate-400">Therapeutic Options</p>
-                <ul className="mt-1 space-y-1 max-h-20 overflow-y-auto pr-1">
+                <ul className="mt-1 space-y-1">
                   {gene.therapeuticOptions.map((t, i) => (
                     <li key={i} className="text-[11px] text-slate-600 leading-snug flex gap-1.5">
                       <span className="text-slate-400 shrink-0">&bull;</span>
-                      <span>{t}</span>
+                      <span className="min-w-0 break-words">{t}</span>
                     </li>
                   ))}
                 </ul>
