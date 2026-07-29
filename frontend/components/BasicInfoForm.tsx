@@ -3,7 +3,6 @@
 import { X, Search, Dna, Loader2 } from "lucide-react";
 import { Card, SectionHeader, FieldLabel } from "./ui";
 import OrganismSelect from "./OrganismSelect";
-import DiseaseGeneSuggestions from "./DiseaseGeneSuggestions";
 
 interface Props {
   organism: string;
@@ -14,6 +13,7 @@ interface Props {
   setGeneSymbol: (v: string) => void;
   onLoadGene: () => void;
   loading: boolean;
+  geneFieldsDisabled?: boolean;
 }
 
 export default function BasicInfoForm({
@@ -25,6 +25,7 @@ export default function BasicInfoForm({
   setGeneSymbol,
   onLoadGene,
   loading,
+  geneFieldsDisabled = false,
 }: Props) {
   return (
     <Card>
@@ -60,11 +61,6 @@ export default function BasicInfoForm({
               </button>
             )}
           </div>
-          <DiseaseGeneSuggestions
-            diseaseName={diseaseName}
-            organismId={organism}
-            onSelectGene={(symbol) => setGeneSymbol(symbol)}
-          />
         </div>
 
         {/* Gene symbol */}
@@ -76,9 +72,10 @@ export default function BasicInfoForm({
             <input
               value={geneSymbol}
               onChange={(e) => setGeneSymbol(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && onLoadGene()}
+              onKeyDown={(e) => e.key === "Enter" && !geneFieldsDisabled && onLoadGene()}
+              disabled={geneFieldsDisabled}
               placeholder="e.g. DMD"
-              className="w-full rounded border border-slate-300 bg-white py-2 pl-3 pr-14 text-[12.5px] font-medium text-slate-700 placeholder:font-normal placeholder:text-slate-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+              className="w-full rounded border border-slate-300 bg-white py-2 pl-3 pr-14 text-[12.5px] font-medium text-slate-700 placeholder:font-normal placeholder:text-slate-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"
             />
             <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1">
               {geneSymbol && (
@@ -99,7 +96,7 @@ export default function BasicInfoForm({
       <div className="flex items-center justify-end px-5 pb-3 pt-2">
         <button
           onClick={onLoadGene}
-          disabled={loading || !geneSymbol.trim()}
+          disabled={loading || !geneSymbol.trim() || geneFieldsDisabled}
           className="flex items-center gap-1.5 rounded bg-[#061b49] px-4 py-2 text-[12.5px] font-medium text-white transition-colors hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-50"
         >
           {loading ? (

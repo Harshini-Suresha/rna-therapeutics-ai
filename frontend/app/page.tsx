@@ -10,6 +10,8 @@ import GeneOverviewCard from "@/components/GeneOverviewCard";
 import InfoGrid from "@/components/InfoGrid";
 import StatsRow from "@/components/StatsRow";
 import FooterBar from "@/components/FooterBar";
+import DiseaseSearchSection from "@/components/DiseaseSearchSection";
+import DiseaseMatchIndicator from "@/components/DiseaseMatchIndicator";
 import { GeneTargetObject } from "@/types/gene";
 import { fetchGene } from "@/lib/api";
 import { getOrganism } from "@/lib/organisms";
@@ -107,6 +109,7 @@ export default function NewProjectPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [autoSearchTriggered, setAutoSearchTriggered] = useState(false);
+  const [diseaseSearchActive, setDiseaseSearchActive] = useState(false);
 
   useEffect(() => {
     const query = searchParams.get("q")?.trim();
@@ -371,6 +374,7 @@ export default function NewProjectPage() {
               setGeneSymbol={setGeneSymbol}
               onLoadGene={handleLoadGene}
               loading={loading}
+              geneFieldsDisabled={diseaseSearchActive}
             />
           )}
           {error && (
@@ -417,6 +421,22 @@ export default function NewProjectPage() {
                 setGeneSymbol={setGeneSymbol}
                 onLoadGene={handleLoadGene}
                 loading={loading}
+                geneFieldsDisabled={diseaseSearchActive}
+              />
+
+              {/* Disease-based gene discovery */}
+              <DiseaseSearchSection
+                organismId={organism}
+                active={diseaseSearchActive}
+                onActivate={() => setDiseaseSearchActive(true)}
+                onDeactivate={() => setDiseaseSearchActive(false)}
+                onSelectGene={(symbol, disease) => {
+                  setOrganism("human");
+                  setGeneSymbol(symbol);
+                  setDiseaseName(disease);
+                  setDiseaseSearchActive(false);
+                  setTimeout(() => handleLoadGene(), 0);
+                }}
               />
 
               {/* Analysis Modules + Therapeutic Mechanisms */}
@@ -496,6 +516,9 @@ export default function NewProjectPage() {
           {gene && (
             <>
               <GeneOverviewCard gene={gene} onRefresh={handleLoadGene} />
+              {gene.organism === "homo_sapiens" && diseaseName.trim() && (
+                <DiseaseMatchIndicator enteredDisease={diseaseName} gene={gene} />
+              )}
               <InfoGrid gene={gene} />
               <StatsRow gene={gene} />
             </>
