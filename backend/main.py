@@ -23,6 +23,7 @@ try:  # ``uvicorn backend.main:app`` from the repository root
     from .services.variant_details_service import get_variant_details
     from .services.protein_properties_service import get_protein_properties
     from .services.single_cell_service import get_single_cell_expression
+    from .services.tissue_expression_service import get_tissue_expression
     from .services.rna_halflife_service import get_rna_halflife
     from .services.dependency_service import get_gene_dependency
     from .services.fda_therapies_service import get_fda_therapies
@@ -43,6 +44,7 @@ except ImportError:  # ``uvicorn main:app`` while working in backend/
     from services.variant_details_service import get_variant_details
     from services.protein_properties_service import get_protein_properties
     from services.single_cell_service import get_single_cell_expression
+    from services.tissue_expression_service import get_tissue_expression
     from services.rna_halflife_service import get_rna_halflife
     from services.dependency_service import get_gene_dependency
     from services.fda_therapies_service import get_fda_therapies
@@ -303,117 +305,55 @@ async def fetch_gene_from_ncbi(session: aiohttp.ClientSession, gene_symbol: str,
         return None
 
 async def fetch_expression_details(session: aiohttp.ClientSession, symbol: str, ensembl_gene_id: str, species: str) -> dict:
-    expr_data = {
-        "available": False,
-        "top_tissue": None,
-        "tpm": None,
-        "gtex_level": None,
-        "hpa_level": None,
-        "top_tissues": [],
-        "expression_cv": None,
-        "vital_organ_tpm": None,
-        "vital_organ_tissues": [],
-        "dominant_isoform_fraction": None,
-        "dominant_isoform_id": None,
-    }
-
-    if species != "homo_sapiens" or not ensembl_gene_id:
-        return expr_data
-
+    """Fetch tissue expression data using the new multi-source tissue expression service."""
     try:
-        # GTEx expression endpoints require a versioned GENCODE ID, not a symbol
-        # or an unversioned Ensembl ID. Resolve it first from the official API.
-        async with session.get(
-            "https://gtexportal.org/api/v2/reference/geneSearch",
-            params={
-                "geneId": symbol,
-                "gencodeVersion": "v26",
-                "genomeBuild": "GRCh38/hg38",
-            },
-            timeout=aiohttp.ClientTimeout(total=4),
-        ) as response:
-            search_data = await response.json() if response.status == 200 else {}
-
-        matches = search_data.get("data", [])
-        gene_record = next(
-            (record for record in matches if record.get("geneSymbol", "").upper() == symbol.upper()),
-            None,
+        tissue_data = await get_tissue_expression(
+            symbol=symbol,
+            ensembl_id=ensembl_gene_id,
+            species=species,
         )
-        gencode_id = gene_record.get("gencodeId") if gene_record else None
-        if not gencode_id:
-            return expr_data
 
-        async with session.get(
-            "https://gtexportal.org/api/v2/expression/medianGeneExpression",
-            params={"gencodeId": gencode_id, "datasetId": "gtex_v8"},
-            timeout=aiohttp.ClientTimeout(total=4),
-        ) as response:
-            data = await response.json() if response.status == 200 else {}
+        # Map to the expected format
+        expr_data = {
+            "available": tissue_data.get("available", False),
+            "top_tissue": tissue_data.get("top_tissue"),
+            "tpm": tissue_data.get("tpm"),
+            "gtex_level": f"{tissue_data['top_tissue']} ({tissue_data['tpm']} TPM)" if tissue_data.get("top_tissue") and tissue_data.get("tpm") else None,
+            "hpa_level": None,
+            "top_tissues": tissue_data.get("topTissues", []),
+            "expression_cv": tissue_data.get("expressionStabilityCV"),
+            "vital_organ_tpm": None,
+            "vital_organ_tissues": tissue_data.get("vitalOrganTissues", []),
+            "dominant_isoform_fraction": tissue_data.get("dominantIsoformFraction"),
+            "dominant_isoform_id": tissue_data.get("dominantIsoformId"),
+            "source": tissue_data.get("source"),
+        }
 
-        records = data.get("data", [])
-        if records:
-            sorted_records = sorted(records, key=lambda x: x.get("median", 0.0), reverse=True)
-            top_record = sorted_records[0]
-            tissue = top_record.get("tissueSiteDetailId", "Tissue").replace("_", " ")
-            tpm = round(top_record.get("median", 0.0), 1)
-            expr_data["available"] = True
-            expr_data["top_tissue"] = tissue.title()
-            expr_data["tpm"] = tpm
-            expr_data["gtex_level"] = f"{tissue.title()} ({tpm} TPM)"
-            expr_data["top_tissues"] = [
-                {
-                    "name": record.get("tissueSiteDetailId", "Tissue").replace("_", " ").title(),
-                    "tpm": round(record.get("median", 0.0), 1),
-                }
-                for record in sorted_records[:12]
-            ]
+        # Calculate vital_organ_tpm from top_tissues
+        vital_keywords = ["Heart", "Kidney", "Lung", "Brain", "Liver"]
+        vital_matches = [
+            t for t in expr_data["top_tissues"]
+            if any(kw in t.get("name", "") for kw in vital_keywords)
+        ]
+        expr_data["vital_organ_tpm"] = max((t.get("tpm", 0) or 0 for t in vital_matches), default=None)
 
-            # Expression stability (CV across tissues)
-            tpm_vals = [t["tpm"] for t in expr_data["top_tissues"]]
-            if len(tpm_vals) > 1:
-                mean_tpm = sum(tpm_vals) / len(tpm_vals)
-                variance = sum((x - mean_tpm) ** 2 for x in tpm_vals) / len(tpm_vals)
-                std_dev = variance ** 0.5
-                expr_data["expression_cv"] = round(std_dev / mean_tpm, 3) if mean_tpm > 0 else None
-            else:
-                expr_data["expression_cv"] = None
-
-            # Off-target safety (vital organ expression)
-            vital_keywords = ["Heart", "Kidney", "Lung"]
-            vital_matches = [
-                t for t in expr_data["top_tissues"]
-                if any(kw in t["name"] for kw in vital_keywords)
-            ]
-            expr_data["vital_organ_tpm"] = max((t["tpm"] for t in vital_matches), default=None)
-            expr_data["vital_organ_tissues"] = [t["name"] for t in vital_matches]
-
-            # Dominant isoform fraction from GTEx transcript-level expression
-            try:
-                async with session.get(
-                    "https://gtexportal.org/api/v2/expression/medianTranscriptExpression",
-                    params={"gencodeId": gencode_id, "datasetId": "gtex_v8"},
-                timeout=aiohttp.ClientTimeout(total=4),
-                ) as tresp:
-                    tdata = await tresp.json() if tresp.status == 200 else {}
-                trecords = tdata.get("data", [])
-                if trecords:
-                    transcript_totals = {}
-                    for r in trecords:
-                        tid = r.get("transcriptId", "")
-                        median = r.get("median", 0) or 0
-                        transcript_totals[tid] = transcript_totals.get(tid, 0) + median
-                    if transcript_totals:
-                        sorted_t = sorted(transcript_totals.items(), key=lambda x: x[1], reverse=True)
-                        top_tid, top_total = sorted_t[0]
-                        grand_total = sum(transcript_totals.values())
-                        expr_data["dominant_isoform_fraction"] = round(top_total / grand_total, 3) if grand_total > 0 else None
-                        expr_data["dominant_isoform_id"] = top_tid
-            except Exception:
-                logger.info("GTEx transcript expression lookup failed for %s", symbol)
+        return expr_data
     except Exception as e:
-        logger.info(f"GTEx lookup unavailable for {symbol}: {e}")
-
-    return expr_data
+        logger.info(f"Tissue expression lookup failed for {symbol}: {e}")
+        return {
+            "available": False,
+            "top_tissue": None,
+            "tpm": None,
+            "gtex_level": None,
+            "hpa_level": None,
+            "top_tissues": [],
+            "expression_cv": None,
+            "vital_organ_tpm": None,
+            "vital_organ_tissues": [],
+            "dominant_isoform_fraction": None,
+            "dominant_isoform_id": None,
+            "source": None,
+        }
 
 async def fetch_disease_associations(session: aiohttp.ClientSession, symbol: str, ensembl_id: str, species: str) -> dict:
     result = {"diseases": [], "omim_id": None, "source": []}
@@ -514,7 +454,10 @@ async def initialize_target(payload: TargetRequest):
         species = ORGANISM_ID_TO_ENSEMBL.get(species.lower(), species)
         is_human = species == "homo_sapiens"
 
-        meta = get_gene_metadata(symbol_upper, species)
+        try:
+            meta = get_gene_metadata(symbol_upper, species)
+        except EnsemblLookupUnavailable:
+            meta = None
         if not meta or not meta.get("id"):
             # Try NCBI Gene fallback for species not in Ensembl
             async with aiohttp.ClientSession() as session:
@@ -567,9 +510,12 @@ async def initialize_target(payload: TargetRequest):
             
         omim_id = f"#{disease_info['omim_id']}" if disease_info.get("omim_id") else None
 
-        async def _run_sync(fn, label, default=None):
+        async def _run_sync(fn, label, default=None, timeout_seconds: float = 18.0):
             try:
-                return await asyncio.to_thread(fn)
+                return await asyncio.wait_for(asyncio.to_thread(fn), timeout=timeout_seconds)
+            except asyncio.TimeoutError:
+                logger.warning("%s timed out for %s", label, official_symbol)
+                return default
             except Exception as e:
                 logger.warning("%s failed for %s: %s", label, official_symbol, e)
                 return default
@@ -583,9 +529,9 @@ async def initialize_target(payload: TargetRequest):
             _run_sync(lambda: get_variant_details(gene_symbol=official_symbol, ensembl_gene_id=meta.get("id"), entrez_id=meta.get("entrezGeneId")) if is_human else {}, "Variant details lookup", {}),
             _run_sync(lambda: get_single_cell_expression(ensembl_id=gene_id, gene_symbol=official_symbol) if is_human else {}, "Single-cell lookup", {}),
             _run_sync(lambda: get_clinical_details(gene_symbol=official_symbol, disease_name=disease_resolved, omim_id=disease_info.get("omim_id"), phenotypes=disease_info.get("diseases")), "Clinical details lookup", {}),
-            _run_sync(lambda: get_fda_therapies(official_symbol, disease_resolved) if is_human else {}, "FDA therapies lookup", {}),
+            _run_sync(lambda: get_fda_therapies(official_symbol, disease_resolved) if is_human else {}, "FDA therapies lookup", {}, timeout_seconds=18.0),
             _run_sync(lambda: get_orphanet_data(official_symbol, ensembl_id=gene_id, disease_name=disease_resolved, phenotypes=disease_info.get("diseases")) if is_human else {}, "Orphanet lookup", {}),
-            _run_sync(lambda: get_mutation_breakdown(official_symbol) if is_human else {}, "Mutation breakdown lookup", {}),
+            _run_sync(lambda: get_mutation_breakdown(official_symbol) if is_human else {}, "Mutation breakdown lookup", {}, timeout_seconds=60.0),
         )
 
         # Protein chain — depends on protein_db_ids → protein_properties
@@ -892,6 +838,7 @@ async def initialize_target(payload: TargetRequest):
 
             # FDA-approved ASO therapies
             "fdaApprovedTherapies": fda_therapies.get("fdaApprovedTherapies", []),
+            "fdaMessage": fda_therapies.get("message"),
             "targetableExons": fda_therapies.get("targetableExons"),
 
             # Orphanet / ICD-11 / incidence

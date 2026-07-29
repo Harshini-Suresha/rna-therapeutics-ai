@@ -67,9 +67,9 @@ export function InfoField({
   valueClassName?: string;
 }) {
   return (
-    <div>
+    <div className="min-w-0">
       <p className="text-[11px] text-slate-400">{label}</p>
-      <p className={`text-[12.5px] font-medium text-slate-800 mt-0.5 ${valueClassName}`}>
+      <p className={`mt-0.5 break-words text-[12.5px] font-medium leading-relaxed text-slate-800 ${valueClassName}`}>
         {value}
       </p>
     </div>
@@ -110,9 +110,11 @@ export function DataRow({
   highlight?: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between py-0.5">
-      <span className="text-[11px] text-slate-500">{label}</span>
-      <span className={`text-[11px] font-medium ${highlight ? "text-emerald-600" : "text-slate-700"}`}>{value}</span>
+    <div className="flex items-start justify-between gap-3 py-0.5">
+      <span className="shrink-0 text-[11px] text-slate-500">{label}</span>
+      <span className={`min-w-0 break-words text-right text-[11px] font-medium ${highlight ? "text-emerald-600" : "text-slate-700"}`}>
+        {value}
+      </span>
     </div>
   );
 }

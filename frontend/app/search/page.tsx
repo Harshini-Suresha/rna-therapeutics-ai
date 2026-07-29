@@ -5,18 +5,47 @@ import { useSearchParams, useRouter } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 import Topbar from "@/components/Topbar";
 import { Card } from "@/components/ui";
+import { fetchGene } from "@/lib/api";
+import { GeneTargetObject } from "@/types/gene";
 
 export default function SearchPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const query = searchParams.get("q") ?? "";
   const [searchText, setSearchText] = useState(query);
+  const [geneResult, setGeneResult] = useState<GeneTargetObject | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (query !== searchText) {
       setSearchText(query);
     }
   }, [query, searchText]);
+
+  useEffect(() => {
+    if (!query) {
+      setGeneResult(null);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    setGeneResult(null);
+
+    fetchGene("homo_sapiens", "", query)
+      .then((result) => {
+        setGeneResult(result);
+      })
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : "Unable to resolve gene.");
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [query]);
 
   return (
     <div className="flex min-h-screen bg-[#F5F6FA]">
@@ -33,37 +62,109 @@ export default function SearchPage() {
             </div>
 
             <div className="grid gap-4 md:grid-cols-3">
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <button
+                type="button"
+                onClick={() => router.push(`/?q=${encodeURIComponent(query)}`)}
+                className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-left transition hover:border-slate-300"
+              >
                 <p className="text-[12px] font-semibold text-slate-700">Genes</p>
                 <p className="mt-2 text-[11px] text-slate-500">Search across gene names, symbols, and identifiers.</p>
-              </div>
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push(`/targets?search=${encodeURIComponent(query)}`)}
+                className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-left transition hover:border-slate-300"
+              >
                 <p className="text-[12px] font-semibold text-slate-700">Targets</p>
-                <p className="mt-2 text-[11px] text-slate-500">Find active targets, curated reference targets, and therapeutic candidates.</p>
-              </div>
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <p className="mt-2 text-[11px] text-slate-500">Browse target discovery content for the search term.</p>
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push(`/projects?search=${encodeURIComponent(query)}`)}
+                className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-left transition hover:border-slate-300"
+              >
                 <p className="text-[12px] font-semibold text-slate-700">Projects</p>
                 <p className="mt-2 text-[11px] text-slate-500">Locate projects by name, disease, or owner.</p>
-              </div>
+              </button>
             </div>
 
             <div className="grid gap-4 lg:grid-cols-2">
               <div className="rounded-xl border border-slate-200 p-4">
                 <p className="text-[12px] font-semibold text-slate-700">Gene match</p>
-                <p className="mt-2 text-[11px] text-slate-500">Use the gene search bar on the dashboard to resolve and load a gene into the pipeline.</p>
+                {loading ? (
+                  <p className="mt-2 text-[11px] text-slate-500">Resolving gene...</p>
+                ) : error ? (
+                  <p className="mt-2 text-[11px] text-red-600">{error}</p>
+                ) : geneResult ? (
+                  <div className="space-y-3">
+                    <p className="text-[11px] text-slate-500">Resolved gene</p>
+                    <p className="text-[13px] font-semibold text-slate-800">{geneResult.geneSymbol} — {geneResult.geneName ?? "No name available"}</p>
+                    <div className="grid gap-2 text-[11px] text-slate-500 sm:grid-cols-2">
+                      <div>Ensembl: {geneResult.geneId ?? "N/A"}</div>
+                      <div>Entrez: {geneResult.entrezGeneId ?? "N/A"}</div>
+                      <div>Type: {geneResult.geneType ?? "N/A"}</div>
+                      <div>Chromosome: {geneResult.chromosome ?? "N/A"}</div>
+                    </div>
+                    <p className="text-[11px] text-slate-500">{geneResult.geneFunction ?? "No function summary available."}</p>
+                    <div className="flex flex-wrap gap-2">
+                      <span className="rounded-full bg-slate-100 px-2 py-1 text-[10.5px] text-slate-700">Tissue: {geneResult.defaultTissue ?? "N/A"}</span>
+                      <span className="rounded-full bg-slate-100 px-2 py-1 text-[10.5px] text-slate-700">TPM: {geneResult.tissueTpm ?? "N/A"}</span>
+                      <span className="rounded-full bg-slate-100 px-2 py-1 text-[10.5px] text-slate-700">GO BP: {geneResult.goBiologicalProcessHighlight ?? "N/A"}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => router.push(`/?q=${encodeURIComponent(query)}`)}
+                      className="inline-flex rounded-md bg-brand px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-brand-dark"
+                    >
+                      Open on dashboard
+                    </button>
+                  </div>
+                ) : (
+                  <p className="mt-2 text-[11px] text-slate-500">Enter a gene query to lookup the live backend.</p>
+                )}
               </div>
               <div className="rounded-xl border border-slate-200 p-4">
                 <p className="text-[12px] font-semibold text-slate-700">Project match</p>
-                <p className="mt-2 text-[11px] text-slate-500">Projects are coming soon — this stub will be replaced by live project search results.</p>
+                <p className="mt-2 text-[11px] text-slate-500">Projects are routed to the project page. Live project search is not yet available in the backend.</p>
+                <button
+                  type="button"
+                  onClick={() => router.push(`/projects?search=${encodeURIComponent(query)}`)}
+                  className="mt-4 inline-flex rounded-md border border-slate-300 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Browse projects
+                </button>
               </div>
             </div>
+
+            {geneResult && (
+              <div className="rounded-xl border border-slate-200 bg-white p-4">
+                <p className="text-[12px] font-semibold uppercase tracking-wide text-slate-500">Gene details</p>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  <div className="rounded-xl bg-slate-50 p-3">
+                    <p className="text-[11px] text-slate-500">Clinical association</p>
+                    <p className="mt-1 text-[12px] font-semibold text-slate-800">{geneResult.diseaseAssociation ?? "None identified"}</p>
+                    <p className="mt-1 text-[11px] text-slate-500">Source: {geneResult.diseaseAssociationSource?.join(" · ") || "N/A"}</p>
+                  </div>
+                  <div className="rounded-xl bg-slate-50 p-3">
+                    <p className="text-[11px] text-slate-500">Pathway highlight</p>
+                    <p className="mt-1 text-[12px] font-semibold text-slate-800">{geneResult.pathwayHighlight ?? "N/A"}</p>
+                    <p className="mt-1 text-[11px] text-slate-500">Go BP: {geneResult.goBiologicalProcessHighlight ?? "N/A"}</p>
+                  </div>
+                  <div className="rounded-xl bg-slate-50 p-3">
+                    <p className="text-[11px] text-slate-500">Clinical evidence</p>
+                    <p className="mt-1 text-[12px] font-semibold text-slate-800">OMIM: {geneResult.omimId ?? "N/A"}</p>
+                    <p className="mt-1 text-[11px] text-slate-500">ClinVar top variant: {geneResult.topHgvsName ?? geneResult.topRsId ?? "N/A"}</p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Next steps</p>
               <ul className="mt-3 space-y-2 text-[11px] text-slate-600 list-disc list-inside">
-                <li>Search dispatches to `/search?q=...`.</li>
-                <li>Gene searches are supported via the main dashboard loader.</li>
-                <li>Target and project search pages can be added as live results later.</li>
+                <li>Gene searches resolve via the live backend and can be opened in the dashboard.</li>
+                <li>Target discovery results land on the existing target page.</li>
+                <li>Project search currently navigates to the project dashboard.</li>
               </ul>
             </div>
           </Card>

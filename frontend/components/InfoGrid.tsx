@@ -72,7 +72,7 @@ export default function InfoGrid({ gene }: { gene: GeneTargetObject }) {
   return (
     <div className="space-y-5">
       {/* Row 1: Transcripts, Variant Registry, Tissue Expression */}
-      <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+      <div className="grid min-w-0 grid-cols-1 gap-5 md:grid-cols-3">
         {/* Transcripts */}
         <Card className="flex h-[330px] flex-col overflow-hidden">
           <MiniCardHeader icon={ListTree} iconBg="#EFF6FF" iconColor="#2563EB" title="Transcripts" />
@@ -138,7 +138,7 @@ export default function InfoGrid({ gene }: { gene: GeneTargetObject }) {
         </Card>
 
         {/* Variant Registry */}
-        <Card className="flex h-[330px] flex-col overflow-hidden">
+        <Card className="flex min-w-0 h-[330px] flex-col overflow-hidden">
           <MiniCardHeader icon={Shuffle} iconBg="#FFF7ED" iconColor="#EA580C" title="Variant Registry" />
           <div className="flex-1 px-4 py-3 space-y-3 overflow-y-auto">
             <div className="rounded-lg border border-orange-100 bg-orange-50/50 p-3">
@@ -194,7 +194,7 @@ export default function InfoGrid({ gene }: { gene: GeneTargetObject }) {
         </Card>
 
         {/* Tissue Expression */}
-        <Card className="flex h-[330px] flex-col overflow-hidden">
+        <Card className="flex min-w-0 h-[330px] flex-col overflow-hidden">
           <MiniCardHeader icon={Layers} iconBg="#ECFDF5" iconColor="#059669" title="Tissue Expression" />
           <div className="flex-1 overflow-y-auto px-4 py-3">
             {hasTissueExpression ? (
@@ -235,7 +235,7 @@ export default function InfoGrid({ gene }: { gene: GeneTargetObject }) {
       </div>
 
       {/* Row 2: Expression Context, Protein & Genetics, Disease Association */}
-      <div className="grid grid-cols-1 gap-5 md:auto-rows-[520px] md:grid-cols-3">
+      <div className="grid min-w-0 grid-cols-1 gap-5 md:auto-rows-[520px] md:grid-cols-3">
         {/* Expression Context */}
         <Card className="flex flex-col overflow-hidden md:h-full">
           <MiniCardHeader icon={CircleDot} iconBg="#FDF2F8" iconColor="#DB2777" title="Expression Context" />
@@ -301,7 +301,7 @@ export default function InfoGrid({ gene }: { gene: GeneTargetObject }) {
         </Card>
 
         {/* Protein & Genetics */}
-        <Card className="flex flex-col overflow-hidden md:h-full">
+        <Card className="flex min-w-0 flex-col overflow-hidden md:h-full">
           <MiniCardHeader icon={Link2} iconBg="#F5F3FF" iconColor="#7C3AED" title="Protein & Genetics" />
           <div className="card-scroll flex-1 overflow-y-auto px-4 py-2 pb-3 space-y-1.5">
             <DataRow label="Isoelectric Point (pI)" value={gene.isoelectricPoint ?? DASH} />
@@ -341,7 +341,7 @@ export default function InfoGrid({ gene }: { gene: GeneTargetObject }) {
         </Card>
 
         {/* Disease Association */}
-        <Card className="flex flex-col overflow-hidden">
+        <Card className="flex min-w-0 flex-col overflow-hidden">
           <MiniCardHeader icon={HeartPulse} iconBg="#FEF2F2" iconColor="#DC2626" title="Disease Association" />
           <div className="card-scroll flex-1 overflow-y-auto px-4 py-2 pb-3 space-y-1.5">
             {gene.diseaseName && (

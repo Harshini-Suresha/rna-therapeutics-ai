@@ -9,7 +9,7 @@ Source: NCBI ClinVar (via ESearch + EFetch)
 
 import logging
 import re
-import xml.etree.ElementTree as ET
+import time
 from typing import Optional
 
 import requests
@@ -19,69 +19,67 @@ logger = logging.getLogger(__name__)
 NCBI_EUTILS = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
 
 
-def _clinvar_search_count(session: requests.Session, query: str) -> int:
-    """Return ClinVar record count for a query."""
-    try:
-        resp = session.get(
-            f"{NCBI_EUTILS}/esearch.fcgi",
-            params={"db": "clinvar", "term": query, "retmode": "json"},
-            timeout=10,
-        )
-        if resp.status_code == 200:
-            return int((resp.json().get("esearchresult") or {}).get("count", 0))
-    except Exception:
-        pass
-    return 0
-
-
-def _clinvar_fetch_types(session: requests.Session, query: str, retmax: int = 200) -> list:
-    """Fetch ClinVar variant type annotations via ESummary, batched to avoid URL length limits."""
-    try:
-        # First get IDs
-        resp = session.get(
-            f"{NCBI_EUTILS}/esearch.fcgi",
-            params={
-                "db": "clinvar",
-                "term": query,
-                "retmax": retmax,
-                "retmode": "json",
-            },
-            timeout=10,
-        )
-        if resp.status_code != 200:
-            return []
-        ids = (resp.json().get("esearchresult") or {}).get("idlist", [])
-        if not ids:
-            return []
-
-        # Batch esummary requests (max ~100 IDs per request to stay under URL length limit)
-        types = []
-        batch_size = 100
-        for i in range(0, len(ids), batch_size):
-            batch = ids[i:i + batch_size]
-            resp = session.get(
-                f"{NCBI_EUTILS}/esummary.fcgi",
-                params={"db": "clinvar", "id": ",".join(batch), "retmode": "json"},
-                timeout=15,
-            )
-            if resp.status_code != 200:
+def _clinvar_esearch(session: requests.Session, query: str, retmax: int = 0) -> tuple:
+    """Single ESearch call returning (count, id_list). Retries with backoff on 429."""
+    for attempt in range(4):
+        try:
+            params = {"db": "clinvar", "term": query, "retmode": "json"}
+            if retmax:
+                params["retmax"] = retmax
+            resp = session.get(f"{NCBI_EUTILS}/esearch.fcgi", params=params, timeout=10)
+            if resp.status_code == 200:
+                data = resp.json().get("esearchresult") or {}
+                count = int(data.get("count", 0))
+                ids = data.get("idlist", [])
+                return count, ids
+            if resp.status_code == 429:
+                wait = 2.0 * (2 ** attempt)
+                logger.warning("ClinVar ESearch 429, retrying in %.1fs (attempt %d/4)", wait, attempt + 1)
+                time.sleep(wait)
                 continue
+            logger.warning("ClinVar ESearch HTTP %d", resp.status_code)
+            break
+        except Exception as e:
+            logger.warning("ClinVar ESearch failed: %s", e)
+            break
+    return 0, []
 
-            data = resp.json().get("result", {})
-            for uid in batch:
-                record = data.get(uid, {})
-                if not isinstance(record, dict):
-                    continue
-                title = record.get("title", "")
-                variant_type = record.get("variation_type", "")
-                types.append({
-                    "title": title,
-                    "type": variant_type,
-                })
-        return types
-    except Exception as e:
-        logger.info(f"ClinVar type fetch failed: {e}")
+
+def _clinvar_fetch_types(session: requests.Session, ids: list) -> list:
+    """Fetch ClinVar variant type annotations via ESummary for given IDs."""
+    if not ids:
         return []
+    types = []
+    batch_size = 100
+    for i in range(0, len(ids), batch_size):
+        batch = ids[i:i + batch_size]
+        data = None
+        for attempt in range(3):
+            try:
+                resp = session.get(
+                    f"{NCBI_EUTILS}/esummary.fcgi",
+                    params={"db": "clinvar", "id": ",".join(batch), "retmode": "json"},
+                    timeout=10,
+                )
+                if resp.status_code == 200:
+                    data = resp.json().get("result", {})
+                    break
+                time.sleep(1.0 * (2 ** attempt) + 0.5)
+            except Exception:
+                time.sleep(1.0 * (2 ** attempt) + 0.5)
+        if data is None:
+            continue
+        for uid in batch:
+            record = data.get(uid, {})
+            if not isinstance(record, dict):
+                continue
+            title = record.get("title", "")
+            variant_type = record.get("variation_type", "")
+            types.append({
+                "title": title,
+                "type": variant_type,
+            })
+    return types
 
 
 def _classify_variant(title: str, variant_type: str) -> Optional[str]:
@@ -180,15 +178,16 @@ def get_mutation_breakdown(gene_symbol: str) -> dict:
     base_query = f"{symbol}[gene] AND (pathogenic[clinsig] OR likely pathogenic[clinsig])"
 
     with requests.Session() as session:
-        # Get total pathogenic variant count
-        total = _clinvar_search_count(session, base_query)
+        # Single ESearch for count + IDs (avoids double-call rate limiting)
+        sample = min(300, 10000)  # cap at 300 samples
+        total, ids = _clinvar_esearch(session, base_query, retmax=sample)
         result["knownPathogenicVariants"] = total if total > 0 else None
 
-        if total == 0:
+        if total == 0 or not ids:
             return result
 
-        # Fetch sample of variant records to classify types
-        records = _clinvar_fetch_types(session, base_query, retmax=min(total, 500))
+        # Fetch variant type annotations via ESummary
+        records = _clinvar_fetch_types(session, ids)
 
         if not records:
             return result

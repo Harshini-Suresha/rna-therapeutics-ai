@@ -9,30 +9,56 @@ export async function fetchGene(
   diseaseName: string,
   geneSymbol: string
 ): Promise<GeneTargetObject> {
-  const response = await fetch(`${API_BASE}/api/pipeline/initialize-target`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      gene_symbol: geneSymbol.trim(),
-      organism,
-      disease_name: diseaseName.trim() || null,
-    }),
-  });
+  const normalizedSymbol = geneSymbol.trim().toUpperCase();
+  const fallbackGene = normalizedSymbol ? lookupMockGene(normalizedSymbol) : undefined;
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(
-      errorData.detail || `Target gene "${geneSymbol.toUpperCase()}" could not be resolved.`
-    );
+  let data: Record<string, unknown> | null = null;
+
+  try {
+    const response = await fetch(`${API_BASE}/api/pipeline/initialize-target`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        gene_symbol: geneSymbol.trim(),
+        organism,
+        disease_name: diseaseName.trim() || null,
+      }),
+    });
+
+    if (!response.ok) {
+      if (fallbackGene) {
+        return fallbackGene;
+      }
+
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(
+        errorData.detail || `Target gene "${normalizedSymbol}" could not be resolved.`
+      );
+    }
+
+    data = await response.json();
+  } catch (error) {
+    if (fallbackGene) {
+      return fallbackGene;
+    }
+
+    throw error instanceof Error
+      ? error
+      : new Error(`Target gene "${normalizedSymbol}" could not be resolved.`);
   }
 
-  const data = await response.json();
+  if (!data || typeof data !== "object") {
+    if (fallbackGene) {
+      return fallbackGene;
+    }
 
-  const finalSymbol = data.geneSymbol ?? geneSymbol.toUpperCase();
-  const fallbackGene = lookupMockGene(finalSymbol);
-  const rawSynonyms = Array.isArray(data.synonyms) ? data.synonyms : [];
+    throw new Error(`Target gene "${normalizedSymbol}" could not be resolved.`);
+  }
+
+  const finalSymbol = data.geneSymbol ?? fallbackGene?.geneSymbol ?? normalizedSymbol;
+  const synonymValues = Array.isArray(data.synonyms) ? data.synonyms : [];
   const seenSynonyms = new Set<string>();
-  const filteredSynonyms = rawSynonyms.filter((syn: unknown): syn is string => {
+  const filteredSynonyms = synonymValues.filter((syn: unknown): syn is string => {
     if (typeof syn !== "string") return false;
     const normalized = syn.trim().toLocaleUpperCase();
     if (!normalized || normalized === finalSymbol.toLocaleUpperCase() || normalized === "NONE IDENTIFIED") {
@@ -236,6 +262,7 @@ export async function fetchGene(
     proteinMass: data.proteinMass ?? data.molecularWeight ?? null,
 
     fdaApprovedTherapies: Array.isArray(data.fdaApprovedTherapies) ? data.fdaApprovedTherapies : [],
+    fdaMessage: data.fdaMessage ?? null,
     targetableExons: data.targetableExons ?? null,
 
     incidence: data.incidence ?? null,

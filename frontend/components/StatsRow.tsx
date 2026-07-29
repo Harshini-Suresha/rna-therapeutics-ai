@@ -86,7 +86,7 @@ export default function StatsRow({ gene }: { gene: GeneTargetObject }) {
   const hasPathways = gene.keggCount !== null || gene.reactomeCount !== null || gene.pathwayCommonsCount !== null || gene.keggPathwayName !== null || gene.reactomePathwayName !== null || gene.keggPathwayId !== null || gene.reactomePathwayId !== null;
   const hasGoTerms = gene.goBiologicalProcess !== null || gene.goMolecularFunction !== null || gene.goCellularComponent !== null;
   const hasClinical = gene.omimId !== null || gene.phenotypes.length > 0 || gene.therapeuticOptions.length > 0 || gene.diagnosticTests.length > 0 || gene.clinicalSymptoms.length > 0;
-  const hasMutations = gene.knownPathogenicVariants !== null;
+  const hasMutations = gene.knownPathogenicVariants !== null || Object.values(gene.mutationBreakdown ?? {}).some((value) => value !== null);
   const hasFda = gene.fdaApprovedTherapies.length > 0;
   const hasOrphanet = gene.orphanetCode !== null || gene.icd11Code !== null || gene.incidence !== null || (gene.orphanetDiseaseNames?.length ?? 0) > 0;
   const clinVarGeneSearch = `https://www.ncbi.nlm.nih.gov/clinvar/?term=${encodeURIComponent(`${gene.geneSymbol}[gene]`)}`;
@@ -191,32 +191,25 @@ export default function StatsRow({ gene }: { gene: GeneTargetObject }) {
         ]}
         sources={[{ label: "Source: Ensembl", url: links.ensembl ?? "#" }]}
         extra={
-          <div className="mt-2 space-y-1">
-            {gene.genomicOverviewDetails?.canonicalTranscript && (
-              <div className="text-[12px]">
-                <div className="text-[11px] text-slate-500">Canonical transcript</div>
-                <div className="mt-1 text-[12px]">
-                  {gene.genomicOverviewDetails.canonicalTranscriptLink ? (
-                    <a href={gene.genomicOverviewDetails.canonicalTranscriptLink} target="_blank" rel="noreferrer" className="text-brand hover:underline">
-                      {gene.genomicOverviewDetails.canonicalTranscript}
+          <div className="mt-2 space-y-3 text-[12px] leading-5">
+            {gene.proteinId && (
+              <div>
+                <div className="text-[11px] text-slate-500">Protein entry</div>
+                <div className="mt-1">
+                  {links.uniprot ? (
+                    <a href={links.uniprot} target="_blank" rel="noreferrer" className="text-brand hover:underline">
+                      {gene.proteinId}
                     </a>
                   ) : (
-                    <span>{gene.genomicOverviewDetails.canonicalTranscript}</span>
+                    <span>{gene.proteinId}</span>
                   )}
-                  {gene.genomicOverviewDetails.proteinId ? (
-                    <a className="ml-2 text-[11px] text-slate-400 hover:underline" href={links.uniprot ?? "#"} target="_blank" rel="noreferrer"> UniProt</a>
-                  ) : null}
                 </div>
               </div>
             )}
-            {gene.genomicOverviewDetails?.otherTranscripts && gene.genomicOverviewDetails.otherTranscripts.length > 0 && (
+            {gene.proteinLength !== null && (
               <div>
-                <div className="text-[11px] text-slate-500">Other transcripts</div>
-                <ul className="mt-1 text-[12px] list-disc list-inside">
-                  {gene.genomicOverviewDetails.otherTranscripts.slice(0, 3).map((t, i) => (
-                    <li key={`tx-${i}`} className="truncate">{t}</li>
-                  ))}
-                </ul>
+                <div className="text-[11px] text-slate-500">Protein length</div>
+                <div className="mt-1">{`${gene.proteinLength.toLocaleString()} aa`}</div>
               </div>
             )}
           </div>
@@ -240,20 +233,13 @@ export default function StatsRow({ gene }: { gene: GeneTargetObject }) {
         sources={links.omim && gene.omimId ? [{ label: "Source: OMIM", url: links.omim }] : []}
         extra={
           <div className="mt-2 space-y-1">
-            {gene.clinicalProfileAnnotations && gene.clinicalProfileAnnotations.length > 0 && (
+            {gene.diagnosticTests.length > 0 && (
               <div>
-                <div className="text-[11px] text-slate-500">Top phenotypes</div>
-                <ul className="mt-1 text-[12px] list-disc list-inside">
-                  {gene.clinicalProfileAnnotations.slice(0, 3).map((a, i) => (
-                    <li key={`ph-${i}`} className="truncate">
-                      {a.id && /^\d+$/.test(String(a.id)) ? (
-                        <a className="text-brand hover:underline" href={`https://www.omim.org/entry/${a.id}`} target="_blank" rel="noreferrer">
-                          {a.description || a.id}
-                        </a>
-                      ) : (
-                        <span>{a.description || a.id}</span>
-                      )}
-                      {a.source ? <span className="text-slate-400"> — {a.source}</span> : null}
+                <div className="text-[11px] text-slate-500">Diagnostic tests</div>
+                <ul className="mt-1 text-[12px] leading-5 list-disc list-inside">
+                  {gene.diagnosticTests.slice(0, 3).map((test, i) => (
+                    <li key={`dt-${i}`}>
+                      {test}
                     </li>
                   ))}
                 </ul>
@@ -405,7 +391,7 @@ export default function StatsRow({ gene }: { gene: GeneTargetObject }) {
               }))
             : isHuman
               ? [
-                  { label: "Status", value: "No approved therapy for this gene" },
+                  { label: "Status", value: gene.fdaMessage ?? "No approved therapy for this gene" },
                   { label: "Tip", value: "Check ClinicalTrials.gov for active trials" },
                 ]
               : [{ label: "Status", value: "Human only" }]

@@ -249,6 +249,7 @@ export const MOCK_GENES: Record<string, GeneTargetObject> = {
       { name: "Viltolarsen (Viltepso)", indication: "Duchenne muscular dystrophy (exon 53 skipping)", approvalYear: "2020", source: "FDA Orange Book" },
       { name: "Casimersen (Amondys 45)", indication: "Duchenne muscular dystrophy (exon 45 skipping)", approvalYear: "2021", source: "FDA Orange Book" },
     ],
+    fdaMessage: null,
     targetableExons: 4,
     incidence: "1 in 3,500 male births",
     orphanetCode: "ORPHA:98896",

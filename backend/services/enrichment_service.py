@@ -1,9 +1,13 @@
 """Live enrichment and interaction summaries for the target dashboard."""
 
 import re
+import time
+import logging
 from typing import Optional
 
 import requests
+
+logger = logging.getLogger(__name__)
 
 
 def _as_list(value):
@@ -227,9 +231,30 @@ def get_gene_enrichment(ensembl_gene_id: str, taxon_id: int, gene_symbol: Option
 ENSEMBL_REST = "https://rest.ensembl.org"
 
 
-def _ensembl_get(url, timeout=10):
+def _ensembl_get(url, timeout=10, retries=3):
     headers = {"Content-Type": "application/json"}
-    return requests.get(url, headers=headers, timeout=timeout)
+    last_exc = None
+    for attempt in range(1, retries + 1):
+        try:
+            response = requests.get(url, headers=headers, timeout=timeout)
+            if response.status_code == 404:
+                return response
+            if response.ok:
+                return response
+            if response.status_code >= 500:
+                last_exc = RuntimeError(f"HTTP {response.status_code}")
+                wait = 1.5 * (2 ** (attempt - 1))
+                logger.info("Ensembl %d (attempt %d/%d), retrying in %.1fs", response.status_code, attempt, retries, wait)
+                time.sleep(wait)
+                continue
+            return response
+        except requests.RequestException as exc:
+            last_exc = exc
+            if attempt < retries:
+                wait = 1.5 * (2 ** (attempt - 1))
+                logger.info("Ensembl request failed (attempt %d/%d), retrying in %.1fs: %s", attempt, retries, wait, exc)
+                time.sleep(wait)
+    raise last_exc or RuntimeError("Ensembl unavailable")
 
 
 def _compute_codon_usage_bias(cds_seq: str) -> Optional[str]:

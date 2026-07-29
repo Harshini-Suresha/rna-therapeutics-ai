@@ -245,6 +245,7 @@ export interface GeneTargetObject {
     source: string;
     modality?: string;
   }[];
+  fdaMessage: string | null;  // informational message when no therapies found
   targetableExons: number | null;  // computed from transcript CDS exons
 
   // Incidence and Orphanet / ICD-11

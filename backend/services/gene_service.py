@@ -6,9 +6,9 @@ from typing import Optional
 
 REST_API_BASE = "https://rest.ensembl.org"
 HGNC_API_BASE = "https://rest.genenames.org"
-ENSEMBL_TIMEOUT = 30
-MAX_RETRIES = 3
-RETRY_BACKOFF = 1.5
+ENSEMBL_TIMEOUT = 8
+MAX_RETRIES = 2
+RETRY_BACKOFF = 1.0
 
 logger = logging.getLogger(__name__)
 

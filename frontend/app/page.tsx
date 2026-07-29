@@ -305,6 +305,7 @@ export default function NewProjectPage() {
         mrnaLength: null,
         proteinMass: null,
         fdaApprovedTherapies: [],
+        fdaMessage: null,
         targetableExons: null,
         incidence: null,
         orphanetCode: null,

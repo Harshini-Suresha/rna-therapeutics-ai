@@ -42,16 +42,17 @@ export default function GeneOverviewCard({ gene, onRefresh }: GeneOverviewCardPr
         }
       />
 
-      <div className="flex flex-col gap-6 px-6 pb-6 md:flex-row">
+      <div className="flex min-w-0 flex-col gap-6 px-6 pb-6 md:flex-row">
         {/* Gene glyph */}
         <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-50 to-blue-50">
           <Dna className="h-10 w-10 text-indigo-500" strokeWidth={1.75} />
         </div>
 
-        <div className="grid flex-1 gap-5 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.35fr)]">
+        <div className="grid min-w-0 flex-1 gap-5 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.35fr)]">
           {/* Compact identity and structure fields */}
-          <div className="grid grid-cols-2 content-start gap-x-6 gap-y-4">
+          <div className="grid min-w-0 grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
             <InfoField label="Gene Symbol" value={gene.geneSymbol} />
+            <InfoField label="Organism" value={gene.organism ?? DASH} />
             <InfoField label="Gene ID" value={gene.geneId ?? DASH} />
             <InfoField label="Gene Name" value={gene.geneName ?? DASH} />
             <InfoField label="Chromosome" value={gene.chromosome ?? DASH} />
