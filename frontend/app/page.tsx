@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AlertCircle, ArrowRight, BookOpen, ClipboardCheck, Cpu, Database, Dna, FileText, ChevronRight } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import Topbar from "@/components/Topbar";
@@ -99,9 +99,17 @@ const ARCHITECTURE_STEPS = [
 
 export default function NewProjectPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [organism, setOrganism] = useState("human");
   const [diseaseName, setDiseaseName] = useState("");
   const [geneSymbol, setGeneSymbol] = useState("");
+
+  useEffect(() => {
+    const query = searchParams.get("q")?.trim();
+    if (query && query !== geneSymbol) {
+      setGeneSymbol(query);
+    }
+  }, [searchParams, geneSymbol]);
 
   const [gene, setGene] = useState<GeneTargetObject | null>(null);
   const [loading, setLoading] = useState(false);

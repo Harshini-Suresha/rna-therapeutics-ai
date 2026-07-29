@@ -135,7 +135,7 @@ def get_gene_enrichment(ensembl_gene_id: str, taxon_id: int, gene_symbol: Option
             pc_response = requests.get(
                 "https://www.pathwaycommons.org/pc2/search",
                 params={"q": gene_symbol, "format": "json", "type": "pathway"},
-                timeout=8,
+                timeout=2,
             )
             if pc_response.ok:
                 pc_data = pc_response.json()
