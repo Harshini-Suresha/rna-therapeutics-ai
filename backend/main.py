@@ -932,7 +932,7 @@ async def initialize_target(payload: TargetRequest):
             "reactomePathwayName": enrichment_data.get("reactomePathwayName"),
             "keggPathwayId": enrichment_data.get("keggPathwayId"),
             "reactomePathwayId": enrichment_data.get("reactomePathwayId"),
-            "pathwayCommonsCount": None,
+            "pathwayCommonsCount": enrichment_data.get("pathwayCommonsCount"),
 
             "goBiologicalProcess": enrichment_data.get("goBiologicalProcess"),
             "goMolecularFunction": enrichment_data.get("goMolecularFunction"),

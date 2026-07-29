@@ -208,6 +208,10 @@ export async function fetchGene(
     goBiologicalProcessHighlight: data.goBiologicalProcessHighlight ?? null,
     goMolecularFunctionHighlight: data.goMolecularFunctionHighlight ?? null,
     goCellularComponentHighlight: data.goCellularComponentHighlight ?? null,
+    // Detailed GO annotation lists from backend
+    goBiologicalProcessAnnotations: Array.isArray(data.goBiologicalProcessAnnotations) ? data.goBiologicalProcessAnnotations : null,
+    goMolecularFunctionAnnotations: Array.isArray(data.goMolecularFunctionAnnotations) ? data.goMolecularFunctionAnnotations : null,
+    goCellularComponentAnnotations: Array.isArray(data.goCellularComponentAnnotations) ? data.goCellularComponentAnnotations : null,
 
     stringHighConfidenceCount: data.stringHighConfidenceCount ?? null,
     totalInteractors: data.totalInteractors ?? null,

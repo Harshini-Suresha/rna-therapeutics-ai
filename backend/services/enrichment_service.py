@@ -73,6 +73,7 @@ def get_gene_enrichment(ensembl_gene_id: str, taxon_id: int, gene_symbol: Option
         "reactomePathwayName": None,
         "keggPathwayId": None,
         "reactomePathwayId": None,
+        "pathwayCommonsCount": None,
         "goBiologicalProcess": None,
         "goMolecularFunction": None,
         "goCellularComponent": None,
