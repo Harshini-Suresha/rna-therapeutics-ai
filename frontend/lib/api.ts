@@ -193,10 +193,14 @@ export async function fetchGene(
 
     deepLinks: data.deepLinks ?? {},
 
-    keggCount: data.keggCount ?? null,
-    reactomeCount: data.reactomeCount ?? null,
-    pathwayCommonsCount: data.pathwayCommonsCount ?? null,
-    pathwayHighlight: data.pathwayHighlight ?? null,
+    keggCount: data.keggCount ?? fallbackGene?.keggCount ?? null,
+    reactomeCount: data.reactomeCount ?? fallbackGene?.reactomeCount ?? null,
+    pathwayCommonsCount: data.pathwayCommonsCount ?? fallbackGene?.pathwayCommonsCount ?? null,
+    keggPathwayName: data.keggPathwayName ?? fallbackGene?.keggPathwayName ?? null,
+    reactomePathwayName: data.reactomePathwayName ?? fallbackGene?.reactomePathwayName ?? null,
+    keggPathwayId: data.keggPathwayId ?? fallbackGene?.keggPathwayId ?? null,
+    reactomePathwayId: data.reactomePathwayId ?? fallbackGene?.reactomePathwayId ?? null,
+    pathwayHighlight: data.pathwayHighlight ?? fallbackGene?.pathwayHighlight ?? null,
 
     goBiologicalProcess: data.goBiologicalProcess ?? null,
     goMolecularFunction: data.goMolecularFunction ?? null,

@@ -213,6 +213,10 @@ export const MOCK_GENES: Record<string, GeneTargetObject> = {
     keggCount: 12,
     reactomeCount: 18,
     pathwayCommonsCount: 24,
+    keggPathwayName: "Dilated cardiomyopathy",
+    reactomePathwayName: "Muscle contraction",
+    keggPathwayId: "hsa05414",
+    reactomePathwayId: "R-HSA-390522",
     pathwayHighlight: "Dilated cardiomyopathy - Homo sapiens (human)",
 
     goBiologicalProcess: 1246,

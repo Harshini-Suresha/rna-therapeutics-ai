@@ -83,7 +83,7 @@ export default function StatsRow({ gene }: { gene: GeneTargetObject }) {
   const isHuman = organism === "homo_sapiens";
   const hasInteractions = gene.stringHighConfidenceCount !== null || gene.totalInteractors !== null;
   const hasLiterature = gene.pubmedArticleCount !== null || gene.reviewCount !== null || gene.clinicalTrialsCount !== null || gene.preprintCount !== null || gene.caseReportsCount !== null;
-  const hasPathways = gene.keggCount !== null || gene.reactomeCount !== null;
+  const hasPathways = gene.keggCount !== null || gene.reactomeCount !== null || gene.pathwayCommonsCount !== null || gene.keggPathwayName !== null || gene.reactomePathwayName !== null || gene.keggPathwayId !== null || gene.reactomePathwayId !== null;
   const hasGoTerms = gene.goBiologicalProcess !== null || gene.goMolecularFunction !== null || gene.goCellularComponent !== null;
   const hasClinical = gene.omimId !== null || gene.phenotypes.length > 0 || gene.therapeuticOptions.length > 0 || gene.diagnosticTests.length > 0 || gene.clinicalSymptoms.length > 0;
   const hasMutations = gene.knownPathogenicVariants !== null;
@@ -158,16 +158,19 @@ export default function StatsRow({ gene }: { gene: GeneTargetObject }) {
         iconBg="#F5F3FF"
         iconColor="#7C3AED"
         title="Pathways"
+        sourcesColumns={2}
         notConnected={!hasPathways}
         rows={[
           { label: "Top pathway", value: gene.pathwayHighlight ?? DASH },
-          { label: "KEGG", value: gene.keggCount ?? DASH },
-          { label: "Reactome", value: gene.reactomeCount ?? DASH },
-          { label: "Total pathways", value: (gene.keggCount ?? 0) + (gene.reactomeCount ?? 0) || DASH },
+          { label: "KEGG", value: gene.keggCount != null && links.kegg ? <a href={links.kegg} target="_blank" rel="noreferrer" className="text-brand hover:underline">{gene.keggCount} <ExternalLink className="inline h-2.5 w-2.5" /></a> : (gene.keggCount ?? DASH) },
+          { label: "Reactome", value: gene.reactomeCount != null && links.reactome ? <a href={links.reactome} target="_blank" rel="noreferrer" className="text-brand hover:underline">{gene.reactomeCount} <ExternalLink className="inline h-2.5 w-2.5" /></a> : (gene.reactomeCount ?? DASH) },
+          { label: "Pathway Commons", value: gene.pathwayCommonsCount ?? DASH },
+          { label: "Top KEGG ID", value: gene.keggPathwayId ?? DASH },
+          { label: "Total", value: (gene.keggCount ?? 0) + (gene.reactomeCount ?? 0) + (gene.pathwayCommonsCount ?? 0) || DASH },
         ]}
         sources={[
-          links.kegg ? { label: "Source: KEGG", url: links.kegg } : null,
-          links.reactome ? { label: "Source: Reactome", url: links.reactome } : null,
+          links.kegg ? { label: "KEGG", url: links.kegg } : null,
+          links.reactome ? { label: "Reactome", url: links.reactome } : null,
         ].filter(Boolean) as { label: string; url: string }[]}
       />
 
@@ -222,6 +225,67 @@ export default function StatsRow({ gene }: { gene: GeneTargetObject }) {
           { label: "Top CC term", value: gene.goCellularComponentHighlight ?? DASH },
         ]}
         sources={links.go ? [{ label: "Source: Gene Ontology", url: links.go }] : []}
+        extra={
+          <div className="mt-2 space-y-1">
+            {gene.goBiologicalProcessAnnotations && gene.goBiologicalProcessAnnotations.length > 0 && (
+              <div>
+                <div className="text-[11px] text-slate-500">Top BP annotations</div>
+                <ul className="mt-1 text-[12px] list-disc list-inside">
+                  {gene.goBiologicalProcessAnnotations.slice(0, 3).map((a, i) => (
+                    <li key={`bp-${i}`} className="truncate">
+                      {a.url ? (
+                        <a className="text-brand hover:underline" href={a.url} target="_blank" rel="noreferrer">
+                          {a.term || a.id}
+                        </a>
+                      ) : (
+                        <span>{a.term || a.id}</span>
+                      )}
+                      {a.evidence ? <span className="text-slate-400"> — {a.evidence}</span> : null}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {gene.goMolecularFunctionAnnotations && gene.goMolecularFunctionAnnotations.length > 0 && (
+              <div>
+                <div className="text-[11px] text-slate-500">Top MF annotations</div>
+                <ul className="mt-1 text-[12px] list-disc list-inside">
+                  {gene.goMolecularFunctionAnnotations.slice(0, 3).map((a, i) => (
+                    <li key={`mf-${i}`} className="truncate">
+                      {a.url ? (
+                        <a className="text-brand hover:underline" href={a.url} target="_blank" rel="noreferrer">
+                          {a.term || a.id}
+                        </a>
+                      ) : (
+                        <span>{a.term || a.id}</span>
+                      )}
+                      {a.evidence ? <span className="text-slate-400"> — {a.evidence}</span> : null}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {gene.goCellularComponentAnnotations && gene.goCellularComponentAnnotations.length > 0 && (
+              <div>
+                <div className="text-[11px] text-slate-500">Top CC annotations</div>
+                <ul className="mt-1 text-[12px] list-disc list-inside">
+                  {gene.goCellularComponentAnnotations.slice(0, 3).map((a, i) => (
+                    <li key={`cc-${i}`} className="truncate">
+                      {a.url ? (
+                        <a className="text-brand hover:underline" href={a.url} target="_blank" rel="noreferrer">
+                          {a.term || a.id}
+                        </a>
+                      ) : (
+                        <span>{a.term || a.id}</span>
+                      )}
+                      {a.evidence ? <span className="text-slate-400"> — {a.evidence}</span> : null}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        }
       />
 
       {/* 8. Interactions */}

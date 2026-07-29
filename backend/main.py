@@ -557,7 +557,7 @@ async def initialize_target(payload: TargetRequest):
             )
 
         try:
-            enrichment_data = get_gene_enrichment(gene_id, taxon_id)
+            enrichment_data = get_gene_enrichment(gene_id, taxon_id, official_symbol)
         except Exception as e:
             logger.warning(f"Enrichment lookup failed for {official_symbol}: {e}")
             enrichment_data = {}
@@ -928,11 +928,18 @@ async def initialize_target(payload: TargetRequest):
 
             "keggCount": enrichment_data.get("keggCount"),
             "reactomeCount": enrichment_data.get("reactomeCount"),
+            "keggPathwayName": enrichment_data.get("keggPathwayName"),
+            "reactomePathwayName": enrichment_data.get("reactomePathwayName"),
+            "keggPathwayId": enrichment_data.get("keggPathwayId"),
+            "reactomePathwayId": enrichment_data.get("reactomePathwayId"),
             "pathwayCommonsCount": None,
 
             "goBiologicalProcess": enrichment_data.get("goBiologicalProcess"),
             "goMolecularFunction": enrichment_data.get("goMolecularFunction"),
             "goCellularComponent": enrichment_data.get("goCellularComponent"),
+            "goBiologicalProcessAnnotations": enrichment_data.get("goBiologicalProcessAnnotations"),
+            "goMolecularFunctionAnnotations": enrichment_data.get("goMolecularFunctionAnnotations"),
+            "goCellularComponentAnnotations": enrichment_data.get("goCellularComponentAnnotations"),
             "pathwayHighlight": enrichment_data.get("pathwayHighlight"),
             "goBiologicalProcessHighlight": enrichment_data.get("goBiologicalProcessHighlight"),
             "goMolecularFunctionHighlight": enrichment_data.get("goMolecularFunctionHighlight"),

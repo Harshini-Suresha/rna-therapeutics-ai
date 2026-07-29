@@ -186,6 +186,10 @@ export interface GeneTargetObject {
   keggCount: number | null;
   reactomeCount: number | null;
   pathwayCommonsCount: number | null;
+  keggPathwayName: string | null;
+  reactomePathwayName: string | null;
+  keggPathwayId: string | null;
+  reactomePathwayId: string | null;
   pathwayHighlight: string | null;
 
   // GO terms — not connected yet
@@ -195,6 +199,10 @@ export interface GeneTargetObject {
   goBiologicalProcessHighlight: string | null;
   goMolecularFunctionHighlight: string | null;
   goCellularComponentHighlight: string | null;
+  // Detailed GO annotations (id, term, evidence, url)
+  goBiologicalProcessAnnotations?: { id: string | null; term: string | null; evidence?: string | null; url?: string | null }[] | null;
+  goMolecularFunctionAnnotations?: { id: string | null; term: string | null; evidence?: string | null; url?: string | null }[] | null;
+  goCellularComponentAnnotations?: { id: string | null; term: string | null; evidence?: string | null; url?: string | null }[] | null;
 
   // Interactions — real STRING data when available
   stringHighConfidenceCount: number | null;

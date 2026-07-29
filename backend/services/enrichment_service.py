@@ -31,11 +31,48 @@ def _first_pathway(values):
     return name
 
 
-def get_gene_enrichment(ensembl_gene_id: str, taxon_id: int) -> dict:
+def _first_pathway_id(values):
+    first = _as_list(values)
+    if not first:
+        return None
+    value = first[0]
+    return value.get("id") if isinstance(value, dict) else None
+
+
+def _annotation_items(values):
+    """Return a normalized list of annotation dicts with id, term, evidence and a link."""
+    items = []
+    for v in _as_list(values):
+        aid = None
+        term = None
+        evidence = None
+        if isinstance(v, dict):
+            aid = v.get("id") or v.get("GO") or v.get("accession")
+            term = v.get("term") or v.get("name") or None
+            evidence = v.get("evidence") or v.get("evidence_code") or None
+        else:
+            s = str(v)
+            m = re.match(r"(GO:\d+)\s*[:;\-]?\s*(.+)", s)
+            if m:
+                aid = m.group(1)
+                term = m.group(2).strip()
+            else:
+                term = s
+
+        url = f"https://www.ebi.ac.uk/QuickGO/term/{aid}" if aid else None
+        items.append({"id": aid, "term": term, "evidence": evidence, "url": url})
+    return items
+
+
+def get_gene_enrichment(ensembl_gene_id: str, taxon_id: int, gene_symbol: Optional[str] = None) -> dict:
     """Fetch GO, pathway and STRING counts without fabricating unavailable data."""
     result = {
         "keggCount": None,
         "reactomeCount": None,
+        "keggPathwayName": None,
+        "reactomePathwayName": None,
+        "keggPathwayId": None,
+        "reactomePathwayId": None,
         "goBiologicalProcess": None,
         "goMolecularFunction": None,
         "goCellularComponent": None,
@@ -73,15 +110,45 @@ def get_gene_enrichment(ensembl_gene_id: str, taxon_id: int) -> dict:
 
         result["keggCount"] = len(_as_list(pathway.get("kegg")))
         result["reactomeCount"] = len(_as_list(pathway.get("reactome")))
+        result["keggPathwayName"] = _first_pathway(pathway.get("kegg"))
+        result["reactomePathwayName"] = _first_pathway(pathway.get("reactome"))
+        result["keggPathwayId"] = _first_pathway_id(pathway.get("kegg"))
+        result["reactomePathwayId"] = _first_pathway_id(pathway.get("reactome"))
         result["goBiologicalProcess"] = len(_as_list(go.get("BP")))
         result["goMolecularFunction"] = len(_as_list(go.get("MF")))
         result["goCellularComponent"] = len(_as_list(go.get("CC")))
-        result["pathwayHighlight"] = _first_pathway(pathway.get("kegg")) or _first_pathway(pathway.get("reactome"))
+        result["pathwayHighlight"] = result["keggPathwayName"] or result["reactomePathwayName"]
         result["goBiologicalProcessHighlight"] = _first_annotation(go.get("BP"))
         result["goMolecularFunctionHighlight"] = _first_annotation(go.get("MF"))
         result["goCellularComponentHighlight"] = _first_annotation(go.get("CC"))
+        # Provide richer GO annotation lists for frontend display
+        result["goBiologicalProcessAnnotations"] = _annotation_items(go.get("BP"))
+        result["goMolecularFunctionAnnotations"] = _annotation_items(go.get("MF"))
+        result["goCellularComponentAnnotations"] = _annotation_items(go.get("CC"))
     except (requests.RequestException, ValueError):
         pass
+
+    # Pathway Commons (via gene symbol)
+    if gene_symbol:
+        try:
+            pc_response = requests.get(
+                "https://www.pathwaycommons.org/pc2/search",
+                params={"q": gene_symbol, "format": "json", "type": "pathway"},
+                timeout=8,
+            )
+            if pc_response.ok:
+                pc_data = pc_response.json()
+                hits = pc_data.get("searchHit", [])
+                unique_pathways = set()
+                for hit in hits:
+                    pw = hit.get("pathway")
+                    if isinstance(pw, dict):
+                        uri = pw.get("uri") or pw.get("name")
+                        if uri:
+                            unique_pathways.add(uri)
+                result["pathwayCommonsCount"] = len(unique_pathways) if unique_pathways else len(hits)
+        except (requests.RequestException, ValueError):
+            pass
 
     try:
         response = requests.get(
