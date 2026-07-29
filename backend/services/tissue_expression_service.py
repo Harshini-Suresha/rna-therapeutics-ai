@@ -14,7 +14,6 @@ from typing import Dict, Any, Optional, List
 import asyncio
 
 import aiohttp
-import requests
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +63,7 @@ async def _fetch_gtex_expression(
     }
 
     try:
-        # First, search for the gene to get GENCODE ID
+        # Search by gene symbol first
         async with session.get(
             "https://gtexportal.org/api/v2/reference/geneSearch",
             params={
@@ -74,9 +73,10 @@ async def _fetch_gtex_expression(
             },
             timeout=aiohttp.ClientTimeout(total=8),
         ) as response:
-            if response.status != 200:
-                return result
-            search_data = await response.json()
+            if response.status == 200:
+                search_data = await response.json()
+            else:
+                search_data = {}
 
         matches = search_data.get("data", [])
         gene_record = next(
@@ -84,7 +84,25 @@ async def _fetch_gtex_expression(
             None,
         )
 
-        # If no exact match, try first result
+        # If no exact match by symbol, retry with Ensembl ID (handles aliases like OCT4 -> POU5F1)
+        if not gene_record and ensembl_gene_id:
+            ensembl_base = ensembl_gene_id.split(".")[0]
+            async with session.get(
+                "https://gtexportal.org/api/v2/reference/geneSearch",
+                params={
+                    "geneId": ensembl_base,
+                    "gencodeVersion": "v26",
+                    "genomeBuild": "GRCh38/hg38",
+                },
+                timeout=aiohttp.ClientTimeout(total=8),
+            ) as response:
+                if response.status == 200:
+                    ensembl_search = await response.json()
+                    ensembl_matches = ensembl_search.get("data", [])
+                    if ensembl_matches:
+                        gene_record = ensembl_matches[0]
+
+        # Last resort: use first result from symbol search (fuzzy match)
         if not gene_record and matches:
             gene_record = matches[0]
 
@@ -166,7 +184,8 @@ async def _fetch_gtex_expression(
     return result
 
 
-def _fetch_hpa_tissue_expression(
+async def _fetch_hpa_tissue_expression(
+    session: aiohttp.ClientSession,
     ensembl_id: Optional[str] = None,
     gene_symbol: Optional[str] = None,
 ) -> Dict[str, Any]:
@@ -186,27 +205,28 @@ def _fetch_hpa_tissue_expression(
         return result
 
     try:
-        resp = requests.get(
+        async with session.get(
             f"https://www.proteinatlas.org/{ensembl_id}.json",
-            timeout=15,
-        )
-        if resp.status_code != 200:
-            return result
+            timeout=aiohttp.ClientTimeout(total=10),
+        ) as resp:
+            if resp.status != 200:
+                return result
 
-        data = resp.json()
+            data = await resp.json()
 
-        # Try RNA tissue specificity (nTPM values)
-        rna_tissue = data.get("RNA tissue specificity") or {}
-        rna_tissue_nTPM = data.get("RNA tissue expression, nTPM") or {}
+        # HPA v2 API: "RNA tissue specific nTPM" is a dict of enriched tissues only
+        rna_nTPM = data.get("RNA tissue specific nTPM") or {}
+        # Legacy key fallback
+        if not rna_nTPM:
+            rna_nTPM = data.get("RNA tissue expression, nTPM") or {}
 
-        if rna_tissue_nTPM:
-            # Convert to list and sort by expression
+        if isinstance(rna_nTPM, dict) and rna_nTPM:
             tissues = []
-            for tissue_name, ntpm_val in rna_tissue_nTPM.items():
+            for tissue_name, ntpm_val in rna_nTPM.items():
                 try:
                     ntpm = float(ntpm_val) if ntpm_val else 0
                     tissues.append({
-                        "name": tissue_name,
+                        "name": tissue_name.title(),
                         "tpm": round(ntpm, 1),
                     })
                 except (ValueError, TypeError):
@@ -219,11 +239,9 @@ def _fetch_hpa_tissue_expression(
                 result["tpm"] = tissues[0]["tpm"]
                 result["top_tissues"] = tissues[:15]
 
-                # Calculate CV
                 tpm_vals = [t["tpm"] for t in result["top_tissues"]]
                 result["expression_cv"] = _calculate_expression_cv(tpm_vals)
 
-                # Vital organ expression
                 vital_matches = [
                     t for t in result["top_tissues"]
                     if any(kw in t["name"] for kw in VITAL_ORGAN_KEYWORDS)
@@ -231,27 +249,39 @@ def _fetch_hpa_tissue_expression(
                 result["vital_organ_tpm"] = max((t["tpm"] for t in vital_matches), default=None)
                 result["vital_organ_tissues"] = [t["name"] for t in vital_matches]
 
-        # If no nTPM data, try RNA tissue category
-        if not result["available"] and rna_tissue:
-            # Map category to approximate expression level
-            category_map = {
-                "Tissue enhanced": 50,
-                "Group enriched": 30,
-                "Tissue enhanced (single)": 50,
-                "Low tissue specificity": 10,
-                "Not detected": 0,
-            }
-            for tissue_name, category in rna_tissue.items():
-                if category in category_map and category_map[category] > 0:
-                    result["available"] = True
-                    result["top_tissue"] = tissue_name
-                    result["tpm"] = category_map[category]
-                    result["top_tissues"].append({
-                        "name": tissue_name,
-                        "tpm": category_map[category],
-                    })
-                    if len(result["top_tissues"]) >= 5:
-                        break
+        # Fallback: use RNA tissue specificity string + tissue cell type enrichment
+        if not result["available"]:
+            specificity = data.get("RNA tissue specificity") or ""
+            cell_type_enrichment = data.get("RNA tissue cell type enrichment") or []
+            tissue_cluster = data.get("Tissue expression cluster") or ""
+
+            if specificity and specificity not in ("Not detected", "Low tissue specificity"):
+                # Map specificity to approximate TPM
+                category_map = {
+                    "Tissue enhanced": 50,
+                    "Group enriched": 30,
+                    "Tissue enriched": 50,
+                    "Tissue enhanced (single)": 50,
+                }
+                approx_tpm = category_map.get(specificity)
+                if approx_tpm:
+                    # Use cell type enrichment as tissue proxy
+                    tissues_found = []
+                    for item in (cell_type_enrichment if isinstance(cell_type_enrichment, list) else []):
+                        tissue_name = item.split(" - ")[0].strip() if " - " in str(item) else str(item)
+                        if tissue_name and tissue_name not in [t["name"] for t in tissues_found]:
+                            tissues_found.append({"name": tissue_name.title(), "tpm": approx_tpm})
+
+                    if not tissues_found and tissue_cluster:
+                        cluster_name = tissue_cluster.split(":")[-1].strip().split(" - ")[0].strip()
+                        if cluster_name:
+                            tissues_found.append({"name": cluster_name.title(), "tpm": approx_tpm})
+
+                    if tissues_found:
+                        result["available"] = True
+                        result["top_tissue"] = tissues_found[0]["name"]
+                        result["tpm"] = tissues_found[0]["tpm"]
+                        result["top_tissues"] = tissues_found[:15]
 
     except Exception as e:
         logger.info(f"HPA tissue lookup failed for {ensembl_id}: {e}")
@@ -259,7 +289,10 @@ def _fetch_hpa_tissue_expression(
     return result
 
 
-def _fetch_uniprot_expression(gene_symbol: str) -> Dict[str, Any]:
+async def _fetch_uniprot_expression(
+    session: aiohttp.ClientSession,
+    gene_symbol: str,
+) -> Dict[str, Any]:
     """Fetch basic tissue expression from UniProt."""
     result = {
         "source": "UniProt",
@@ -270,36 +303,41 @@ def _fetch_uniprot_expression(gene_symbol: str) -> Dict[str, Any]:
     }
 
     try:
-        resp = requests.get(
-            f"https://rest.uniprot.org/uniprotkb/search",
+        async with session.get(
+            "https://rest.uniprot.org/uniprotkb/search",
             params={
                 "query": f"gene:{gene_symbol} AND organism_id:9606",
                 "format": "json",
                 "size": 1,
             },
-            timeout=15,
-        )
-        if resp.status_code != 200:
-            return result
+            timeout=aiohttp.ClientTimeout(total=10),
+        ) as resp:
+            if resp.status != 200:
+                return result
 
-        data = resp.json()
-        results = data.get("results", [])
-        if not results:
-            return result
+            data = await resp.json()
+            results = data.get("results", [])
+            if not results:
+                return result
 
-        entry = results[0]
+            entry = results[0]
 
-        # Check for tissue expression in comments
-        comments = entry.get("comments", [])
-        for comment in comments:
-            if comment.get("commentType") == "TISSUE SPECIFICITY":
-                tissue_text = comment.get("texts", [{}])[0].get("value", "")
-                if tissue_text:
-                    result["available"] = True
-                    result["top_tissue"] = tissue_text[:100]
-                    result["tpm"] = None  # UniProt doesn't provide TPM values
-                    result["top_tissues"] = [{"name": "See UniProt", "tpm": None}]
-                    break
+            # Check for tissue expression in comments
+            comments = entry.get("comments", [])
+            for comment in comments:
+                if comment.get("commentType") == "TISSUE SPECIFICITY":
+                    tissue_text = comment.get("texts", [{}])[0].get("value", "")
+                    if tissue_text:
+                        # Parse tissue names from UniProt text like "Expressed in brain, heart, ..."
+                        tissues = []
+                        for part in tissue_text.split(","):
+                            part = part.strip().rstrip(".")
+                            if part and len(part) < 60:
+                                tissues.append({"name": part.title(), "tpm": None})
+                        result["available"] = True
+                        result["top_tissue"] = tissues[0]["name"] if tissues else tissue_text[:80]
+                        result["top_tissues"] = tissues[:10] if tissues else [{"name": tissue_text[:80], "tpm": None}]
+                        break
 
     except Exception as e:
         logger.info(f"UniProt expression lookup failed for {gene_symbol}: {e}")
@@ -342,39 +380,39 @@ async def get_tissue_expression(
     async with aiohttp.ClientSession() as session:
         gtex_data = await _fetch_gtex_expression(session, symbol, ensembl_id)
 
-    if gtex_data["available"]:
-        result["available"] = True
-        result["top_tissue"] = gtex_data["top_tissue"]
-        result["tpm"] = gtex_data["tpm"]
-        result["tissueExpressionLevel"] = _get_tissue_level(gtex_data["tpm"]) if gtex_data["tpm"] else None
-        result["topTissues"] = gtex_data["top_tissues"]
-        result["expressionStabilityCV"] = gtex_data["expression_cv"]
-        result["vitalOrganTissues"] = gtex_data["vital_organ_tissues"]
-        result["dominantIsoformFraction"] = gtex_data["dominant_isoform_fraction"]
-        result["dominantIsoformId"] = gtex_data["dominant_isoform_id"]
-        result["source"] = "GTEx"
-        return result
+        if gtex_data["available"]:
+            result["available"] = True
+            result["top_tissue"] = gtex_data["top_tissue"]
+            result["tpm"] = gtex_data["tpm"]
+            result["tissueExpressionLevel"] = _get_tissue_level(gtex_data["tpm"]) if gtex_data["tpm"] else None
+            result["topTissues"] = gtex_data["top_tissues"]
+            result["expressionStabilityCV"] = gtex_data["expression_cv"]
+            result["vitalOrganTissues"] = gtex_data["vital_organ_tissues"]
+            result["dominantIsoformFraction"] = gtex_data["dominant_isoform_fraction"]
+            result["dominantIsoformId"] = gtex_data["dominant_isoform_id"]
+            result["source"] = "GTEx"
+            return result
 
-    # Fallback to Human Protein Atlas
-    hpa_data = _fetch_hpa_tissue_expression(ensembl_id, symbol)
-    if hpa_data["available"]:
-        result["available"] = True
-        result["top_tissue"] = hpa_data["top_tissue"]
-        result["tpm"] = hpa_data["tpm"]
-        result["tissueExpressionLevel"] = _get_tissue_level(hpa_data["tpm"]) if hpa_data["tpm"] else None
-        result["topTissues"] = hpa_data["top_tissues"]
-        result["expressionStabilityCV"] = hpa_data["expression_cv"]
-        result["vitalOrganTissues"] = hpa_data["vital_organ_tissues"]
-        result["source"] = "Human Protein Atlas"
-        return result
+        # Fallback to Human Protein Atlas
+        hpa_data = await _fetch_hpa_tissue_expression(session, ensembl_id, symbol)
+        if hpa_data["available"]:
+            result["available"] = True
+            result["top_tissue"] = hpa_data["top_tissue"]
+            result["tpm"] = hpa_data["tpm"]
+            result["tissueExpressionLevel"] = _get_tissue_level(hpa_data["tpm"]) if hpa_data["tpm"] else None
+            result["topTissues"] = hpa_data["top_tissues"]
+            result["expressionStabilityCV"] = hpa_data["expression_cv"]
+            result["vitalOrganTissues"] = hpa_data["vital_organ_tissues"]
+            result["source"] = "Human Protein Atlas"
+            return result
 
-    # Fallback to UniProt
-    uniprot_data = _fetch_uniprot_expression(symbol)
-    if uniprot_data["available"]:
-        result["available"] = True
-        result["top_tissue"] = uniprot_data["top_tissue"]
-        result["topTissues"] = uniprot_data["top_tissues"]
-        result["source"] = "UniProt"
-        return result
+        # Fallback to UniProt
+        uniprot_data = await _fetch_uniprot_expression(session, symbol)
+        if uniprot_data["available"]:
+            result["available"] = True
+            result["top_tissue"] = uniprot_data["top_tissue"]
+            result["topTissues"] = uniprot_data["top_tissues"]
+            result["source"] = "UniProt"
+            return result
 
     return result
