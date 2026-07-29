@@ -190,6 +190,37 @@ export default function StatsRow({ gene }: { gene: GeneTargetObject }) {
           { label: "Targetable Exons", value: gene.targetableExons ?? DASH },
         ]}
         sources={[{ label: "Source: Ensembl", url: links.ensembl ?? "#" }]}
+        extra={
+          <div className="mt-2 space-y-1">
+            {gene.genomicOverviewDetails?.canonicalTranscript && (
+              <div className="text-[12px]">
+                <div className="text-[11px] text-slate-500">Canonical transcript</div>
+                <div className="mt-1 text-[12px]">
+                  {gene.genomicOverviewDetails.canonicalTranscriptLink ? (
+                    <a href={gene.genomicOverviewDetails.canonicalTranscriptLink} target="_blank" rel="noreferrer" className="text-brand hover:underline">
+                      {gene.genomicOverviewDetails.canonicalTranscript}
+                    </a>
+                  ) : (
+                    <span>{gene.genomicOverviewDetails.canonicalTranscript}</span>
+                  )}
+                  {gene.genomicOverviewDetails.proteinId ? (
+                    <a className="ml-2 text-[11px] text-slate-400 hover:underline" href={links.uniprot ?? "#"} target="_blank" rel="noreferrer"> UniProt</a>
+                  ) : null}
+                </div>
+              </div>
+            )}
+            {gene.genomicOverviewDetails?.otherTranscripts && gene.genomicOverviewDetails.otherTranscripts.length > 0 && (
+              <div>
+                <div className="text-[11px] text-slate-500">Other transcripts</div>
+                <ul className="mt-1 text-[12px] list-disc list-inside">
+                  {gene.genomicOverviewDetails.otherTranscripts.slice(0, 3).map((t, i) => (
+                    <li key={`tx-${i}`} className="truncate">{t}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        }
       />
 
       {/* 6. Clinical Profile */}
@@ -207,13 +238,36 @@ export default function StatsRow({ gene }: { gene: GeneTargetObject }) {
           { label: "Therapeutic options", value: gene.therapeuticOptions.length > 0 ? gene.therapeuticOptions.length : DASH },
         ]}
         sources={links.omim && gene.omimId ? [{ label: "Source: OMIM", url: links.omim }] : []}
+        extra={
+          <div className="mt-2 space-y-1">
+            {gene.clinicalProfileAnnotations && gene.clinicalProfileAnnotations.length > 0 && (
+              <div>
+                <div className="text-[11px] text-slate-500">Top phenotypes</div>
+                <ul className="mt-1 text-[12px] list-disc list-inside">
+                  {gene.clinicalProfileAnnotations.slice(0, 3).map((a, i) => (
+                    <li key={`ph-${i}`} className="truncate">
+                      {a.id && /^\d+$/.test(String(a.id)) ? (
+                        <a className="text-brand hover:underline" href={`https://www.omim.org/entry/${a.id}`} target="_blank" rel="noreferrer">
+                          {a.description || a.id}
+                        </a>
+                      ) : (
+                        <span>{a.description || a.id}</span>
+                      )}
+                      {a.source ? <span className="text-slate-400"> — {a.source}</span> : null}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        }
       />
 
       {/* 7. GO Terms */}
       <StatCard
         icon={Tags}
-        iconBg="#FDF2F8"
-        iconColor="#DB2777"
+        iconBg="#F5F3FF"
+        iconColor="#7C3AED"
         title="GO Terms"
         notConnected={!hasGoTerms}
         rows={[

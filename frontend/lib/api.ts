@@ -213,6 +213,10 @@ export async function fetchGene(
     goMolecularFunctionAnnotations: Array.isArray(data.goMolecularFunctionAnnotations) ? data.goMolecularFunctionAnnotations : null,
     goCellularComponentAnnotations: Array.isArray(data.goCellularComponentAnnotations) ? data.goCellularComponentAnnotations : null,
 
+    // Rich genomic and clinical payloads
+    genomicOverviewDetails: data.genomicOverviewDetails ?? null,
+    clinicalProfileAnnotations: Array.isArray(data.clinicalProfileAnnotations) ? data.clinicalProfileAnnotations : null,
+
     stringHighConfidenceCount: data.stringHighConfidenceCount ?? null,
     totalInteractors: data.totalInteractors ?? null,
     topInteractors: data.topInteractors ?? [],

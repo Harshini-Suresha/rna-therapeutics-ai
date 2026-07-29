@@ -224,6 +224,18 @@ export interface GeneTargetObject {
   genomicSize: number | null;      // geneLength in bp
   mrnaLength: number | null;       // cdsLength in bp (coding sequence)
   proteinMass: string | null;      // molecularWeight from UniProt (Da)
+  // Rich genomic overview details (backend-provided)
+  genomicOverviewDetails?: {
+    canonicalTranscript?: string | null;
+    canonicalTranscriptLink?: string | null;
+    otherTranscripts?: string[] | null;
+    exonCount?: number | null;
+    proteinLength?: number | null;
+    proteinId?: string | null;
+  } | null;
+
+  // Clinical phenotype annotations
+  clinicalProfileAnnotations?: { description?: string | null; source?: string | null; id?: string | null }[] | null;
 
   // FDA-approved ASO therapies (live from FDA Orange Book / ClinicalTrials.gov)
   fdaApprovedTherapies: {

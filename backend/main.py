@@ -963,6 +963,14 @@ async def initialize_target(payload: TargetRequest):
             "genomicSize": gene_length,
             "mrnaLength": cds_length,
             "proteinMass": protein_props.get("molecularWeight"),
+            "genomicOverviewDetails": {
+                "canonicalTranscript": meta.get("canonicalTranscript"),
+                "canonicalTranscriptLink": (ensembl_url.replace("/Gene/Summary?g=", "/Transcript/Summary?t=") if meta.get("canonicalTranscript") else None),
+                "otherTranscripts": meta.get("otherTranscripts", [])[:5],
+                "exonCount": exon_count,
+                "proteinLength": protein_length,
+                "proteinId": meta.get("proteinId"),
+            },
 
             # FDA-approved ASO therapies
             "fdaApprovedTherapies": fda_therapies.get("fdaApprovedTherapies", []),
@@ -983,6 +991,14 @@ async def initialize_target(payload: TargetRequest):
                 "frameshiftMutations": None,
                 "spliceSiteMutations": None,
             }),
+            "clinicalProfileAnnotations": [
+                {
+                    "description": p.get("description") or p.get("phenotype") or None,
+                    "source": p.get("source") or None,
+                    "id": (p.get("accession") or p.get("id") or p.get("ontology_accession") or p.get("external_reference"))
+                }
+                for p in (phenotypes or [])
+            ],
         }
     except HTTPException:
         raise
