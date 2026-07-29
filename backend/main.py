@@ -419,7 +419,7 @@ async def fetch_disease_associations(session: aiohttp.ClientSession, symbol: str
     result = {"diseases": [], "omim_id": None, "source": []}
     is_human = species == "homo_sapiens"
 
-    def add_disease(name: str | None) -> None:
+    def add_disease(name: Optional[str]) -> None:
         if not name:
             return
         cleaned = name.strip()
