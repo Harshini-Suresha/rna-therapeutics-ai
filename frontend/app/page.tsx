@@ -103,6 +103,10 @@ export default function NewProjectPage() {
   const [organism, setOrganism] = useState("human");
   const [diseaseName, setDiseaseName] = useState("");
   const [geneSymbol, setGeneSymbol] = useState("");
+  const [gene, setGene] = useState<GeneTargetObject | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [autoSearchTriggered, setAutoSearchTriggered] = useState(false);
 
   useEffect(() => {
     const query = searchParams.get("q")?.trim();
@@ -111,9 +115,14 @@ export default function NewProjectPage() {
     }
   }, [searchParams, geneSymbol]);
 
-  const [gene, setGene] = useState<GeneTargetObject | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    const query = searchParams.get("q")?.trim();
+    if (!query || query !== geneSymbol || gene || loading) return;
+    if (autoSearchTriggered) return;
+
+    setAutoSearchTriggered(true);
+    handleLoadGene();
+  }, [searchParams, geneSymbol, gene, loading, autoSearchTriggered]);
 
   async function handleLoadGene() {
     if (!geneSymbol.trim()) return;
@@ -336,6 +345,7 @@ export default function NewProjectPage() {
     setGeneSymbol("");
     setGene(null);
     setError(null);
+    setAutoSearchTriggered(false);
   }
 
   function handleConfirm() {

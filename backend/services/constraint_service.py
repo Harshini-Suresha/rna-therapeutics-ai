@@ -52,7 +52,7 @@ CLINGEN_HI_SCORES = {
 def _gnomad_constraint_index():
     """Load the public constraint release once per API process."""
     try:
-        response = requests.get(GNOMAD_CONSTRAINT_URL, timeout=25)
+        response = requests.get(GNOMAD_CONSTRAINT_URL, timeout=12)
         response.raise_for_status()
         text = gzip.decompress(response.content).decode("utf-8")
         rows = csv.DictReader(io.StringIO(text), delimiter="\t")
@@ -73,7 +73,7 @@ def _gnomad_constraint_index():
 def _clingen_dosage_index():
     """Load ClinGen's live dosage-sensitivity export once per API process."""
     try:
-        response = requests.get(CLINGEN_DOSAGE_URL, timeout=20)
+        response = requests.get(CLINGEN_DOSAGE_URL, timeout=10)
         response.raise_for_status()
         lines = response.text.splitlines()
         # The CSV has metadata header rows, separator lines, then a real header + data.

@@ -25,7 +25,7 @@ def _load_halflife_index():
     where the gene was measured.
     """
     try:
-        response = requests.get(RNADECAYCAFE_URL, timeout=30)
+        response = requests.get(RNADECAYCAFE_URL, timeout=12)
         response.raise_for_status()
         text = response.content.decode("utf-8")
         reader = csv.DictReader(io.StringIO(text))

@@ -220,7 +220,7 @@ def get_gene_phenotypes(gene_symbol: str, organism: str):
         response = requests.get(
             url,
             headers={"Accept": "application/json"},
-            timeout=60,
+            timeout=8,
         )
         if not response.ok:
             return []

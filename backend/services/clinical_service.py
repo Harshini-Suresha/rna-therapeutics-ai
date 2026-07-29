@@ -339,7 +339,7 @@ def _ncbi_search(query: str, db: str = "pubmed", retmax: int = 5) -> list:
         resp = requests.get(
             f"{NCBI_EUTILS}/esearch.fcgi",
             params={"db": db, "term": query, "retmax": retmax, "retmode": "json"},
-            timeout=15,
+            timeout=10,
         )
         resp.raise_for_status()
         return resp.json().get("esearchresult", {}).get("idlist", [])
@@ -359,7 +359,7 @@ def _ncbi_fetch_abstracts(pmids: list) -> str:
                 "rettype": "abstract",
                 "retmode": "xml",
             },
-            timeout=20,
+            timeout=12,
         )
         resp.raise_for_status()
         root = ET.fromstring(resp.content)

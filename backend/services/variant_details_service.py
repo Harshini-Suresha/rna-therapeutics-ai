@@ -16,7 +16,7 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-_TIMEOUT = 30
+_TIMEOUT = 12
 GNOMAD_API = "https://gnomad.broadinstitute.org/api"
 NCBI_EUTILS = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
 

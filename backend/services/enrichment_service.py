@@ -420,7 +420,7 @@ def get_aso_analysis(ensembl_gene_id: str, taxon_id: int) -> dict:
 
     # Fetch transcript data from Ensembl (expand=1 required to get Transcript list)
     try:
-        resp = _ensembl_get(f"{ENSEMBL_REST}/lookup/id/{ensembl_gene_id}?expand=1", timeout=20)
+        resp = _ensembl_get(f"{ENSEMBL_REST}/lookup/id/{ensembl_gene_id}?expand=1", timeout=10)
         if resp.ok:
             data = resp.json()
             transcripts = data.get("Transcript", [])

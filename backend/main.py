@@ -146,7 +146,7 @@ async def _ncbi_call(session: aiohttp.ClientSession, db: str, term: str) -> Opti
         async with session.get(
             "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi",
             params={"db": db, "term": term, "retmode": "json"},
-            timeout=aiohttp.ClientTimeout(total=12),
+            timeout=aiohttp.ClientTimeout(total=5),
         ) as response:
             return await response.json() if response.status == 200 else {}
 
@@ -162,7 +162,7 @@ async def _ncbi_fetch(session: aiohttp.ClientSession, url: str, params: dict) ->
         _last_ncbi_req = time.monotonic()
         params.setdefault("retmode", "json")
         async with session.get(
-            url, params=params, timeout=aiohttp.ClientTimeout(total=12),
+            url, params=params, timeout=aiohttp.ClientTimeout(total=5),
         ) as response:
             return await response.json() if response.status == 200 else {}
 
@@ -330,7 +330,7 @@ async def fetch_expression_details(session: aiohttp.ClientSession, symbol: str, 
                 "gencodeVersion": "v26",
                 "genomeBuild": "GRCh38/hg38",
             },
-            timeout=aiohttp.ClientTimeout(total=6),
+            timeout=aiohttp.ClientTimeout(total=4),
         ) as response:
             search_data = await response.json() if response.status == 200 else {}
 
@@ -346,7 +346,7 @@ async def fetch_expression_details(session: aiohttp.ClientSession, symbol: str, 
         async with session.get(
             "https://gtexportal.org/api/v2/expression/medianGeneExpression",
             params={"gencodeId": gencode_id, "datasetId": "gtex_v8"},
-            timeout=aiohttp.ClientTimeout(total=6),
+            timeout=aiohttp.ClientTimeout(total=4),
         ) as response:
             data = await response.json() if response.status == 200 else {}
 
@@ -392,7 +392,7 @@ async def fetch_expression_details(session: aiohttp.ClientSession, symbol: str, 
                 async with session.get(
                     "https://gtexportal.org/api/v2/expression/medianTranscriptExpression",
                     params={"gencodeId": gencode_id, "datasetId": "gtex_v8"},
-                    timeout=aiohttp.ClientTimeout(total=10),
+                timeout=aiohttp.ClientTimeout(total=4),
                 ) as tresp:
                     tdata = await tresp.json() if tresp.status == 200 else {}
                 trecords = tdata.get("data", [])
@@ -472,7 +472,7 @@ async def fetch_disease_associations(session: aiohttp.ClientSession, symbol: str
     # Open Targets returns ranked disease associations, while Ensembl carries
     # phenotype and model-organism annotations that often fill in gaps.  Merge
     # them rather than treating the first successful provider as exhaustive.
-    phenotypes = get_gene_phenotypes(symbol, species)
+    phenotypes = await asyncio.to_thread(get_gene_phenotypes, symbol, species)
     if phenotypes:
         phenotype_sources = set()
         for phenotype in phenotypes:
@@ -556,51 +556,6 @@ async def initialize_target(payload: TargetRequest):
                 ncbi_aliases_task,
             )
 
-        try:
-            enrichment_data = get_gene_enrichment(gene_id, taxon_id, official_symbol)
-        except Exception as e:
-            logger.warning(f"Enrichment lookup failed for {official_symbol}: {e}")
-            enrichment_data = {}
-
-        constraint_data = get_human_constraint_metrics(official_symbol) if is_human else {}
-
-        # ASO-specific analysis (G-quadruplexes, CpG density, isoforms, splice switches)
-        try:
-            aso_data = get_aso_analysis(gene_id, taxon_id)
-        except Exception as e:
-            logger.warning(f"ASO analysis failed for {official_symbol}: {e}")
-            aso_data = {}
-
-        # RNA half-life from RNAdecayCafe (human only)
-        rna_halflife_data = {}
-        if is_human:
-            try:
-                rna_halflife_data = get_rna_halflife(official_symbol)
-            except Exception as e:
-                logger.warning(f"RNA half-life lookup failed for {official_symbol}: {e}")
-                rna_halflife_data = {}
-
-        # Gene dependency from FAVOR API
-        dependency_data = {}
-        try:
-            dependency_data = get_gene_dependency(official_symbol)
-        except Exception as e:
-            logger.warning(f"Dependency lookup failed for {official_symbol}: {e}")
-            dependency_data = {}
-
-        # Fetch top ClinVar variant details (HGVS, rsID)
-        variant_details = {}
-        if is_human:
-            try:
-                variant_details = get_variant_details(
-                    gene_symbol=official_symbol,
-                    ensembl_gene_id=meta.get("id"),
-                    entrez_id=meta.get("entrezGeneId"),
-                )
-            except Exception as exc:
-                logger.warning("Variant details lookup failed for %s: %s", official_symbol, exc)
-                variant_details = {}
-
         synonyms_list = clean_synonyms(
             [*(meta.get("synonyms") or []), *ncbi_aliases],
             official_symbol,
@@ -612,11 +567,31 @@ async def initialize_target(payload: TargetRequest):
             
         omim_id = f"#{disease_info['omim_id']}" if disease_info.get("omim_id") else None
 
-        # Fetch protein properties from UniProt
+        async def _run_sync(fn, label, default=None):
+            try:
+                return await asyncio.to_thread(fn)
+            except Exception as e:
+                logger.warning("%s failed for %s: %s", label, official_symbol, e)
+                return default
+
+        enrichment_data, constraint_data, aso_data, rna_halflife_data, dependency_data, variant_details, single_cell, clinical_details, fda_therapies, orphanet_data, mutation_data = await asyncio.gather(
+            _run_sync(lambda: get_gene_enrichment(gene_id, taxon_id, official_symbol), "Enrichment lookup", {}),
+            _run_sync(lambda: get_human_constraint_metrics(official_symbol) if is_human else {}, "Constraint lookup", {}),
+            _run_sync(lambda: get_aso_analysis(gene_id, taxon_id), "ASO analysis", {}),
+            _run_sync(lambda: get_rna_halflife(official_symbol) if is_human else {}, "RNA half-life lookup", {}),
+            _run_sync(lambda: get_gene_dependency(official_symbol), "Dependency lookup", {}),
+            _run_sync(lambda: get_variant_details(gene_symbol=official_symbol, ensembl_gene_id=meta.get("id"), entrez_id=meta.get("entrezGeneId")) if is_human else {}, "Variant details lookup", {}),
+            _run_sync(lambda: get_single_cell_expression(ensembl_id=gene_id, gene_symbol=official_symbol) if is_human else {}, "Single-cell lookup", {}),
+            _run_sync(lambda: get_clinical_details(gene_symbol=official_symbol, disease_name=disease_resolved, omim_id=disease_info.get("omim_id"), phenotypes=disease_info.get("diseases")), "Clinical details lookup", {}),
+            _run_sync(lambda: get_fda_therapies(official_symbol, disease_resolved) if is_human else {}, "FDA therapies lookup", {}),
+            _run_sync(lambda: get_orphanet_data(official_symbol, ensembl_id=gene_id, disease_name=disease_resolved, phenotypes=disease_info.get("diseases")) if is_human else {}, "Orphanet lookup", {}),
+            _run_sync(lambda: get_mutation_breakdown(official_symbol) if is_human else {}, "Mutation breakdown lookup", {}),
+        )
+
+        # Protein chain — depends on protein_db_ids → protein_properties
         protein_props = {}
         protein_db = {}
         try:
-            # First get UniProt accession from protein service
             protein_db = get_protein_db_ids(
                 uniprot_id=meta.get("proteinId"),
                 gene_symbol=official_symbol,
@@ -635,64 +610,7 @@ async def initialize_target(payload: TargetRequest):
             protein_props = {}
             protein_db = {}
 
-        # Fetch single-cell expression from HPA
-        single_cell = {}
-        if is_human:
-            try:
-                single_cell = get_single_cell_expression(
-                    ensembl_id=gene_id,
-                    gene_symbol=official_symbol,
-                )
-            except Exception as exc:
-                logger.warning("Single-cell lookup failed for %s: %s", official_symbol, exc)
-                single_cell = {}
-
-        # Fetch clinical details from NCBI/OMIM
-        clinical_details = {}
-        try:
-            clinical_details = get_clinical_details(
-                gene_symbol=official_symbol,
-                disease_name=disease_resolved,
-                omim_id=disease_info.get("omim_id"),
-                phenotypes=disease_info.get("diseases"),
-            )
-        except Exception as e:
-            logger.warning(f"Clinical details lookup failed for {official_symbol}: {e}")
-            clinical_details = {}
-
-        # FDA-approved ASO therapies (human only)
-        fda_therapies = {}
-        if is_human:
-            try:
-                fda_therapies = get_fda_therapies(official_symbol, disease_resolved)
-            except Exception as e:
-                logger.warning(f"FDA therapies lookup failed for {official_symbol}: {e}")
-                fda_therapies = {}
-
-        # Orphanet / ICD-11 / incidence (human only)
-        orphanet_data = {}
-        if is_human:
-            try:
-                orphanet_data = get_orphanet_data(
-                    official_symbol,
-                    ensembl_id=gene_id,
-                    disease_name=disease_resolved,
-                    phenotypes=disease_info.get("diseases"),
-                )
-            except Exception as e:
-                logger.warning(f"Orphanet lookup failed for {official_symbol}: {e}")
-                orphanet_data = {}
-
-        # ClinVar mutation breakdown (human only)
-        mutation_data = {}
-        if is_human:
-            try:
-                mutation_data = get_mutation_breakdown(official_symbol)
-            except Exception as e:
-                logger.warning(f"Mutation breakdown failed for {official_symbol}: {e}")
-                mutation_data = {}
-
-            _add_notification(
+        _add_notification(
             "analysis",
             f"Gene lookup completed for {symbol_upper}",
             f"Retrieved data for {symbol_upper} in {species.replace('_', ' ')}.",

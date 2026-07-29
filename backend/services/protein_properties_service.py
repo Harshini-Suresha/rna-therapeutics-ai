@@ -13,7 +13,7 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-_TIMEOUT = 20
+_TIMEOUT = 10
 
 # Amino acid average residue masses (Da) — used for molecular weight.
 _AA_MASS = {
