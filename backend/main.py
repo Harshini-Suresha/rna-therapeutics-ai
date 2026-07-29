@@ -993,9 +993,9 @@ async def initialize_target(payload: TargetRequest):
             }),
             "clinicalProfileAnnotations": [
                 {
-                    "description": p.get("description") or p.get("phenotype") or None,
-                    "source": p.get("source") or None,
-                    "id": (p.get("accession") or p.get("id") or p.get("ontology_accession") or p.get("external_reference"))
+                    "description": p if isinstance(p, str) else (p.get("description") or p.get("phenotype") or None),
+                    "source": None if isinstance(p, str) else (p.get("source") or None),
+                    "id": None if isinstance(p, str) else (p.get("accession") or p.get("id") or p.get("ontology_accession") or p.get("external_reference"))
                 }
                 for p in (disease_info.get("diseases", []) or [])
             ],
