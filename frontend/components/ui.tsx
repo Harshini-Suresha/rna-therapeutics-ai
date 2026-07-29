@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import { LucideIcon } from "lucide-react";
 
 export function Card({
@@ -42,15 +45,25 @@ export function FieldLabel({
   children: React.ReactNode;
   hint?: string;
 }) {
+  const [open, setOpen] = useState(false);
   return (
     <label className="mb-1 flex items-center gap-1.5 text-[12px] font-medium text-slate-600">
       {children}
       {hint && (
-        <span
-          title={hint}
-          className="flex h-3.5 w-3.5 items-center justify-center rounded-full border border-slate-300 text-[9px] text-slate-400"
-        >
-          ?
+        <span className="relative inline-flex">
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            onBlur={() => setOpen(false)}
+            className="flex h-3.5 w-3.5 items-center justify-center rounded-full border border-slate-300 text-[9px] text-slate-400 hover:border-slate-400 hover:text-slate-600"
+          >
+            ?
+          </button>
+          {open && (
+            <span className="absolute left-5 top-0 z-20 mt-0 w-56 rounded border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] leading-relaxed text-slate-600 shadow-md">
+              {hint}
+            </span>
+          )}
         </span>
       )}
     </label>

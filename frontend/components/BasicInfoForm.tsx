@@ -3,6 +3,7 @@
 import { X, Search, Dna, Loader2 } from "lucide-react";
 import { Card, SectionHeader, FieldLabel } from "./ui";
 import OrganismSelect from "./OrganismSelect";
+import DiseaseGeneSuggestions from "./DiseaseGeneSuggestions";
 
 interface Props {
   organism: string;
@@ -40,7 +41,7 @@ export default function BasicInfoForm({
         {/* Disease name */}
         <div>
           <FieldLabel hint="A free-text label for your project. The Disease Association shown after loading comes from live Ensembl/Open Targets data for the gene, not from this field.">
-            Disease Name <span className="text-red-500">*</span>
+            Disease Name
           </FieldLabel>
           <div className="relative">
             <input
@@ -59,6 +60,11 @@ export default function BasicInfoForm({
               </button>
             )}
           </div>
+          <DiseaseGeneSuggestions
+            diseaseName={diseaseName}
+            organismId={organism}
+            onSelectGene={(symbol) => setGeneSymbol(symbol)}
+          />
         </div>
 
         {/* Gene symbol */}
