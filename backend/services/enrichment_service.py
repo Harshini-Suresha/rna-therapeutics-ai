@@ -100,7 +100,7 @@ def get_gene_enrichment(ensembl_gene_id: str, taxon_id: int, gene_symbol: Option
                 "species": taxon_id,
                 "size": 1,
             },
-            timeout=8,
+            timeout=5,
         )
         hits = (response.json() if response.ok else {}).get("hits") or []
         hit = hits[0] if hits else {}
