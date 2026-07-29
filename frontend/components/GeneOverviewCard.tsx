@@ -52,19 +52,18 @@ export default function GeneOverviewCard({ gene, onRefresh }: GeneOverviewCardPr
           {/* Compact identity and structure fields */}
           <div className="grid grid-cols-2 content-start gap-x-6 gap-y-4">
             <InfoField label="Gene Symbol" value={gene.geneSymbol} />
-            <InfoField label="Chromosome" value={gene.chromosome ?? DASH} />
+            <InfoField label="Gene ID" value={gene.geneId ?? DASH} />
             <InfoField label="Gene Name" value={gene.geneName ?? DASH} />
+            <InfoField label="Chromosome" value={gene.chromosome ?? DASH} />
             <InfoField label="Location" value={gene.location ?? DASH} />
-            <InfoField label="Strand" value={gene.strand ?? DASH} />
-            <InfoField label="Transcript Count" value={gene.totalTranscripts ?? DASH} />
-            <InfoField
-              label="Canonical Transcript"
-              value={gene.canonicalTranscript ?? DASH}
-              valueClassName="break-all text-[12px]"
-            />
             <InfoField label="Entrez Gene ID" value={gene.entrezGeneId ?? DASH} />
             <InfoField label="Nomenclature ID" value={gene.hgncId ?? DASH} />
             <InfoField label="Gene Type" value={gene.geneType?.replace(/_/g, " ") ?? DASH} />
+            <InfoField label="Source" value={gene.source?.length ? gene.source.join(", ") : DASH} valueClassName="break-all text-[12px]" />
+            <InfoField label="Transcript Count" value={gene.totalTranscripts ?? DASH} />
+            <InfoField label="Canonical Transcript" value={gene.canonicalTranscript ?? DASH} valueClassName="break-all text-[12px]" />
+            <InfoField label="Canonical Label" value={gene.canonicalTranscriptLabel ?? DASH} />
+            <InfoField label="Protein ID" value={gene.proteinId ?? DASH} />
             <InfoField label="Protein Length" value={gene.proteinLength ? `${gene.proteinLength.toLocaleString()} aa` : DASH} />
             <InfoField label="Molecular Weight" value={gene.molecularWeight ?? DASH} />
             <InfoField label="Exon Count" value={gene.exonCount ?? DASH} />

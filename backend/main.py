@@ -997,7 +997,7 @@ async def initialize_target(payload: TargetRequest):
                     "source": p.get("source") or None,
                     "id": (p.get("accession") or p.get("id") or p.get("ontology_accession") or p.get("external_reference"))
                 }
-                for p in (phenotypes or [])
+                for p in (disease_info.get("diseases", []) or [])
             ],
         }
     except HTTPException:
