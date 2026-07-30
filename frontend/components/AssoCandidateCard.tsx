@@ -177,6 +177,24 @@ export default function AssoCandidateCard({
                 <span>Poly-G Penalty</span>
                 <span className="font-medium text-red-500">-{candidate.polygPenalty}</span>
               </div>
+              {candidate.chemBonus !== 0 && (
+                <div className="flex justify-between">
+                  <span>Chemistry Bonus ({candidate.chemistry})</span>
+                  <span className="font-medium text-emerald-600">+{candidate.chemBonus}</span>
+                </div>
+              )}
+              {candidate.modBonus !== 0 && (
+                <div className="flex justify-between">
+                  <span>Modification Bonus</span>
+                  <span className="font-medium text-emerald-600">+{candidate.modBonus}</span>
+                </div>
+              )}
+              {candidate.cpgPenalty > 0 && (
+                <div className="flex justify-between">
+                  <span>CpG Immune Risk</span>
+                  <span className="font-medium text-red-500">-{candidate.cpgPenalty}</span>
+                </div>
+              )}
               <div className="border-t border-slate-200 pt-1 mt-1 flex justify-between font-semibold">
                 <span>Final Score</span>
                 <span className="text-slate-700">{candidate.qualityScore}</span>

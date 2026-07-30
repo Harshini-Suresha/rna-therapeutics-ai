@@ -45,7 +45,10 @@ export interface AssoCandidate {
   tmScore: number;
   selfComplementPenalty: number;
   polygPenalty: number;
+  chemBonus: number;
+  modBonus: number;
   cpgCount: number;
+  cpgPenalty: number;
   longestHomopolymer: number;
   purineContent: number;
   sequenceComplexity: number;

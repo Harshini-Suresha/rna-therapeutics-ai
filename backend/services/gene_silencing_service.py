@@ -376,13 +376,42 @@ def generate_candidates(
             tm = _calc_tm(candidate_seq)
             sc = _self_complement_score(candidate_seq)
             pg = _polyg_score(candidate_seq)
+            cpg = _cpg_count(candidate_seq)
 
             # Composite quality score (0-100)
             gc_score = max(0, 100 - abs(gc - 0.50) * 400)
             tm_score = max(0, 100 - abs(tm - 52) * 3)
             sc_penalty = sc * 200
             pg_penalty = pg * 15
-            quality = max(0, min(100, gc_score * 0.35 + tm_score * 0.45 - sc_penalty - pg_penalty))
+
+            # Chemistry-specific bonuses
+            chem_bonus = 0
+            if chemistry == "lna_gapmer":
+                chem_bonus += 5  # LNA boosts binding affinity
+            elif chemistry == "2ome":
+                chem_bonus += 3  # 2'-OMe moderate affinity boost
+            elif chemistry == "pmo":
+                chem_bonus -= 3  # PMO lower uptake without CPP
+            elif chemistry == "sirna":
+                chem_bonus += 2  # siRNA RISC amplification
+
+            # Modification bonuses
+            mod_bonus = 0
+            if "phosphorothioate" in modifications:
+                mod_bonus += 4  # PS increases nuclease resistance
+            if "lna_wings" in modifications:
+                mod_bonus += 5  # LNA wings boost Tm significantly
+            if "2omemod" in modifications:
+                mod_bonus += 3  # 2'-OMe wings moderate boost
+            if "pmo_core" in modifications:
+                mod_bonus += 2  # PMO core for splice-switching
+            if "pna_clamp" in modifications:
+                mod_bonus += 3  # PNA clamp protects from exonucleases
+
+            # CpG penalty (immune stimulation risk)
+            cpg_penalty = max(0, (cpg - 2)) * 5
+
+            quality = max(0, min(100, gc_score * 0.30 + tm_score * 0.40 - sc_penalty - pg_penalty + chem_bonus + mod_bonus - cpg_penalty))
 
             if is_total_knockdown:
                 region_label = f"Full Transcript offset +{offset}"
@@ -420,7 +449,10 @@ def generate_candidates(
                 "tmScore": round(tm_score, 1),
                 "selfComplementPenalty": round(sc_penalty, 1),
                 "polygPenalty": round(pg_penalty, 1),
-                "cpgCount": _cpg_count(candidate_seq),
+                "chemBonus": chem_bonus,
+                "modBonus": mod_bonus,
+                "cpgCount": cpg,
+                "cpgPenalty": cpg_penalty,
                 "longestHomopolymer": _longest_homopolymer(candidate_seq),
                 "purineContent": _purine_content(candidate_seq),
                 "sequenceComplexity": _sequence_complexity(candidate_seq),
