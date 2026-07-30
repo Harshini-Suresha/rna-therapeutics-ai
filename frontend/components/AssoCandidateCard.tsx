@@ -254,7 +254,7 @@ export default function AssoCandidateCard({
                   <li><strong>Poly-G:</strong> Count of G-tracts (≥3 consecutive G) × 15.</li>
                   <li><strong>Chemistry:</strong> LNA +5, 2'-OMe +3, siRNA +2, PMO −3.</li>
                   <li><strong>Modifications:</strong> PS +4, LNA wings +5, 2'-OMe +3, PMO core +2, PNA +3.</li>
-                  <li><strong>CpG:</strong> (count − 2) × 5 if >2 CpGs (TLR9 immune stimulation).</li>
+                  <li><strong>CpG:</strong> (count − 2) × 5 if {'>'}2 CpGs (TLR9 immune stimulation).</li>
                 </ul>
               </div>
               <div>
