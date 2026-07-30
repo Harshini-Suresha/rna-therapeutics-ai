@@ -29,6 +29,8 @@ export default function GeneSilencingPage() {
   const [gene, setGene] = useState<GeneTargetObject | null>(null);
   const [mechanism, setMechanism] = useState<{ id: string; name: string } | null>(null);
   const [silencingScope, setSilencingScope] = useState<string | null>(null);
+  const [defectType, setDefectType] = useState<string | null>(null);
+  const [therapeuticGoal, setTherapeuticGoal] = useState<string | null>(null);
 
   const [target, setTarget] = useState<TargetAnalysis | null>(null);
   const [targetLoading, setTargetLoading] = useState(true);
@@ -62,6 +64,8 @@ export default function GeneSilencingPage() {
         const parsed = JSON.parse(mechStored);
         setMechanism({ id: parsed.mechanism?.id ?? "", name: parsed.mechanism?.name ?? "" });
         setSilencingScope(parsed.silencingScope ?? null);
+        setDefectType(parsed.defectType ?? null);
+        setTherapeuticGoal(parsed.therapeuticGoal ?? null);
         if (parsed.silencingScope === "total_knockdown") {
           setIsTotalKnockdown(true);
         }
@@ -134,6 +138,8 @@ export default function GeneSilencingPage() {
         chemistry,
         modifications: selectedMods,
         deliveryContext: deliveryContext || undefined,
+        defectType: defectType || undefined,
+        silencingScope: silencingScope || undefined,
       });
       setResults(res);
       saveReport({
@@ -248,11 +254,52 @@ export default function GeneSilencingPage() {
             />
           )}
 
-          {/* Steps 2 + 3: Design Form */}
+          {/* Steps 2 + 3: Design Form + Results */}
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-5">
-            <div className="lg:col-span-2">
+            <div className="lg:col-span-2 space-y-4">
+              {/* Exon Selection - mandatory, shown first */}
+              {target && !targetLoading && (
+                <Card className="p-5">
+                  <SectionHeader step="2" title="Target Selection" />
+                  <div className="px-5 pb-5">
+                    <p className="mb-3 text-[12px] text-slate-500">
+                      {isTotalKnockdown
+                        ? "Total Transcript Knockdown — all exons will be targeted."
+                        : `Select exon(s) to target. ${selectedExons.length > 0 ? `${selectedExons.length} exon(s) selected.` : "At least one exon required."}`}
+                    </p>
+                    {!isTotalKnockdown && target.exons.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {target.exons.map((exon) => {
+                          const idx = exon.index ?? 0;
+                          const isSelected = selectedExons.includes(idx);
+                          return (
+                            <button
+                              key={exon.id ?? idx}
+                              onClick={() => handleToggleExon(idx)}
+                              className={`rounded-md px-3 py-1.5 text-[12px] font-medium transition-colors ${
+                                isSelected
+                                  ? "bg-brand text-white"
+                                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                              }`}
+                            >
+                              Exon {idx}{exon.length ? ` · ${exon.length}bp` : ""}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {!isTotalKnockdown && selectedExons.length > 0 && (
+                      <p className="mt-2 text-[11px] text-slate-400">
+                        Targeting: {selectedExons.sort((a, b) => a - b).join(", ")}
+                      </p>
+                    )}
+                  </div>
+                </Card>
+              )}
+
+              {/* ASO Design Parameters */}
               <Card className="p-5">
-                <SectionHeader step="2" title="ASO Design Parameters" />
+                <SectionHeader step="3" title="ASO Design Parameters" />
                 <div className="px-5 pb-5">
                   <AssoDesignForm
                     options={options}
@@ -282,7 +329,7 @@ export default function GeneSilencingPage() {
             </div>
 
             <div className="lg:col-span-3 space-y-3">
-              <SectionHeader step="3" title="Generated ASO Candidates" />
+              <SectionHeader step="4" title="Generated ASO Candidates" />
 
               {genError && (
                 <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-600">

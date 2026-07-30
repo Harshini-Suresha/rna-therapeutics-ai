@@ -435,6 +435,85 @@ def _tissue_scores(delivery_context: str | None, chemistry: str, length: int) ->
     }
 
 
+def _defect_scores(defect_type: str | None, silencing_scope: str | None, chemistry: str, nuclease_score: float) -> dict:
+    """Calculate defect-type-specific scoring adjustments.
+
+    Different molecular defects require different ASO strategies:
+    - Loss-of-function: knockdown the toxic/ dysfunctional protein
+    - Gain-of-function: reduce the overactive protein
+    - Haploinsufficiency: upregulate (not applicable for silencing ASOs)
+    - Dominant-negative: knockdown the mutant allele
+    - Toxic RNA: degrade the toxic RNA transcript
+    - Splice defect: correct splicing (steric blocking, not cleavage)
+    """
+    defect = (defect_type or "").lower().strip()
+    scope = (silencing_scope or "").lower().strip()
+
+    scores = {
+        "defect_bonus": 0,
+        "nuclease_preference": 0,
+        "chemistry_preference": 0,
+        "defect_notes": "No defect-specific adjustments applied.",
+    }
+
+    if "loss-of-function" in defect or "lof" in defect:
+        # LoF: aggressive knockdown preferred; high nuclease resistance important
+        scores["defect_bonus"] = 3
+        scores["nuclease_preference"] = 5 if nuclease_score >= 70 else -3
+        scores["defect_notes"] = "Loss-of-function: aggressive knockdown preferred. High nuclease resistance favors efficacy."
+
+    elif "gain-of-function" in defect or "gof" in defect:
+        # GoF: need substantial reduction; gapmer preferred
+        scores["defect_bonus"] = 2
+        if chemistry == "gapmer" or chemistry == "lna_gapmer":
+            scores["chemistry_preference"] = 5
+        scores["defect_notes"] = "Gain-of-function: substantial protein reduction needed. Gapmer/LNA chemistry preferred for potent knockdown."
+
+    elif "haploinsufficiency" in defect:
+        # Haploinsufficiency: silencing ASOs are contraindicated; warn
+        scores["defect_bonus"] = -10
+        scores["defect_notes"] = "Haploinsufficiency: gene silencing may worsen the phenotype. Consider upregulation mechanisms instead."
+
+    elif "dominant-negative" in defect or "dominant negative" in defect:
+        # Dominant-negative: allele-specific silencing preferred
+        scores["defect_bonus"] = 2
+        scores["defect_notes"] = "Dominant-negative: allele-specific silencing of the mutant allele preferred. Consider variant-specific ASO design."
+
+    elif "toxic rna" in defect or "toxic gain" in defect or "rna toxicity" in defect:
+        # Toxic RNA: degrade the toxic transcript; RNAse H preferred
+        scores["defect_bonus"] = 4
+        if chemistry in ("gapmer", "lna_gapmer"):
+            scores["chemistry_preference"] = 6
+        scores["defect_notes"] = "Toxic RNA: transcript degradation preferred. RNase H-recruiting gapmers are most effective."
+
+    elif "splice" in defect or "splicing" in defect:
+        # Splice defect: steric blocking preferred, not cleavage
+        scores["defect_bonus"] = 3
+        if chemistry in ("pmo", "2ome"):
+            scores["chemistry_preference"] = 8
+        elif chemistry in ("gapmer", "lna_gapmer"):
+            scores["chemistry_preference"] = -5  # Gapmers cleave, not ideal for splice correction
+        scores["defect_notes"] = "Splice defect: steric blocking (PMO/2'-OMe) preferred for splice correction. RNase H gapmers may be counterproductive."
+
+    elif "nonsense" in defect or "premature stop" in defect:
+        # Nonsense mutations: read-through or exon skipping
+        scores["defect_bonus"] = 2
+        scores["defect_notes"] = "Nonsense mutation: exon-skipping ASOs may bypass the premature stop codon."
+
+    elif "frameshift" in defect:
+        # Frameshift: similar to nonsense
+        scores["defect_bonus"] = 2
+        scores["defect_notes"] = "Frameshift mutation: exon-skipping or transcript degradation strategies applicable."
+
+    # Silencing scope adjustments
+    if scope == "total_knockdown":
+        # Total knockdown: higher nuclease resistance needed for widespread degradation
+        scores["nuclease_preference"] += 3
+        scores["defect_notes"] += " Total transcript knockdown selected — broad targeting across all exons."
+
+    return scores
+
+
 def _estimated_binding_energy(gc_content: float, tm: float) -> float:
     """Estimated binding free energy (kcal/mol) from GC% and Tm."""
     # Simplified nearest-neighbor approximation
@@ -486,6 +565,8 @@ def generate_candidates(
     exons: list[dict],
     mechanism_id: str,
     delivery_context: str | None = None,
+    defect_type: str | None = None,
+    silencing_scope: str | None = None,
 ) -> list[dict]:
     """Generate candidate ASOs for the selected mechanism and target region.
 
@@ -633,7 +714,13 @@ def generate_candidates(
             tissue_chem = tissue["chem_tissue_bonus"]
             tissue_len = tissue["length_modifier"]
 
-            quality = max(0, min(100, gc_score * 0.30 + tm_score * 0.40 - sc_penalty - pg_penalty + chem_bonus + mod_bonus - cpg_penalty + tissue_uptake + tissue_bbb + tissue_immune + tissue_chem + tissue_len))
+            # Defect-type-specific adjustments
+            defect = _defect_scores(defect_type, silencing_scope, chemistry, _nuclease_resistance_score(chemistry, modifications))
+            defect_bonus = defect["defect_bonus"]
+            defect_nuclease = defect["nuclease_preference"]
+            defect_chem = defect["chemistry_preference"]
+
+            quality = max(0, min(100, gc_score * 0.30 + tm_score * 0.40 - sc_penalty - pg_penalty + chem_bonus + mod_bonus - cpg_penalty + tissue_uptake + tissue_bbb + tissue_immune + tissue_chem + tissue_len + defect_bonus + defect_nuclease + defect_chem))
 
             if is_total_knockdown:
                 region_label = f"Full Transcript offset +{offset}"
@@ -710,6 +797,12 @@ def generate_candidates(
                 "tissueChemBonus": tissue_chem,
                 "tissueLengthModifier": tissue_len,
                 "tissueNotes": tissue["tissue_notes"],
+                "defectType": defect_type or "",
+                "silencingScope": silencing_scope or "",
+                "defectBonus": defect_bonus,
+                "defectNucleasePreference": defect_nuclease,
+                "defectChemPreference": defect_chem,
+                "defectNotes": defect["defect_notes"],
             })
 
     # Sort by quality descending, return top 10

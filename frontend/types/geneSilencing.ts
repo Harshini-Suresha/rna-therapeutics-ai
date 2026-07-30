@@ -71,6 +71,12 @@ export interface AssoCandidate {
   tissueChemBonus: number;
   tissueLengthModifier: number;
   tissueNotes: string;
+  defectType: string;
+  silencingScope: string;
+  defectBonus: number;
+  defectNucleasePreference: number;
+  defectChemPreference: number;
+  defectNotes: string;
 }
 
 export interface GenerateResponse {
