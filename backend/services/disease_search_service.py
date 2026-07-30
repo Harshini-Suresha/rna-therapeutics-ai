@@ -40,6 +40,9 @@ def get_disease_detail(query: str, gene_limit: int = 30) -> dict:
         "knownDrugs": [],
         "synonyms": [],
         "phenotypes": [],
+        "relatedDiseases": [],
+        "childDiseases": [],
+        "databaseRefs": {},
     }
     query = (query or "").strip()
     if not query:
@@ -78,6 +81,9 @@ def get_disease_detail(query: str, gene_limit: int = 30) -> dict:
             therapeuticAreas { id name }
             synonyms { relation terms }
             phenotypes { count rows { phenotypeHPO { id name } } }
+            children { id name }
+            dbXRefs
+            similarEntities { category id score }
             associatedTargets(page: {index: 0, size: $size}) {
               count
               rows {
@@ -132,6 +138,29 @@ def get_disease_detail(query: str, gene_limit: int = 30) -> dict:
             if hpo.get("name"):
                 phenotypes.append({"id": hpo.get("id", ""), "name": hpo["name"]})
         result["phenotypes"] = phenotypes[:20]  # Limit to 20 phenotypes
+
+        # Parse child diseases (subtypes)
+        child_diseases = []
+        for child in (disease_data.get("children") or []):
+            if child.get("name"):
+                child_diseases.append({"id": child.get("id", ""), "name": child["name"]})
+        result["childDiseases"] = child_diseases[:10]
+
+        # Parse database cross-references
+        db_refs = {}
+        for ref in (disease_data.get("dbXRefs") or []):
+            if ":" in ref:
+                db, acc = ref.split(":", 1)
+                if db not in db_refs:
+                    db_refs[db] = acc
+        result["databaseRefs"] = db_refs
+
+        # Parse similar diseases (not drugs)
+        similar_diseases = []
+        for sim in (disease_data.get("similarEntities") or []):
+            if sim.get("category") == "disease" and sim.get("id") != result["diseaseId"]:
+                similar_diseases.append({"id": sim.get("id", ""), "score": sim.get("score", 0)})
+        result["relatedDiseases"] = similar_diseases[:10]
 
         rows = (disease_data.get("associatedTargets") or {}).get("rows") or []
         genes = []

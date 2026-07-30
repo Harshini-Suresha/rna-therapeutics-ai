@@ -28,4 +28,7 @@ export interface DiseaseDetailResponse {
   knownDrugs: KnownDrug[];
   synonyms: { term: string; relation: string }[];
   phenotypes: { id: string; name: string }[];
+  relatedDiseases: { id: string; score: number }[];
+  childDiseases: { id: string; name: string }[];
+  databaseRefs: Record<string, string>;
 }
