@@ -11,7 +11,7 @@ import { useAuth } from "@/contexts/AuthContext";
 export default function Topbar() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [showNotifications, setShowNotifications] = useState(false);
   const [searchText, setSearchText] = useState("");
 
@@ -62,13 +62,19 @@ export default function Topbar() {
           <NotificationPanel open={showNotifications} onClose={() => setShowNotifications(false)} />
         </div>
 
-        <AccountMenu
-          initials={user?.initials ?? "U"}
-          name={user?.name ?? "User"}
-          email={user?.email ?? ""}
-          role={user?.role}
-          institution={user?.institution}
-        />
+        {!authLoading && (
+          <AccountMenu
+            initials={user?.initials ?? "U"}
+            name={user?.name ?? "User"}
+            email={user?.email ?? ""}
+            role={user?.role}
+            institution={user?.institution}
+            verified={user?.verified}
+          />
+        )}
+        {authLoading && (
+          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-200 animate-pulse" />
+        )}
       </div>
     </header>
   );

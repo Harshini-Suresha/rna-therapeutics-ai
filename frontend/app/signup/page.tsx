@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Dna, Loader2, AlertCircle } from "lucide-react";
+import { Dna, Loader2, AlertCircle, Mail } from "lucide-react";
 import { signup as apiSignup } from "@/lib/auth";
 
 export default function SignupPage() {
@@ -12,6 +12,7 @@ export default function SignupPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -19,12 +20,49 @@ export default function SignupPage() {
     setLoading(true);
     try {
       await apiSignup(name, email, password);
-      router.push("/dashboard");
+      setSubmitted(true);
     } catch (err: any) {
       setError(err.message || "Signup failed");
     } finally {
       setLoading(false);
     }
+  }
+
+  if (submitted) {
+    return (
+      <div className="flex min-h-screen bg-[#F5F6FA]">
+        <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-navy-950 to-navy-900 items-center justify-center">
+          <div className="max-w-md px-8 text-center">
+            <div className="flex items-center justify-center gap-2.5 mb-6">
+              <Dna className="h-8 w-8 text-indigo-400" strokeWidth={2} />
+              <div className="text-left">
+                <p className="text-[18px] font-bold tracking-wide text-white">RNA THERAPEUTICS</p>
+                <p className="text-[12px] text-slate-400">Platform</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="flex flex-1 items-center justify-center px-6 py-12">
+          <div className="w-full max-w-sm text-center space-y-4">
+            <Mail className="h-12 w-12 text-indigo-500 mx-auto" />
+            <h1 className="text-[22px] font-bold text-slate-900">Check your email</h1>
+            <p className="text-[13px] text-slate-500">
+              We sent a verification link to <span className="font-medium text-slate-700">{email}</span>.
+              Click the link to activate your account.
+            </p>
+            <p className="text-[12px] text-slate-400">
+              Didn&apos;t get it? Check your spam folder or{" "}
+              <a href="/verify-email" className="font-medium text-indigo-600 hover:text-indigo-700">resend verification</a>.
+            </p>
+            <div className="pt-4">
+              <a href="/login" className="text-[12px] font-medium text-indigo-600 hover:text-indigo-700">
+                Back to sign in
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (

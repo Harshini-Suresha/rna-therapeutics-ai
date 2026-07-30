@@ -9,6 +9,7 @@ export interface AuthUser {
   department: string;
   bio: string;
   initials: string;
+  verified: boolean;
   token: string;
 }
 
@@ -168,4 +169,24 @@ export async function getActivity(): Promise<{ id: number; action: string; detai
 
 export function logout() {
   clearToken();
+}
+
+export async function verifyEmail(token: string): Promise<{ ok: boolean; message: string }> {
+  const res = await fetch(`${API_BASE}/api/auth/verify-email`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || "Verification failed");
+  return data;
+}
+
+export async function resendVerification(email: string): Promise<{ ok: boolean; message: string }> {
+  const res = await fetch(`${API_BASE}/api/auth/resend-verification`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token: email }),
+  });
+  return res.json();
 }

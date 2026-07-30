@@ -58,12 +58,14 @@ export default function AccountMenu({
   email,
   role,
   institution,
+  verified,
 }: {
   initials: string;
   name: string;
   email: string;
   role?: string;
   institution?: string;
+  verified?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -119,6 +121,12 @@ export default function AccountMenu({
                 <p className="text-[10.5px] text-slate-400 truncate">{email}</p>
               </div>
             </div>
+            {verified === false && (
+              <a href="/verify-email" className="mt-2 flex items-center gap-1.5 rounded-md bg-amber-50 border border-amber-200 px-2.5 py-1.5 text-[10.5px] text-amber-700 hover:bg-amber-100">
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0" />
+                Email not verified — click to resend
+              </a>
+            )}
           </div>
 
           {/* Workspace */}

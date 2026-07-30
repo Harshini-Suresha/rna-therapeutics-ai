@@ -23,12 +23,14 @@ class User(Base):
     institution = Column(String(255), nullable=False, default="")
     department = Column(String(255), nullable=False, default="")
     bio = Column(Text, nullable=False, default="")
+    verified = Column(Integer, nullable=False, default=0)
     created_at = Column(Float, nullable=False, default=time.time)
 
     interests = relationship("ResearchInterest", back_populates="user", cascade="all, delete-orphan")
     saved_designs = relationship("SavedDesign", back_populates="user", cascade="all, delete-orphan")
     favorites = relationship("FavoriteGene", back_populates="user", cascade="all, delete-orphan")
     activity = relationship("RecentActivity", back_populates="user", cascade="all, delete-orphan")
+    verification_tokens = relationship("VerificationToken", back_populates="user", cascade="all, delete-orphan")
 
 
 class ResearchInterest(Base):
@@ -81,3 +83,15 @@ class RecentActivity(Base):
     timestamp = Column(Float, nullable=False, default=time.time)
 
     user = relationship("User", back_populates="activity")
+
+
+class VerificationToken(Base):
+    __tablename__ = "verification_tokens"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    token = Column(String(255), unique=True, index=True, nullable=False)
+    created_at = Column(Float, nullable=False, default=time.time)
+    used = Column(Integer, nullable=False, default=0)
+
+    user = relationship("User", back_populates="verification_tokens")
