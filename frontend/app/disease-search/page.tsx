@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Loader2, AlertCircle, ArrowLeft, Pill, Activity, Dna } from "lucide-react";
+import { Loader2, AlertCircle, ArrowLeft, Pill, Activity, Dna, Tag, Heart } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import Topbar from "@/components/Topbar";
 import { Card, Pill as UiPill } from "@/components/ui";
@@ -107,6 +107,54 @@ export default function DiseaseSearchResultsPage() {
                   )}
                   <p className="mt-3 text-[11.5px] text-slate-400">Source: Open Targets Platform</p>
                 </Card>
+
+                {/* Synonyms */}
+                {detail.synonyms.length > 0 && (
+                  <Card className="p-5">
+                    <div className="flex items-center gap-2">
+                      <Tag className="h-4 w-4 text-slate-500" />
+                      <p className="text-[14px] font-semibold text-slate-800">
+                        Alternative Names ({detail.synonyms.length})
+                      </p>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      {detail.synonyms.map((syn, i) => (
+                        <span key={i} className="rounded-full bg-slate-100 px-2.5 py-1 text-[11.5px] text-slate-600">
+                          {syn.term}
+                          <span className="ml-1 text-[10px] text-slate-400">({syn.relation.replace("has", "").replace("Synonym", "")})</span>
+                        </span>
+                      ))}
+                    </div>
+                  </Card>
+                )}
+
+                {/* Phenotypes / Clinical Features */}
+                {detail.phenotypes.length > 0 && (
+                  <Card className="p-5">
+                    <div className="flex items-center gap-2">
+                      <Heart className="h-4 w-4 text-rose-500" />
+                      <p className="text-[14px] font-semibold text-slate-800">
+                        Clinical Features / Phenotypes ({detail.phenotypes.length})
+                      </p>
+                    </div>
+                    <p className="mt-1 text-[12px] text-slate-500">
+                      Human Phenotype Ontology (HPO) terms associated with this disease.
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      {detail.phenotypes.map((p, i) => (
+                        <a
+                          key={i}
+                          href={`https://hpo.jax.org/browse/term/${p.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="rounded-full bg-rose-50 px-2.5 py-1 text-[11.5px] text-rose-700 hover:bg-rose-100 transition-colors"
+                        >
+                          {p.name}
+                        </a>
+                      ))}
+                    </div>
+                  </Card>
+                )}
 
                 {/* Associated genes */}
                 <Card className="p-5">

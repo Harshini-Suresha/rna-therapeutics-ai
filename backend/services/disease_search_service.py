@@ -38,6 +38,8 @@ def get_disease_detail(query: str, gene_limit: int = 30) -> dict:
         "therapeuticAreas": [],
         "genes": [],
         "knownDrugs": [],
+        "synonyms": [],
+        "phenotypes": [],
     }
     query = (query or "").strip()
     if not query:
@@ -74,6 +76,8 @@ def get_disease_detail(query: str, gene_limit: int = 30) -> dict:
             name
             description
             therapeuticAreas { id name }
+            synonyms { relation terms }
+            phenotypes { count rows { phenotypeHPO { id name } } }
             associatedTargets(page: {index: 0, size: $size}) {
               count
               rows {
@@ -109,6 +113,25 @@ def get_disease_detail(query: str, gene_limit: int = 30) -> dict:
         result["therapeuticAreas"] = [
             ta.get("name") for ta in (disease_data.get("therapeuticAreas") or []) if ta.get("name")
         ]
+
+        # Parse synonyms
+        synonyms = []
+        for syn_group in (disease_data.get("synonyms") or []):
+            relation = syn_group.get("relation", "")
+            terms = syn_group.get("terms") or []
+            for term in terms:
+                if term and term.lower() != (result["diseaseName"] or "").lower():
+                    synonyms.append({"term": term, "relation": relation})
+        result["synonyms"] = synonyms[:15]  # Limit to 15 synonyms
+
+        # Parse phenotypes
+        phenotypes = []
+        pheno_data = disease_data.get("phenotypes") or {}
+        for row in (pheno_data.get("rows") or []):
+            hpo = row.get("phenotypeHPO") or {}
+            if hpo.get("name"):
+                phenotypes.append({"id": hpo.get("id", ""), "name": hpo["name"]})
+        result["phenotypes"] = phenotypes[:20]  # Limit to 20 phenotypes
 
         rows = (disease_data.get("associatedTargets") or {}).get("rows") or []
         genes = []

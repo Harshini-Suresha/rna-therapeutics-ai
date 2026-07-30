@@ -26,4 +26,6 @@ export interface DiseaseDetailResponse {
   therapeuticAreas: string[];
   genes: DiseaseGeneMatch[];
   knownDrugs: KnownDrug[];
+  synonyms: { term: string; relation: string }[];
+  phenotypes: { id: string; name: string }[];
 }
