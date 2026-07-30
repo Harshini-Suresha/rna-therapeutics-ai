@@ -1,6 +1,6 @@
 "use client";
 
-import { Copy, Check, Thermometer, Info, Dna, FlaskConical, Shield, BarChart3 } from "lucide-react";
+import { Copy, Check, Thermometer, Info } from "lucide-react";
 import { useState } from "react";
 import { AssoCandidate } from "@/types/geneSilencing";
 import { Card } from "./ui";
@@ -58,7 +58,6 @@ export default function AssoCandidateCard({
 }) {
   const [copied, setCopied] = useState(false);
   const [showBreakdown, setShowBreakdown] = useState(false);
-  const [showAllMetrics, setShowAllMetrics] = useState(false);
 
   function copySequence() {
     navigator.clipboard.writeText(candidate.sequence).then(() => {
@@ -66,13 +65,6 @@ export default function AssoCandidateCard({
       setTimeout(() => setCopied(false), 1500);
     });
   }
-
-  const gcTone =
-    candidate.gcContent >= 40 && candidate.gcContent <= 60
-      ? "text-emerald-600"
-      : candidate.gcContent >= 30 && candidate.gcContent <= 70
-        ? "text-amber-600"
-        : "text-red-500";
 
   const homopolymerWarn = candidate.longestHomopolymer >= 4;
   const cpgWarn = candidate.cpgCount >= 3;
@@ -113,8 +105,8 @@ export default function AssoCandidateCard({
           {candidate.sequence}
         </div>
 
-        {/* Primary metrics — always visible */}
-        <div className="grid grid-cols-2 gap-x-6 gap-y-2">
+        {/* All metrics grid — always visible */}
+        <div className="grid grid-cols-3 gap-x-5 gap-y-2.5">
           <Metric label="GC Content" value={`${candidate.gcContent}%`} />
           <Metric label="Melting Temp" value={`${candidate.meltingTemp}`} unit="°C" />
           <Metric
@@ -130,6 +122,12 @@ export default function AssoCandidateCard({
             }
           />
           <Metric label="Poly-G Tracts" value={candidate.polygTracts} />
+          <Metric label="CpG Count" value={candidate.cpgCount} warn={cpgWarn} />
+          <Metric label="Longest Homopolymer" value={candidate.longestHomopolymer} unit="bp" warn={homopolymerWarn} />
+          <Metric label="Purine Content" value={`${(candidate.purineContent * 100).toFixed(1)}%`} />
+          <Metric label="Sequence Complexity" value={candidate.sequenceComplexity.toFixed(2)} warn={complexityWarn} />
+          <Metric label="GC Skew" value={candidate.gcSkew.toFixed(3)} />
+          <Metric label="Binding Energy" value={candidate.bindingEnergy} unit="kcal/mol" />
         </div>
 
         {/* Exon context */}
@@ -144,25 +142,6 @@ export default function AssoCandidateCard({
             <Metric label="Position" value={candidate.targetRegion} />
           </div>
         )}
-
-        {/* Expanded metrics — toggle */}
-        {showAllMetrics && (
-          <div className="grid grid-cols-2 gap-x-6 gap-y-2 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2.5">
-            <Metric label="CpG Count" value={candidate.cpgCount} warn={cpgWarn} />
-            <Metric label="Longest Homopolymer" value={candidate.longestHomopolymer} unit="bp" warn={homopolymerWarn} />
-            <Metric label="Purine Content" value={`${(candidate.purineContent * 100).toFixed(1)}%`} />
-            <Metric label="Sequence Complexity" value={candidate.sequenceComplexity.toFixed(2)} warn={complexityWarn} />
-            <Metric label="GC Skew" value={candidate.gcSkew.toFixed(3)} />
-            <Metric label="Binding Energy" value={candidate.bindingEnergy} unit="kcal/mol" />
-          </div>
-        )}
-
-        <button
-          onClick={() => setShowAllMetrics(!showAllMetrics)}
-          className="text-[10.5px] text-slate-400 hover:text-slate-600 self-start"
-        >
-          {showAllMetrics ? "▲ Hide extended metrics" : "▼ Show extended metrics"}
-        </button>
 
         {/* Quality score */}
         <div>
@@ -208,7 +187,7 @@ export default function AssoCandidateCard({
           )}
         </div>
 
-        {/* Target region + modifications */}
+        {/* Modifications */}
         <div className="flex flex-wrap gap-1.5 pt-1">
           {candidate.modifications.map((m) => (
             <span
