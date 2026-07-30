@@ -168,6 +168,73 @@ def _polyg_score(seq: str) -> int:
     return len(re.findall(r"G{3,}", seq.upper()))
 
 
+def _cpg_count(seq: str) -> int:
+    """Count CpG dinucleotides (immune stimulation risk)."""
+    return len(re.findall(r"CG", seq.upper()))
+
+
+def _longest_homopolymer(seq: str) -> int:
+    """Length of the longest homopolymer run."""
+    seq = seq.upper()
+    if not seq:
+        return 0
+    max_run = 1
+    current = 1
+    for i in range(1, len(seq)):
+        if seq[i] == seq[i - 1]:
+            current += 1
+            max_run = max(max_run, current)
+        else:
+            current = 1
+    return max_run
+
+
+def _purine_content(seq: str) -> float:
+    """Fraction of purines (A+G) in the sequence."""
+    seq = seq.upper()
+    if not seq:
+        return 0.0
+    purines = sum(1 for b in seq if b in "AG")
+    return round(purines / len(seq), 3)
+
+
+def _sequence_complexity(seq: str) -> float:
+    """Shannon entropy-based complexity score (0-1). Higher = more unique."""
+    seq = seq.upper()
+    if not seq:
+        return 0.0
+    from collections import Counter
+    import math
+    counts = Counter(seq)
+    n = len(seq)
+    entropy = -sum((c / n) * math.log2(c / n) for c in counts.values())
+    max_entropy = math.log2(4)  # 4 nucleotides
+    return round(entropy / max_entropy, 3)
+
+
+def _gc_skew(seq: str) -> float:
+    """GC skew: (G-C)/(G+C). Measures strand bias."""
+    seq = seq.upper()
+    g = seq.count("G")
+    c = seq.count("C")
+    if g + c == 0:
+        return 0.0
+    return round((g - c) / (g + c), 3)
+
+
+def _estimated_binding_energy(gc_content: float, tm: float) -> float:
+    """Estimated binding free energy (kcal/mol) from GC% and Tm."""
+    # Simplified nearest-neighbor approximation
+    # ΔG ≈ -RT ln(K) where K relates to Tm
+    # Using empirical: ΔG ≈ -0.01 * Tm * seq_length (rough kcal/mol per bp)
+    import math
+    R = 1.987e-3  # kcal/(mol·K)
+    Tm_K = tm + 273.15
+    # Rough estimate: more negative = more stable
+    dG = -0.36 * gc_content - 0.0048 * Tm_K
+    return round(dG * 21, 1)  # scale to ~21-mer length
+
+
 def _reverse_complement(seq: str) -> str:
     """Return the antisense oligonucleotide sequence for an RNA target site."""
     return seq.upper().translate(str.maketrans("ATGC", "TACG"))[::-1]
@@ -347,6 +414,12 @@ def generate_candidates(
                 "tmScore": round(tm_score, 1),
                 "selfComplementPenalty": round(sc_penalty, 1),
                 "polygPenalty": round(pg_penalty, 1),
+                "cpgCount": _cpg_count(candidate_seq),
+                "longestHomopolymer": _longest_homopolymer(candidate_seq),
+                "purineContent": _purine_content(candidate_seq),
+                "sequenceComplexity": _sequence_complexity(candidate_seq),
+                "gcSkew": _gc_skew(candidate_seq),
+                "bindingEnergy": _estimated_binding_energy(gc, tm),
             })
 
     # Sort by quality descending, return top 10
