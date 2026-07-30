@@ -131,10 +131,10 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      <div className="px-4 py-2.5 text-[9px] text-white border-t border-white/[0.06] leading-relaxed">
-        <span className="text-slate-500">© 2026, KoshKey Sciences Pvt Ltd</span>
+      <div className="px-4 py-3 text-[11px] font-medium leading-relaxed border-t border-white/[0.06]">
+        <span className="text-slate-300">&copy; 2026, KoshKey Sciences Pvt Ltd</span>
         <br />
-        <a href="mailto:mail@koshkey.com" className="text-slate-500 hover:text-slate-300 transition-colors">
+        <a href="mailto:mail@koshkey.com" className="text-slate-300 hover:text-white transition-colors">
           mail@koshkey.com
         </a>
       </div>
