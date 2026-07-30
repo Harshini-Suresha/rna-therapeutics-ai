@@ -271,6 +271,7 @@ export async function fetchGene(
     orphanetDiseaseNames: data.orphanetDiseaseNames ?? [],
 
     knownPathogenicVariants: data.knownPathogenicVariants ?? null,
+    totalClinvarVariants: data.totalClinvarVariants ?? null,
     mutationBreakdown: data.mutationBreakdown ?? {
       largeExonDeletions: null,
       largeExonDuplications: null,

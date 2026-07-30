@@ -360,15 +360,30 @@ export default function StatsRow({ gene }: { gene: GeneTargetObject }) {
         iconColor="#D97706"
         title="Mutation Distribution"
         notConnected={!hasMutations && !gene.mutationBreakdown}
-        rows={[
-          { label: "Pathogenic / likely pathogenic", value: gene.knownPathogenicVariants ?? DASH },
-          { label: "Large Exon Deletions", value: gene.mutationBreakdown?.largeExonDeletions ?? DASH },
-          { label: "Large Exon Duplications", value: gene.mutationBreakdown?.largeExonDuplications ?? DASH },
-          { label: "Nonsense / Point", value: gene.mutationBreakdown?.nonsensePointMutations ?? DASH },
-          { label: "Frameshift", value: gene.mutationBreakdown?.frameshiftMutations ?? DASH },
-          { label: "Splice Site", value: gene.mutationBreakdown?.spliceSiteMutations ?? DASH },
-        ]}
-        sources={isHuman ? [{ label: "Source: NCBI ClinVar", url: links.clinvar ?? clinVarGeneSearch }] : []}
+        rows={
+          hasMutations
+            ? [
+                { label: "Pathogenic / likely pathogenic", value: gene.knownPathogenicVariants ?? DASH },
+                { label: "Large Exon Deletions", value: gene.mutationBreakdown?.largeExonDeletions ?? DASH },
+                { label: "Large Exon Duplications", value: gene.mutationBreakdown?.largeExonDuplications ?? DASH },
+                { label: "Nonsense / Point", value: gene.mutationBreakdown?.nonsensePointMutations ?? DASH },
+                { label: "Frameshift", value: gene.mutationBreakdown?.frameshiftMutations ?? DASH },
+                { label: "Splice Site", value: gene.mutationBreakdown?.spliceSiteMutations ?? DASH },
+              ]
+            : isHuman
+              ? [
+                  { label: "Pathogenic / likely pathogenic", value: "0" },
+                  { label: "Total ClinVar Variants", value: gene.totalClinvarVariants ?? "Search ClinVar" },
+                  { label: "ClinVar", value: `Search ClinVar for ${gene.geneSymbol} variants` },
+                  { label: "OMIM", value: `Check OMIM for ${gene.geneSymbol} phenotype data` },
+                ]
+              : [{ label: "Status", value: "Human gene data only" }]
+        }
+        sources={isHuman ? [
+          { label: "NCBI ClinVar", url: links.clinvar ?? clinVarGeneSearch },
+          { label: "OMIM", url: `https://omim.org/search/${encodeURIComponent(gene.geneSymbol)}` },
+          { label: "UniProt Variants", url: `https://www.uniprot.org/uniprotkb?query=${encodeURIComponent(gene.geneSymbol)}+variant` },
+        ] : []}
       />
 
       {/* 10. FDA Therapies */}
@@ -376,7 +391,7 @@ export default function StatsRow({ gene }: { gene: GeneTargetObject }) {
         icon={Pill}
         iconBg="#ECFDF5"
         iconColor="#059669"
-        title="FDA-Approved Oligonucleotide Therapies"
+        title="Oligonucleotide Therapies"
         sourcesColumns={2}
         rows={
           hasFda
@@ -391,18 +406,24 @@ export default function StatsRow({ gene }: { gene: GeneTargetObject }) {
               }))
             : isHuman
               ? [
-                  { label: "Status", value: gene.fdaMessage ?? "No approved therapy for this gene" },
-                  { label: "Tip", value: "Check ClinicalTrials.gov for active trials" },
+                  { label: "Status", value: gene.fdaMessage ?? "No approved or investigational oligonucleotide therapy found" },
+                  { label: "Clinical Trials", value: `Search ClinicalTrials.gov for ${gene.geneSymbol} oligonucleotide studies` },
+                  { label: "Research", value: `Check PubMed for ${gene.geneSymbol} ASO/siRNA publications` },
                 ]
-              : [{ label: "Status", value: "Human only" }]
+              : [{ label: "Status", value: "Human gene data only" }]
         }
         sources={
           hasFda
             ? [
                 { label: "FDA nucleic-acid therapies", url: "https://www.fda.gov/drugs/nucleic-acid-therapies-and-gene-therapies-approved-and-regulated-fda" },
-                { label: "ClinicalTrials.gov studies", url: `https://clinicaltrials.gov/search?term=${encodeURIComponent(gene.geneSymbol)}` },
+                { label: "ClinicalTrials.gov", url: `https://clinicaltrials.gov/search?term=${encodeURIComponent(gene.geneSymbol)}+oligonucleotide` },
+                { label: "PubMed Literature", url: `https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(gene.geneSymbol)}+oligonucleotide+therapy` },
               ]
-            : [{ label: "Search ClinicalTrials.gov", url: `https://clinicaltrials.gov/search?term=${encodeURIComponent(gene.geneSymbol)}` }]
+              : [
+                  { label: "ClinicalTrials.gov", url: `https://clinicaltrials.gov/search?term=${encodeURIComponent(gene.geneSymbol)}+oligonucleotide` },
+                  { label: "PubMed Literature", url: `https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(gene.geneSymbol)}+oligonucleotide+therapy` },
+                  { label: "FDA Approved Oligos", url: "https://www.fda.gov/drugs/nucleic-acid-therapies-and-gene-therapies-approved-and-regulated-fda" },
+                ]
         }
       />
 

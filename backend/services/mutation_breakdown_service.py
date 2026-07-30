@@ -153,6 +153,7 @@ def get_mutation_breakdown(gene_symbol: str) -> dict:
     Returns:
         dict with keys:
             - knownPathogenicVariants: int | None (pathogenic + likely pathogenic count)
+            - totalClinvarVariants: int | None (total variants in ClinVar)
             - mutationBreakdown: dict with:
                 - largeExonDeletions: int | None
                 - largeExonDuplications: int | None
@@ -162,6 +163,7 @@ def get_mutation_breakdown(gene_symbol: str) -> dict:
     """
     result = {
         "knownPathogenicVariants": None,
+        "totalClinvarVariants": None,
         "mutationBreakdown": {
             "largeExonDeletions": None,
             "largeExonDuplications": None,
@@ -175,6 +177,13 @@ def get_mutation_breakdown(gene_symbol: str) -> dict:
         return result
 
     symbol = gene_symbol.strip()
+    
+    # First, get total ClinVar variants for this gene
+    total_query = f"{symbol}[gene]"
+    total_count, _ = _clinvar_esearch(requests.Session(), total_query, retmax=0)
+    result["totalClinvarVariants"] = total_count if total_count > 0 else None
+    
+    # Then get pathogenic variants
     base_query = f"{symbol}[gene] AND (pathogenic[clinsig] OR likely pathogenic[clinsig])"
 
     with requests.Session() as session:

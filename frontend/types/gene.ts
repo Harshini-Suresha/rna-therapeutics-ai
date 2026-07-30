@@ -256,6 +256,7 @@ export interface GeneTargetObject {
 
   // Known pathogenic variants (ClinVar pathogenic + likely pathogenic count)
   knownPathogenicVariants: number | null;
+  totalClinvarVariants: number | null;
 
   // Mutation distribution breakdown (from ClinVar)
   mutationBreakdown: {

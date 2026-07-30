@@ -867,6 +867,7 @@ async def initialize_target(payload: TargetRequest):
 
             # Known pathogenic variants and mutation breakdown
             "knownPathogenicVariants": mutation_data.get("knownPathogenicVariants"),
+            "totalClinvarVariants": mutation_data.get("totalClinvarVariants"),
             "mutationBreakdown": mutation_data.get("mutationBreakdown", {
                 "largeExonDeletions": None,
                 "largeExonDuplications": None,
