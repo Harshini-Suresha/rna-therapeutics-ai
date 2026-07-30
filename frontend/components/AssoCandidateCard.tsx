@@ -107,6 +107,7 @@ export default function AssoCandidateCard({
 
         {/* All metrics grid — always visible */}
         <div className="grid grid-cols-3 gap-x-5 gap-y-2.5">
+          <Metric label="Confidence Score" value={candidate.qualityScore} warn={candidate.qualityScore < 45} />
           <Metric label="GC Content" value={`${candidate.gcContent}%`} />
           <Metric label="Melting Temp" value={`${candidate.meltingTemp}`} unit="°C" />
           <Metric
