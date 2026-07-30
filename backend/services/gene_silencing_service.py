@@ -222,6 +222,149 @@ def _gc_skew(seq: str) -> float:
     return round((g - c) / (g + c), 3)
 
 
+def _molecular_weight(seq: str) -> float:
+    """Approximate molecular weight (g/mol) for single-stranded DNA."""
+    # Average MW of DNA nucleotides: A=331.2, T=322.2, G=347.2, C=307.2
+    weights = {"A": 331.2, "T": 322.2, "G": 347.2, "C": 307.2}
+    seq = seq.upper()
+    mw = sum(weights.get(b, 320) for b in seq)
+    # Subtract water for phosphodiester bonds
+    mw -= (len(seq) - 1) * 18.0
+    return round(mw, 1)
+
+
+def _extinction_coefficient(seq: str) -> float:
+    """UV extinction coefficient at 260nm (L/mol·cm) using nearest-neighbor method."""
+    seq = seq.upper()
+    # Simplified: sum of nearest-neighbor coefficients
+    nn = {
+        "AA": 27400, "AT": 22300, "AG": 25000, "AC": 21200,
+        "TA": 23500, "TT": 16700, "TG": 20900, "TC": 16200,
+        "GA": 25500, "GT": 20800, "GG": 22600, "GC": 17600,
+        "CA": 21900, "CT": 16900, "CG": 18900, "CC": 15200,
+    }
+    total = 8800  # initiation factor
+    for i in range(len(seq) - 1):
+        total += nn.get(seq[i:i+2], 19000)
+    return round(total, 0)
+
+
+def _nuclease_resistance_score(chemistry: str, modifications: list[str]) -> float:
+    """Estimated nuclease resistance (0-100). Higher = more resistant."""
+    base = 20  # Unmodified DNA
+    chem_scores = {"gapmer": 55, "lna_gapmer": 70, "pmo": 85, "2ome": 60, "sirna": 50}
+    mod_scores = {"phosphorothioate": 25, "lna_wings": 20, "2omemod": 15, "pmo_core": 30, "pna_clamp": 35}
+    score = base + chem_scores.get(chemistry, 0)
+    for m in modifications:
+        score += mod_scores.get(m, 0)
+    return min(100, round(score, 1))
+
+
+def _cellular_uptake_score(chemistry: str, length: int) -> float:
+    """Estimated cellular uptake efficiency (0-100)."""
+    # Shorter oligos cross membranes better
+    length_factor = max(0, 100 - (length - 15) * 5)
+    chem_factors = {"gapmer": 60, "lna_gapmer": 65, "pmo": 40, "2ome": 55, "sirna": 50}
+    base = chem_factors.get(chemistry, 50)
+    return round((base + length_factor) / 2, 1)
+
+
+def _bbb_crossing_score(chemistry: str, length: int, modifications: list[str]) -> float:
+    """Estimated blood-brain barrier crossing potential (0-100)."""
+    base = 10  # Most ASOs don't cross BBB well
+    if chemistry == "pmo":
+        base += 20  # PMOs with CPP can cross
+    if chemistry == "lna_gapmer":
+        base += 5
+    if "pna_clamp" in modifications:
+        base += 15
+    if length <= 18:
+        base += 10  # Shorter = better BBB crossing
+    return min(100, round(base, 1))
+
+
+def _synthesis_difficulty(seq: str, chemistry: str, modifications: list[str]) -> float:
+    """Estimated synthesis difficulty (0-100). Higher = harder to synthesize."""
+    seq = seq.upper()
+    difficulty = 10  # Base difficulty
+    # Homopolymer runs make synthesis harder
+    longest_hp = _longest_homopolymer(seq)
+    difficulty += longest_hp * 5
+    # GC-rich sequences are harder
+    gc = _calc_gc(seq)
+    if gc > 0.6:
+        difficulty += 15
+    elif gc > 0.55:
+        difficulty += 8
+    # Longer = harder
+    difficulty += max(0, (len(seq) - 20) * 2)
+    # Chemistry complexity
+    chem_factor = {"gapmer": 5, "lna_gapmer": 15, "pmo": 10, "2ome": 8, "sirna": 12}
+    difficulty += chem_factor.get(chemistry, 5)
+    # Modification complexity
+    mod_factor = {"phosphorothioate": 5, "lna_wings": 10, "2omemod": 5, "pmo_core": 8, "pna_clamp": 15}
+    for m in modifications:
+        difficulty += mod_factor.get(m, 0)
+    return min(100, round(difficulty, 1))
+
+
+def _off_target_risk(seq: str, complexity: float) -> float:
+    """Estimated off-target binding risk (0-100). Higher = more risk."""
+    risk = 20  # Base risk
+    # Low complexity = higher off-target risk
+    if complexity < 0.7:
+        risk += 30
+    elif complexity < 0.8:
+        risk += 15
+    # Poly-G tracts increase non-specific binding
+    pg = _polyg_score(seq)
+    risk += pg * 10
+    # Very short sequences have more off-targets
+    if len(seq) < 18:
+        risk += 15
+    return min(100, round(risk, 1))
+
+
+def _immune_stimulation_risk(seq: str, chemistry: str) -> float:
+    """Estimated immune stimulation risk (0-100)."""
+    risk = 5
+    cpg = _cpg_count(seq)
+    risk += cpg * 15
+    # Unmodified DNA is more immunostimulatory
+    if chemistry == "gapmer":
+        risk += 10
+    elif chemistry == "pmo":
+        risk -= 3  # PMOs are less immunostimulatory
+    return min(100, max(0, round(risk, 1)))
+
+
+def _drug_likeness_score(quality: float, nuclease: float, uptake: float, off_target: float) -> float:
+    """Overall drug-likeness score combining multiple factors."""
+    # Weighted combination
+    score = (
+        quality * 0.35 +
+        nuclease * 0.25 +
+        uptake * 0.20 +
+        (100 - off_target) * 0.20
+    )
+    return round(min(100, max(0, score)), 1)
+
+
+def _duplex_stability(gc: float, tm: float, length: int) -> str:
+    """Estimated duplex stability category."""
+    # Free energy approximation
+    dG = -0.36 * gc - 0.0048 * (tm + 273.15)
+    dG_total = dG * length
+    if dG_total < -30:
+        return "Very Stable"
+    elif dG_total < -20:
+        return "Stable"
+    elif dG_total < -10:
+        return "Moderate"
+    else:
+        return "Weak"
+
+
 def _estimated_binding_energy(gc_content: float, tm: float) -> float:
     """Estimated binding free energy (kcal/mol) from GC% and Tm."""
     # Simplified nearest-neighbor approximation
@@ -432,6 +575,19 @@ def generate_candidates(
                 exon_num = int(target_label.removeprefix("Exon ")) if target_label.startswith("Exon ") else None
                 exon_len = (exon_end - exon_start) if (exon_start is not None and exon_end is not None) else None
 
+            # Compute additional drug-like properties
+            nuclease_score = _nuclease_resistance_score(chemistry, modifications)
+            uptake_score = _cellular_uptake_score(chemistry, aso_length)
+            bbb_score = _bbb_crossing_score(chemistry, aso_length, modifications)
+            synthesis_score = _synthesis_difficulty(candidate_seq, chemistry, modifications)
+            complexity_val = _sequence_complexity(candidate_seq)
+            off_target = _off_target_risk(candidate_seq, complexity_val)
+            immune_risk = _immune_stimulation_risk(candidate_seq, chemistry)
+            drug_like = _drug_likeness_score(quality, nuclease_score, uptake_score, off_target)
+            stability = _duplex_stability(gc, tm, aso_length)
+            mw = _molecular_weight(candidate_seq)
+            ext_coeff = _extinction_coefficient(candidate_seq)
+
             candidates.append({
                 "sequence": _reverse_complement(candidate_seq),
                 "length": aso_length,
@@ -455,9 +611,19 @@ def generate_candidates(
                 "cpgPenalty": cpg_penalty,
                 "longestHomopolymer": _longest_homopolymer(candidate_seq),
                 "purineContent": _purine_content(candidate_seq),
-                "sequenceComplexity": _sequence_complexity(candidate_seq),
+                "sequenceComplexity": complexity_val,
                 "gcSkew": _gc_skew(candidate_seq),
                 "bindingEnergy": _estimated_binding_energy(gc, tm),
+                "molecularWeight": mw,
+                "extinctionCoefficient": ext_coeff,
+                "nucleaseResistance": nuclease_score,
+                "cellularUptake": uptake_score,
+                "bbbCrossing": bbb_score,
+                "synthesisDifficulty": synthesis_score,
+                "offTargetRisk": off_target,
+                "immuneStimulation": immune_risk,
+                "drugLikeness": drug_like,
+                "duplexStability": stability,
             })
 
     # Sort by quality descending, return top 10

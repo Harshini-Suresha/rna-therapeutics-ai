@@ -20,6 +20,19 @@ function ConfidenceBadge({ score }: { score: number }) {
   );
 }
 
+function ScoreBar({ value, max = 100, warn }: { value: number; max?: number; warn?: boolean }) {
+  const pct = Math.min(100, (value / max) * 100);
+  const color = warn ? "bg-amber-400" : pct >= 70 ? "bg-emerald-400" : pct >= 40 ? "bg-blue-400" : "bg-slate-300";
+  return (
+    <div className="flex items-center gap-2">
+      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
+        <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
+      </div>
+      <span className="text-[10px] font-semibold text-slate-600 w-7 text-right">{value}</span>
+    </div>
+  );
+}
+
 function Row({ label, value, unit, warn, highlight }: { label: string; value: string | number; unit?: string; warn?: boolean; highlight?: boolean }) {
   return (
     <div className="flex items-center justify-between border-b border-slate-100 py-1.5 last:border-0">
@@ -42,6 +55,20 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
+function ScoreSection({ title, value, bar }: { title: string; value: number; bar?: boolean }) {
+  const label = value >= 70 ? "Excellent" : value >= 50 ? "Good" : value >= 30 ? "Fair" : "Poor";
+  const color = value >= 70 ? "text-emerald-600" : value >= 50 ? "text-blue-600" : value >= 30 ? "text-amber-600" : "text-red-500";
+  return (
+    <div className="flex items-center justify-between border-b border-slate-100 py-1.5 last:border-0">
+      <span className="text-[11px] text-slate-500">{title}</span>
+      <div className="flex items-center gap-2">
+        {bar && <ScoreBar value={value} />}
+        <span className={`text-[10.5px] font-medium ${color}`}>{label}</span>
+      </div>
+    </div>
+  );
+}
+
 export default function AssoCandidateCard({
   candidate,
   rank,
@@ -58,10 +85,6 @@ export default function AssoCandidateCard({
       setTimeout(() => setCopied(false), 1500);
     });
   }
-
-  const homopolymerWarn = candidate.longestHomopolymer >= 4;
-  const cpgWarn = candidate.cpgCount >= 3;
-  const complexityWarn = candidate.sequenceComplexity < 0.7;
 
   const selfDimerLabel =
     candidate.selfComplementScore === 0
@@ -109,30 +132,35 @@ export default function AssoCandidateCard({
           <div className="rounded-lg bg-slate-900 px-4 py-2.5 font-mono text-[13px] text-emerald-400 break-all leading-relaxed tracking-widest">
             {candidate.sequence}
           </div>
+          <div className="mt-1.5 flex gap-4 text-[10px] text-slate-400">
+            <span>MW: {candidate.molecularWeight?.toLocaleString()} Da</span>
+            <span>ε₂₆₀: {candidate.extinctionCoefficient?.toLocaleString()} L/mol·cm</span>
+            <span>Duplex: {candidate.duplexStability}</span>
+          </div>
         </div>
 
-        {/* Two-column table layout */}
-        <div className="grid grid-cols-1 divide-y divide-slate-100 md:grid-cols-2 md:divide-y-0 md:divide-x">
-          {/* Left column — Biophysical Properties */}
+        {/* Three-column table layout */}
+        <div className="grid grid-cols-1 divide-y divide-slate-100 md:grid-cols-3 md:divide-y-0 md:divide-x">
+          {/* Column 1 — Biophysical */}
           <div className="px-5 py-3 space-y-3">
             <Section title="Biophysical Properties">
               <Row label="GC Content" value={`${candidate.gcContent}%`} />
-              <Row label="Melting Temperature (Tm)" value={candidate.meltingTemp} unit="°C" />
+              <Row label="Melting Temperature" value={candidate.meltingTemp} unit="°C" />
               <Row label="Self-dimer Risk" value={selfDimerLabel} />
               <Row label="Poly-G Tracts" value={candidate.polygTracts} warn={candidate.polygTracts > 0} />
               <Row label="Binding Energy" value={candidate.bindingEnergy} unit="kcal/mol" />
             </Section>
 
             <Section title="Sequence Composition">
-              <Row label="CpG Dinucleotides" value={candidate.cpgCount} warn={cpgWarn} />
-              <Row label="Longest Homopolymer" value={candidate.longestHomopolymer} unit="bp" warn={homopolymerWarn} />
+              <Row label="CpG Dinucleotides" value={candidate.cpgCount} warn={candidate.cpgCount >= 3} />
+              <Row label="Longest Homopolymer" value={candidate.longestHomopolymer} unit="bp" warn={candidate.longestHomopolymer >= 4} />
               <Row label="Purine Content" value={`${(candidate.purineContent * 100).toFixed(1)}%`} />
               <Row label="GC Skew" value={candidate.gcSkew.toFixed(3)} />
-              <Row label="Sequence Complexity" value={candidate.sequenceComplexity.toFixed(2)} warn={complexityWarn} />
+              <Row label="Complexity" value={candidate.sequenceComplexity.toFixed(2)} warn={candidate.sequenceComplexity < 0.7} />
             </Section>
           </div>
 
-          {/* Right column — Target & Quality */}
+          {/* Column 2 — Target & Design */}
           <div className="px-5 py-3 space-y-3">
             <Section title="Target Information">
               {candidate.exonNumber != null && (
@@ -157,7 +185,23 @@ export default function AssoCandidateCard({
               )}
             </Section>
 
-            <Section title="Quality Score">
+            <Section title="Drug-like Properties">
+              <ScoreSection title="Drug Likeness" value={candidate.drugLikeness} bar />
+              <ScoreSection title="Nuclease Resistance" value={candidate.nucleaseResistance} bar />
+              <ScoreSection title="Cellular Uptake" value={candidate.cellularUptake} bar />
+              <ScoreSection title="BBB Crossing" value={candidate.bbbCrossing} bar />
+            </Section>
+          </div>
+
+          {/* Column 3 — Risk & Quality */}
+          <div className="px-5 py-3 space-y-3">
+            <Section title="Risk Assessment">
+              <ScoreSection title="Off-target Risk" value={100 - candidate.offTargetRisk} bar />
+              <ScoreSection title="Immune Stimulation" value={100 - candidate.immuneStimulation} bar />
+              <ScoreSection title="Synthesis Feasibility" value={100 - candidate.synthesisDifficulty} bar />
+            </Section>
+
+            <Section title="Quality Score Breakdown">
               <Row label="Final Score" value={candidate.qualityScore} unit="/100" highlight />
               <Row label="GC Score (×0.30)" value={candidate.gcScore} />
               <Row label="Tm Score (×0.40)" value={candidate.tmScore} />
@@ -198,11 +242,18 @@ export default function AssoCandidateCard({
                 <li><strong>Poly-G:</strong> G-tract count × 15</li>
                 <li><strong>Chemistry Bonus:</strong> LNA +5, 2'-OMe +3, siRNA +2, PMO −3</li>
                 <li><strong>Modification Bonus:</strong> PS +4, LNA wings +5, 2'-OMe +3, PMO core +2, PNA +3</li>
-                <li><strong>CpG Penalty:</strong> (CpG count − 2) × 5 if >2 CpGs (TLR9 immune stimulation risk)</li>
+                <li><strong>CpG Penalty:</strong> (CpG count − 2) × 5 if >2 CpGs</li>
               </ul>
-              <p className="mt-2 text-[9.5px] text-slate-400">
-                Higher score = better drug-like properties. Ideal candidates have 40–60% GC, Tm 50–60°C, no self-dimers, no poly-G tracts, and appropriate chemistry/modifications for the therapeutic context.
-              </p>
+              <p className="mt-2 font-semibold text-slate-600 mb-1">Drug-like Property Scores</p>
+              <ul className="space-y-0.5 text-[10px]">
+                <li><strong>Drug Likeness:</strong> Weighted combo of quality (35%), nuclease resistance (25%), uptake (20%), low off-target (20%)</li>
+                <li><strong>Nuclease Resistance:</strong> Based on chemistry + modifications (PS, LNA, PNA all increase)</li>
+                <li><strong>Cellular Uptake:</strong> Based on chemistry and length (shorter = better uptake)</li>
+                <li><strong>BBB Crossing:</strong> Most ASOs don't cross well; PMO+CPP and PNA improve this</li>
+                <li><strong>Off-target Risk:</strong> Low sequence complexity + poly-G = higher risk</li>
+                <li><strong>Immune Stimulation:</strong> CpG dinucleotides activate TLR9; gapmers more immunostimulatory than PMOs</li>
+                <li><strong>Synthesis Feasibility:</strong> Homopolymer runs, high GC, LNA, and PNA increase difficulty</li>
+              </ul>
             </div>
           )}
         </div>

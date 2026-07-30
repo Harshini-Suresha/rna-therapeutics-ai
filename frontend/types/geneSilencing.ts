@@ -54,6 +54,16 @@ export interface AssoCandidate {
   sequenceComplexity: number;
   gcSkew: number;
   bindingEnergy: number;
+  molecularWeight: number;
+  extinctionCoefficient: number;
+  nucleaseResistance: number;
+  cellularUptake: number;
+  bbbCrossing: number;
+  synthesisDifficulty: number;
+  offTargetRisk: number;
+  immuneStimulation: number;
+  drugLikeness: number;
+  duplexStability: string;
 }
 
 export interface GenerateResponse {
