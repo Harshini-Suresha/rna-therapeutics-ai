@@ -1,13 +1,12 @@
 """Orphanet disease data: Orphanet code, ICD-11 code, and incidence.
 
-Uses the Open Targets Platform GraphQL API and NCBI Gene database to extract
-Orphanet codes, ICD-11 codes, and disease classification from cross-references
-associated with the gene's top disease association.
+Uses the Open Targets Platform GraphQL API and Orphadata API to extract
+Orphanet codes, ICD-11 codes, disease classification, and incidence data.
 
 Sources:
 - Open Targets Platform (https://api.platform.opentargets.org)
-- NCBI Gene / OMIM cross-references
-- Orphanet public data pages
+- Orphadata API (https://api.orphadata.com)
+- NCBI Gene (https://www.ncbi.nlm.nih.gov/gene)
 """
 
 import logging
@@ -90,61 +89,80 @@ def _extract_disease_names(xrefs: list) -> List[str]:
 
 
 def _get_orphanet_incidence(orpha_code: str) -> Optional[str]:
-    """Try to fetch incidence data from Orphanet public pages (best effort)."""
-    try:
-        # Orphanet public data pages have prevalence info
-        resp = requests.get(
-            f"https://www.orpha.net/en/disease/detail/{orpha_code}",
-            timeout=8,
-            headers={"User-Agent": "Mozilla/5.0"},
-        )
-        if resp.status_code == 200:
-            text = resp.text
-            # Look for prevalence patterns in the HTML
-            prevalence_match = re.search(
-                r"prevalence[^<]*<[^>]*>([^<]+)",
-                text, re.IGNORECASE
-            )
-            if prevalence_match:
-                return prevalence_match.group(1).strip()[:200]
-    except Exception:
-        pass
-    return None
-
-
-def _get_orphanet_by_gene_name(gene_symbol: str) -> Optional[str]:
-    """Search Orphanet API directly by gene symbol to find associated diseases.
-
-    Uses the Orphanet REST API to search for diseases linked to a gene.
-    """
+    """Fetch incidence/prevalence data from the Orphadata API."""
     try:
         resp = requests.get(
-            f"https://api.orphacode.org/EN/ClinicalEntity/gene/{gene_symbol}",
-            headers={"Accept": "application/json"},
+            f"https://api.orphadata.com/rd-epidemiology/orphacodes/{orpha_code}",
+            params={"lang": "en"},
             timeout=10,
         )
         if resp.status_code == 200:
             data = resp.json()
-            # Extract Orphanet codes from the response
-            if isinstance(data, list):
-                for item in data:
-                    code = item.get("orphaCode") or item.get("entityId")
+            results = (data.get("data") or {}).get("results") or {}
+            prevalence_list = results.get("Prevalence") or []
+            if not prevalence_list:
+                return None
+
+            # Prefer "Prevalence at birth" with worldwide scope, then point prevalence
+            worldwide_birth = None
+            any_birth = None
+            worldwide_point = None
+            first_valid = None
+            for entry in prevalence_list:
+                ptype = (entry.get("PrevalenceType") or "").lower()
+                geo = (entry.get("PrevalenceGeographic") or "").lower()
+                pclass = entry.get("PrevalenceClass") or ""
+                val = entry.get("ValMoy")
+                validated = (entry.get("PrevalenceValidationStatus") or "").lower()
+
+                if validated == "validated" or not first_valid:
+                    candidate = f"{pclass} (birth)" if "birth" in ptype else pclass
+                    if val:
+                        candidate = f"{val} per 100,000 ({ptype}, {entry.get('PrevalenceGeographic', '')})"
+                    if "birth" in ptype and "worldwide" in geo and not worldwide_birth:
+                        worldwide_birth = candidate
+                    if "birth" in ptype and not any_birth:
+                        any_birth = candidate
+                    if "point" in ptype and "worldwide" in geo and not worldwide_point:
+                        worldwide_point = candidate
+                    if not first_valid:
+                        first_valid = candidate
+
+            result = worldwide_birth or any_birth or worldwide_point or first_valid
+            if result:
+                return result[:200]
+    except Exception as e:
+        logger.info(f"Orphadata API fetch failed for ORPHA:{orpha_code}: {e}")
+    return None
+
+
+def _get_orphanet_by_gene_name(gene_symbol: str) -> Optional[str]:
+    """Search Orphadata API by gene symbol to find associated Orphanet diseases.
+
+    The Orphadata API requires lowercase gene symbols.
+    """
+    try:
+        resp = requests.get(
+            f"https://api.orphadata.com/rd-associated-genes/genes/symbols/{gene_symbol.lower()}",
+            timeout=10,
+        )
+        if resp.status_code == 200:
+            data = resp.json()
+            results = (data.get("data") or {}).get("results") or []
+            if isinstance(results, list):
+                for item in results:
+                    code = item.get("ORPHAcode")
                     if code:
                         return f"ORPHA:{code}"
-            elif isinstance(data, dict):
-                code = data.get("orphaCode") or data.get("entityId")
-                if code:
-                    return f"ORPHA:{code}"
-    except Exception:
-        pass
+    except Exception as e:
+        logger.info(f"Orphadata gene search failed for {gene_symbol}: {e}")
     return None
 
 
 def _get_omim_orphanet_via_ncbi(gene_symbol: str) -> dict:
-    """Fetch OMIM and disease cross-references from NCBI Gene database.
+    """Fetch disease names and OMIM IDs from NCBI Gene database.
 
-    NCBI Gene entries contain cross-references to Orphanet, OMIM, and ICD-11
-    which can be used when Open Targets doesn't have the data.
+    Used as a fallback when Open Targets doesn't have disease associations.
     """
     result = {"orphanetCode": None, "icd11Code": None, "diseaseNames": []}
     try:
@@ -166,7 +184,7 @@ def _get_omim_orphanet_via_ncbi(gene_symbol: str) -> dict:
         if not gene_ids:
             return result
 
-        # Fetch gene summary which contains cross-references
+        # Fetch gene summary
         resp = requests.get(
             f"{NCBI_EUTILS}/esummary.fcgi",
             params={"db": "gene", "id": gene_ids[0], "retmode": "json"},
@@ -187,12 +205,13 @@ def _get_omim_orphanet_via_ncbi(gene_symbol: str) -> dict:
             elif isinstance(mim, str) and mim.isdigit():
                 result["omimId"] = mim
 
-        # Extract disease names from description
+        # Extract disease names from description/summary
         desc = data.get("description") or data.get("summary") or ""
         if desc:
-            # Look for disease-related terms
             disease_kw = ["disease", "disorder", "syndrome", "deficiency", "dystrophy",
-                         "myopathy", "cancer", "tumor", "carcinoma", "leukemia"]
+                         "myopathy", "cancer", "tumor", "carcinoma", "leukemia",
+                         "cardiomyopathy", "neuropathy", "ataxia", "blindness",
+                         "deafness", "epilepsy", "anemia", "thalassemia"]
             sentences = re.split(r'(?<=[.!?])\s+', desc)
             for sent in sentences:
                 if any(kw in sent.lower() for kw in disease_kw):
@@ -202,7 +221,7 @@ def _get_omim_orphanet_via_ncbi(gene_symbol: str) -> dict:
                         break
 
     except Exception as e:
-        logger.info(f"NCBI Gene cross-ref fetch failed for {gene_symbol}: {e}")
+        logger.info(f"NCBI Gene fetch failed for {gene_symbol}: {e}")
 
     return result
 

@@ -18,6 +18,139 @@ OPEN_TARGETS_URL = "https://api.platform.opentargets.org/api/v4/graphql"
 _TIMEOUT = 10
 
 
+def get_disease_detail(query: str, gene_limit: int = 30) -> dict:
+    """
+    Fuller disease lookup for the dedicated results page: resolves the
+    free-text query to a disease (same as search_disease_genes), then
+    fetches description, therapeutic areas, a larger ranked gene list,
+    and known drugs where Open Targets has them.
+
+    Some of these fields (description, therapeuticAreas, knownDrugs) are
+    less exhaustively tested against the live schema than the core
+    search->targets query — every field is read defensively, so a schema
+    mismatch on any one of them degrades to null/empty rather than
+    breaking the whole response.
+    """
+    result: dict = {
+        "diseaseId": None,
+        "diseaseName": None,
+        "description": None,
+        "therapeuticAreas": [],
+        "genes": [],
+        "knownDrugs": [],
+    }
+    query = (query or "").strip()
+    if not query:
+        return result
+
+    try:
+        search_query = """
+        query diseaseSearch($q: String!) {
+          search(queryString: $q, entityNames: ["disease"], page: {index: 0, size: 1}) {
+            hits { id name entity }
+          }
+        }
+        """
+        resp = requests.post(
+            OPEN_TARGETS_URL,
+            json={"query": search_query, "variables": {"q": query}},
+            timeout=_TIMEOUT,
+        )
+        if resp.status_code != 200:
+            return result
+        data = resp.json().get("data") or {}
+        hits = (data.get("search") or {}).get("hits") or []
+        if not hits:
+            return result
+
+        disease_id = hits[0]["id"]
+        result["diseaseId"] = disease_id
+        result["diseaseName"] = hits[0]["name"]
+
+        detail_query = """
+        query diseaseDetail($efoId: String!, $size: Int!) {
+          disease(efoId: $efoId) {
+            id
+            name
+            description
+            therapeuticAreas { id name }
+            associatedTargets(page: {index: 0, size: $size}) {
+              count
+              rows {
+                score
+                target { id approvedSymbol approvedName biotype }
+              }
+            }
+            drugAndClinicalCandidates {
+              count
+              rows {
+                drug { id name }
+                maxClinicalStage
+              }
+            }
+          }
+        }
+        """
+        resp2 = requests.post(
+            OPEN_TARGETS_URL,
+            json={"query": detail_query, "variables": {"efoId": disease_id, "size": gene_limit}},
+            timeout=_TIMEOUT,
+        )
+        if resp2.status_code != 200:
+            return result
+
+        resp2_data = resp2.json()
+        if resp2_data.get("errors"):
+            return result
+
+        disease_data = (resp2_data.get("data") or {}).get("disease") or {}
+
+        result["description"] = disease_data.get("description")
+        result["therapeuticAreas"] = [
+            ta.get("name") for ta in (disease_data.get("therapeuticAreas") or []) if ta.get("name")
+        ]
+
+        rows = (disease_data.get("associatedTargets") or {}).get("rows") or []
+        genes = []
+        for row in rows:
+            target = row.get("target") or {}
+            symbol = target.get("approvedSymbol")
+            if not symbol:
+                continue
+            score = row.get("score")
+            genes.append({
+                "symbol": symbol,
+                "name": target.get("approvedName"),
+                "ensemblId": target.get("id"),
+                "biotype": target.get("biotype"),
+                "score": round(score, 3) if isinstance(score, (int, float)) else None,
+            })
+        result["genes"] = genes
+
+        drug_rows = (disease_data.get("drugAndClinicalCandidates") or {}).get("rows") or []
+        seen_drugs = set()
+        drugs = []
+        for row in drug_rows:
+            drug = row.get("drug") or {}
+            name = drug.get("name")
+            if not name or name.lower() in seen_drugs:
+                continue
+            seen_drugs.add(name.lower())
+            stage = row.get("maxClinicalStage") or ""
+            drugs.append({
+                "name": name,
+                "mechanismOfAction": None,
+                "phase": None,
+                "status": stage.replace("_", " ").title() if stage else None,
+            })
+        result["knownDrugs"] = drugs[:20]
+
+        return result
+
+    except requests.RequestException:
+        return result
+
+
 def search_disease_genes(query: str, limit: int = 12) -> dict:
     """
     Free-text disease name -> best-matching disease + its top associated
@@ -47,7 +180,11 @@ def search_disease_genes(query: str, limit: int = 12) -> dict:
         if resp.status_code != 200:
             return result
 
-        hits = ((resp.json().get("data") or {}).get("search") or {}).get("hits", [])
+        resp_data = resp.json()
+        if resp_data.get("errors"):
+            return result
+
+        hits = ((resp_data.get("data") or {}).get("search") or {}).get("hits") or []
         if not hits:
             return result
 
@@ -78,7 +215,11 @@ def search_disease_genes(query: str, limit: int = 12) -> dict:
         if resp2.status_code != 200:
             return result
 
-        disease_data = (resp2.json().get("data") or {}).get("disease") or {}
+        resp2_data = resp2.json()
+        if resp2_data.get("errors"):
+            return result
+
+        disease_data = (resp2_data.get("data") or {}).get("disease") or {}
         rows = (disease_data.get("associatedTargets") or {}).get("rows") or []
 
         genes = []

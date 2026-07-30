@@ -6,10 +6,12 @@ import { Bell, Search } from "lucide-react";
 import HelpMenu from "@/components/HelpMenu";
 import NotificationPanel from "@/components/NotificationPanel";
 import AccountMenu from "@/components/AccountMenu";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function Topbar() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { user } = useAuth();
   const [showNotifications, setShowNotifications] = useState(false);
   const [searchText, setSearchText] = useState("");
 
@@ -61,11 +63,11 @@ export default function Topbar() {
         </div>
 
         <AccountMenu
-          initials="HS"
-          name="Harshini Suresha"
-          email="researcher@platform.dev"
-          role="Research Scientist"
-          institution="KoshKey Sciences"
+          initials={user?.initials ?? "U"}
+          name={user?.name ?? "User"}
+          email={user?.email ?? ""}
+          role={user?.role}
+          institution={user?.institution}
         />
       </div>
     </header>

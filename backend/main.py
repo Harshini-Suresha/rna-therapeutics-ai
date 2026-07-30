@@ -35,6 +35,8 @@ try:  # ``uvicorn backend.main:app`` from the repository root
     from .api.assistant import router as assistant_router
     from .api.notifications import router as notifications_router
     from .api.disease_search import router as disease_search_router
+    from .api.auth import router as auth_router
+    from .api.profile import router as profile_router
 except ImportError:  # ``uvicorn main:app`` while working in backend/
     from services.notification_service import add_notification as _add_notification
     from services.gene_service import EnsemblLookupUnavailable, clean_synonyms, get_gene_metadata, get_gene_phenotypes, ensembl_gene_url
@@ -57,6 +59,8 @@ except ImportError:  # ``uvicorn main:app`` while working in backend/
     from api.assistant import router as assistant_router
     from api.notifications import router as notifications_router
     from api.disease_search import router as disease_search_router
+    from api.auth import router as auth_router
+    from api.profile import router as profile_router
 
 
 logging.basicConfig(level=logging.INFO)
@@ -89,6 +93,14 @@ app.include_router(upload_router)
 app.include_router(assistant_router)
 app.include_router(notifications_router)
 app.include_router(disease_search_router)
+app.include_router(auth_router)
+app.include_router(profile_router)
+
+
+@app.on_event("startup")
+def _init_db():
+    from database.db import init_db
+    init_db()
 
 SPECIES_TAXON_IDS = {
     "homo_sapiens": 9606,

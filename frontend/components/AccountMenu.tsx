@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   User,
   Settings,
@@ -9,7 +10,6 @@ import {
   FlaskConical,
   BarChart3,
   HardDrive,
-  Code,
   Star,
   Bookmark,
   FileText,
@@ -23,12 +23,12 @@ import {
   ChevronDown,
   ChevronRight,
 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 const PROFILE_ITEMS = [
   { label: "Profile", icon: User, href: "/settings" },
   { label: "Organization", icon: Building2, href: "/settings/organization" },
   { label: "Research Interests", icon: FlaskConical, href: "/settings/interests" },
-  { label: "API Usage", icon: Code, href: "/settings/api" },
   { label: "Storage", icon: HardDrive, href: "/settings/storage" },
   { label: "Recent Activity", icon: BarChart3, href: "/settings/activity" },
 ];
@@ -67,6 +67,8 @@ export default function AccountMenu({
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const router = useRouter();
+  const { logout } = useAuth();
 
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
@@ -75,6 +77,17 @@ export default function AccountMenu({
     document.addEventListener("mousedown", onClickOutside);
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
+
+  function navigate(href: string) {
+    setOpen(false);
+    router.push(href);
+  }
+
+  function handleLogout() {
+    setOpen(false);
+    logout();
+    router.push("/login");
+  }
 
   return (
     <div ref={ref} className="relative">
@@ -129,14 +142,14 @@ export default function AccountMenu({
             {PROFILE_ITEMS.map((item) => {
               const Icon = item.icon;
               return (
-                <a
+                <button
                   key={item.label}
-                  href={item.href}
-                  className="flex items-center gap-2.5 rounded px-3 py-1.5 text-[11.5px] text-slate-700 hover:bg-slate-50"
+                  onClick={() => navigate(item.href)}
+                  className="flex w-full items-center gap-2.5 rounded px-3 py-1.5 text-[11.5px] text-slate-700 hover:bg-slate-50"
                 >
                   <Icon className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                   {item.label}
-                </a>
+                </button>
               );
             })}
 
@@ -149,14 +162,14 @@ export default function AccountMenu({
             {SAVED_ITEMS.map((item) => {
               const Icon = item.icon;
               return (
-                <a
+                <button
                   key={item.label}
-                  href={item.href}
-                  className="flex items-center gap-2.5 rounded px-3 py-1.5 text-[11.5px] text-slate-700 hover:bg-slate-50"
+                  onClick={() => navigate(item.href)}
+                  className="flex w-full items-center gap-2.5 rounded px-3 py-1.5 text-[11.5px] text-slate-700 hover:bg-slate-50"
                 >
                   <Icon className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                   {item.label}
-                </a>
+                </button>
               );
             })}
 
@@ -169,14 +182,14 @@ export default function AccountMenu({
             {PREFERENCES.map((item) => {
               const Icon = item.icon;
               return (
-                <a
+                <button
                   key={item.label}
-                  href={item.href}
-                  className="flex items-center gap-2.5 rounded px-3 py-1.5 text-[11.5px] text-slate-700 hover:bg-slate-50"
+                  onClick={() => navigate(item.href)}
+                  className="flex w-full items-center gap-2.5 rounded px-3 py-1.5 text-[11.5px] text-slate-700 hover:bg-slate-50"
                 >
                   <Icon className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                   {item.label}
-                </a>
+                </button>
               );
             })}
 
@@ -186,20 +199,20 @@ export default function AccountMenu({
             {BOTTOM_ITEMS.map((item) => {
               const Icon = item.icon;
               return (
-                <a
+                <button
                   key={item.label}
-                  href={item.href}
-                  className="flex items-center gap-2.5 rounded px-3 py-1.5 text-[11.5px] text-slate-700 hover:bg-slate-50"
+                  onClick={() => navigate(item.href)}
+                  className="flex w-full items-center gap-2.5 rounded px-3 py-1.5 text-[11.5px] text-slate-700 hover:bg-slate-50"
                 >
                   <Icon className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                   {item.label}
-                </a>
+                </button>
               );
             })}
 
             <div className="my-1.5 border-t border-slate-100" />
 
-            <button className="flex w-full items-center gap-2.5 rounded px-3 py-1.5 text-left text-[11.5px] text-red-600 hover:bg-red-50">
+            <button onClick={handleLogout} className="flex w-full items-center gap-2.5 rounded px-3 py-1.5 text-left text-[11.5px] text-red-600 hover:bg-red-50">
               <LogOut className="h-3.5 w-3.5 shrink-0" />
               Sign Out
             </button>

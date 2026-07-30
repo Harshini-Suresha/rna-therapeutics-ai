@@ -112,6 +112,21 @@ export default function NewProjectPage() {
   const [diseaseSearchActive, setDiseaseSearchActive] = useState(false);
 
   useEffect(() => {
+    const prefill = sessionStorage.getItem("aso:prefillGeneSearch");
+    if (prefill) {
+      try {
+        const { organism: org, geneSymbol: sym, diseaseName: dis } = JSON.parse(prefill);
+        if (org) setOrganism(org);
+        if (sym) setGeneSymbol(sym);
+        if (dis) setDiseaseName(dis);
+        sessionStorage.removeItem("aso:prefillGeneSearch");
+      } catch {
+        sessionStorage.removeItem("aso:prefillGeneSearch");
+      }
+    }
+  }, []);
+
+  useEffect(() => {
     const query = searchParams.get("q")?.trim();
     if (query && query !== geneSymbol) {
       setGeneSymbol(query);
