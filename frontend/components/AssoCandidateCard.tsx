@@ -1,6 +1,6 @@
 "use client";
 
-import { Copy, Check, Thermometer } from "lucide-react";
+import { Copy, Check, Thermometer, Info } from "lucide-react";
 import { useState } from "react";
 import { AssoCandidate } from "@/types/geneSilencing";
 import { Card } from "./ui";
@@ -23,6 +23,21 @@ function QualityBar({ score }: { score: number }) {
   );
 }
 
+function ConfidenceBadge({ score }: { score: number }) {
+  const label = score >= 70 ? "High" : score >= 45 ? "Moderate" : "Low";
+  const cls =
+    score >= 70
+      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+      : score >= 45
+        ? "bg-amber-50 text-amber-700 border-amber-200"
+        : "bg-red-50 text-red-600 border-red-200";
+  return (
+    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${cls}`}>
+      {label} Confidence
+    </span>
+  );
+}
+
 export default function AssoCandidateCard({
   candidate,
   rank,
@@ -31,6 +46,7 @@ export default function AssoCandidateCard({
   rank: number;
 }) {
   const [copied, setCopied] = useState(false);
+  const [showBreakdown, setShowBreakdown] = useState(false);
 
   function copySequence() {
     navigator.clipboard.writeText(candidate.sequence).then(() => {
@@ -58,6 +74,7 @@ export default function AssoCandidateCard({
             <span className="text-[11px] font-medium text-slate-400">
               {candidate.chemistry} &middot; {candidate.length} nt
             </span>
+            <ConfidenceBadge score={candidate.qualityScore} />
           </div>
           <button
             onClick={copySequence}
@@ -116,10 +133,64 @@ export default function AssoCandidateCard({
           </div>
         </div>
 
+        {/* Exon info */}
+        {candidate.exonNumber != null && (
+          <div className="flex items-center gap-4 rounded-lg bg-slate-50 px-3 py-2">
+            <div>
+              <p className="text-[10px] text-slate-400">Target Exon</p>
+              <p className="text-[12px] font-semibold text-slate-700">Exon {candidate.exonNumber}</p>
+            </div>
+            {candidate.exonLength != null && (
+              <div>
+                <p className="text-[10px] text-slate-400">Exon Length</p>
+                <p className="text-[12px] font-semibold text-slate-700">{candidate.exonLength} bp</p>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Quality score */}
         <div>
-          <p className="mb-1 text-[11px] text-slate-400">Composite Quality</p>
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-[11px] text-slate-400">Composite Quality</p>
+            <button
+              onClick={() => setShowBreakdown(!showBreakdown)}
+              className="flex items-center gap-0.5 text-[10px] text-slate-400 hover:text-slate-600"
+            >
+              <Info className="h-3 w-3" />
+              {showBreakdown ? "Hide" : "How it's calculated"}
+            </button>
+          </div>
           <QualityBar score={candidate.qualityScore} />
+
+          {showBreakdown && (
+            <div className="mt-2 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2.5 text-[10.5px] text-slate-500 space-y-1">
+              <p className="font-medium text-slate-600 mb-1.5">Quality Score Breakdown</p>
+              <div className="flex justify-between">
+                <span>GC Content Score (35%)</span>
+                <span className="font-medium text-slate-700">{candidate.gcScore}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Melting Temp Score (45%)</span>
+                <span className="font-medium text-slate-700">{candidate.tmScore}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Self-dimer Penalty</span>
+                <span className="font-medium text-red-500">-{candidate.selfComplementPenalty}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Poly-G Penalty</span>
+                <span className="font-medium text-red-500">-{candidate.polygPenalty}</span>
+              </div>
+              <div className="border-t border-slate-200 pt-1 mt-1 flex justify-between font-semibold">
+                <span>Final Score</span>
+                <span className="text-slate-700">{candidate.qualityScore}</span>
+              </div>
+              <p className="text-[9.5px] text-slate-400 pt-1">
+                Composite Quality is a weighted score (0–100) combining GC content (ideal: 50%), melting temperature (ideal: 52°C), self-dimer risk, and poly-G tract count. Higher = better drug-like properties.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Target region + modifications */}

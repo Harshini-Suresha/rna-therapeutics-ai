@@ -290,6 +290,11 @@ def generate_candidates(
         if search_end < search_start:
             continue
 
+        exon_start = exon_end = None
+        if targeting_mode != "translation_start" and target_label.startswith("Exon "):
+            ei = int(target_label.removeprefix("Exon "))
+            exon_start, exon_end = exon_cds_map[ei - 1]
+
         for offset in range(search_start, search_end + 1, step):
             candidate_seq = seq[offset : offset + aso_length]
             if len(candidate_seq) < aso_length or candidate_seq in seen:
@@ -314,8 +319,6 @@ def generate_candidates(
             if targeting_mode == "translation_start":
                 region_label = f"{target_label} offset +{offset}"
             else:
-                target_exon_index = int(target_label.removeprefix("Exon "))
-                exon_start, exon_end = exon_cds_map[target_exon_index - 1]
                 relative_pos = offset - exon_start
                 if relative_pos < 0:
                     region_label = f"{target_label} 5' flank {relative_pos}"
@@ -323,6 +326,9 @@ def generate_candidates(
                     region_label = f"{target_label} 3' flank +{relative_pos}"
                 else:
                     region_label = f"{target_label} offset +{relative_pos}"
+
+            exon_num = int(target_label.removeprefix("Exon ")) if target_label.startswith("Exon ") else None
+            exon_len = (exon_end - exon_start) if (exon_start is not None and exon_end is not None) else None
 
             candidates.append({
                 "sequence": _reverse_complement(candidate_seq),
@@ -335,6 +341,12 @@ def generate_candidates(
                 "targetRegion": region_label,
                 "chemistry": chemistry,
                 "modifications": modifications,
+                "exonNumber": exon_num,
+                "exonLength": exon_len,
+                "gcScore": round(gc_score, 1),
+                "tmScore": round(tm_score, 1),
+                "selfComplementPenalty": round(sc_penalty, 1),
+                "polygPenalty": round(pg_penalty, 1),
             })
 
     # Sort by quality descending, return top 10

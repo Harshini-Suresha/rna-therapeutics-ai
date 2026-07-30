@@ -39,6 +39,12 @@ export interface AssoCandidate {
   targetRegion: string;
   chemistry: string;
   modifications: string[];
+  exonNumber: number | null;
+  exonLength: number | null;
+  gcScore: number;
+  tmScore: number;
+  selfComplementPenalty: number;
+  polygPenalty: number;
 }
 
 export interface GenerateResponse {
