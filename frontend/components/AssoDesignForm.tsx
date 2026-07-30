@@ -96,6 +96,7 @@ export default function AssoDesignForm({
   onGenerate,
   loading,
   disabled,
+  hasResults,
 }: {
   options: DesignOptions | null;
   asoLength: number;
@@ -107,6 +108,7 @@ export default function AssoDesignForm({
   onGenerate: () => void;
   loading: boolean;
   disabled: boolean;
+  hasResults?: boolean;
 }) {
   return (
     <div className="space-y-4">
@@ -173,7 +175,7 @@ export default function AssoDesignForm({
         className="flex w-full items-center justify-center gap-2 rounded-lg bg-brand px-5 py-2.5 text-[13.5px] font-medium text-white shadow-sm transition-colors hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-50"
       >
         {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-        {loading ? "Generating candidates..." : "Generate ASO Candidates"}
+        {loading ? "Generating candidates..." : hasResults ? "Regenerate Candidates" : "Generate ASO Candidates"}
       </button>
     </div>
   );

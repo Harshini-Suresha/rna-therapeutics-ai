@@ -263,7 +263,16 @@ export default function GeneSilencingPage() {
                     onGenerate={handleGenerate}
                     loading={genLoading}
                     disabled={!isTotalKnockdown && selectedExons.length === 0 || !target}
+                    hasResults={!!results}
                   />
+                  {results && (
+                    <button
+                      onClick={() => { setResults(null); setGenError(null); }}
+                      className="mt-3 w-full rounded-lg border border-slate-200 px-4 py-2 text-[12.5px] font-medium text-slate-500 hover:bg-slate-50 transition-colors"
+                    >
+                      Reset & choose different options
+                    </button>
+                  )}
                 </div>
               </Card>
             </div>
