@@ -31,6 +31,7 @@ class User(Base):
     favorites = relationship("FavoriteGene", back_populates="user", cascade="all, delete-orphan")
     activity = relationship("RecentActivity", back_populates="user", cascade="all, delete-orphan")
     verification_tokens = relationship("VerificationToken", back_populates="user", cascade="all, delete-orphan")
+    reports = relationship("Report", back_populates="user", cascade="all, delete-orphan")
 
 
 class ResearchInterest(Base):
@@ -83,6 +84,22 @@ class RecentActivity(Base):
     timestamp = Column(Float, nullable=False, default=time.time)
 
     user = relationship("User", back_populates="activity")
+
+
+class Report(Base):
+    __tablename__ = "reports"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    step = Column(String(50), nullable=False)
+    title = Column(String(255), nullable=False)
+    gene_symbol = Column(String(100), nullable=False, default="")
+    disease = Column(String(255), nullable=False, default="")
+    summary = Column(Text, nullable=False, default="")
+    data = Column(Text, nullable=False, default="{}")
+    created_at = Column(Float, nullable=False, default=time.time)
+
+    user = relationship("User", back_populates="reports")
 
 
 class VerificationToken(Base):

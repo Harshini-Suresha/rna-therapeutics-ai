@@ -14,6 +14,7 @@ import DiseaseSearchSection from "@/components/DiseaseSearchSection";
 import DiseaseMatchIndicator from "@/components/DiseaseMatchIndicator";
 import { GeneTargetObject } from "@/types/gene";
 import { fetchGene } from "@/lib/api";
+import { saveReport } from "@/lib/auth";
 import { getOrganism } from "@/lib/organisms";
 import { findViralGene } from "@/lib/virusGenes";
 import { formatGeneSymbol } from "../shared/geneFormat";
@@ -350,6 +351,14 @@ export default function NewProjectPage() {
       const formattedOfficial = formatGeneSymbol(result.geneSymbol, organism);
       setGeneSymbol(formattedOfficial);
       setGene(result);
+      saveReport({
+        step: "gene_lookup",
+        title: `Gene Lookup: ${result.geneSymbol || geneSymbol}`,
+        geneSymbol: result.geneSymbol || geneSymbol,
+        disease: diseaseName || "",
+        summary: `Retrieved data for ${result.geneSymbol} in ${(searchSpecies || "homo_sapiens").replace("_", " ")}.`,
+        data: { geneId: result.geneId, organism: searchSpecies, disease: diseaseName },
+      });
     } catch (err) {
       setGene(null);
       setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");

@@ -35,6 +35,7 @@ import { ValidationReport, AnalysisReport } from "@/types/upload";
 import { Modality } from "@/types/upload";
 import type { AnalyzeResponse } from "@/types/upload-types";
 import { validateSequence, analyzeSequence } from "@/lib/uploadApi";
+import { saveReport } from "@/lib/auth";
 import SequenceTrackViewer from "@/components/SequenceTrackViewer";
 import GcContentChart from "@/components/GcContentChart";
 import NucleotideCompositionChart from "@/components/NucleotideCompositionChart";
@@ -760,6 +761,14 @@ export default function UploadSequencePage() {
       await new Promise((r) => setTimeout(r, 350));
       setAnalysis(result);
       setStep("analysis");
+      saveReport({
+        step: "sequence_analysis",
+        title: `Sequence Analysis: ${filename || "Uploaded Sequence"}`,
+        geneSymbol: "",
+        disease: "",
+        summary: `Analyzed sequence (${rawInput.length} bp). GC: ${((result.gcContent || 0) * 100).toFixed(1)}%. Tm: ${result.meltingTemperature?.toFixed(1) || "N/A"}°C.`,
+        data: { gcContent: result.gcContent, tm: result.meltingTemperature, length: rawInput.length },
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Analysis failed.");
     } finally {

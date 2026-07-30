@@ -190,3 +190,51 @@ export async function resendVerification(email: string): Promise<{ ok: boolean; 
   });
   return res.json();
 }
+
+// ── Reports ─────────────────────────────────────────────────────────────────
+
+export interface ReportSummary {
+  id: number;
+  step: string;
+  title: string;
+  geneSymbol: string;
+  disease: string;
+  summary: string;
+  createdAt: number;
+}
+
+export interface ReportDetail extends ReportSummary {
+  data: Record<string, unknown>;
+}
+
+export async function listReports(): Promise<ReportSummary[]> {
+  const res = await authFetch("/api/reports");
+  if (!res.ok) return [];
+  return res.json();
+}
+
+export async function getReport(id: number): Promise<ReportDetail | null> {
+  const res = await authFetch(`/api/reports/${id}`);
+  if (!res.ok) return null;
+  return res.json();
+}
+
+export async function saveReport(report: {
+  step: string;
+  title: string;
+  geneSymbol?: string;
+  disease?: string;
+  summary?: string;
+  data?: Record<string, unknown>;
+}): Promise<{ id: number; createdAt: number } | null> {
+  const res = await authFetch("/api/reports", {
+    method: "POST",
+    body: JSON.stringify(report),
+  });
+  if (!res.ok) return null;
+  return res.json();
+}
+
+export async function deleteReport(id: number): Promise<void> {
+  await authFetch(`/api/reports/${id}`, { method: "DELETE" });
+}

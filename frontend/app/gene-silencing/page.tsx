@@ -18,6 +18,7 @@ import {
   generateCandidates,
   fetchClinVarVariants,
 } from "@/lib/geneSilencingApi";
+import { saveReport } from "@/lib/auth";
 
 const CONFIRMED_TARGET_KEY = "aso:confirmedTarget";
 const SELECTED_MECHANISM_KEY = "aso:selectedMechanism";
@@ -133,6 +134,14 @@ export default function GeneSilencingPage() {
         modifications: selectedMods,
       });
       setResults(res);
+      saveReport({
+        step: "aso_design",
+        title: `ASO Design: ${gene.geneSymbol} — ${mechanism.name}`,
+        geneSymbol: gene.geneSymbol,
+        disease: gene.disease || "",
+        summary: `Generated ${res.candidates.length} ASO candidates for ${mechanism.name}. Top candidate: ${res.candidates[0]?.asoLabel || "N/A"}.`,
+        data: { mechanismId: mechanism.id, mechanismName: mechanism.name, candidateCount: res.candidates.length },
+      });
     } catch (err) {
       setGenError(err instanceof Error ? err.message : "Generation failed.");
     } finally {

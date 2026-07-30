@@ -20,6 +20,7 @@ import {
   rankRnaProcessingMechanisms,
   getGoalLabel,
 } from "@/lib/mechanismApi";
+import { saveReport } from "@/lib/auth";
 
 const CONFIRMED_TARGET_KEY = "aso:confirmedTarget";
 const SELECTED_MECHANISM_KEY = "aso:selectedMechanism";
@@ -121,6 +122,14 @@ export default function MechanismSelectionPage() {
       }
 
       setRanking(result);
+      saveReport({
+        step: "mechanism",
+        title: `Mechanism Analysis: ${gene.geneSymbol} (${selectedGoal || "N/A"})`,
+        geneSymbol: gene.geneSymbol,
+        disease: gene.disease || "",
+        summary: `Ranked ${result.results.length} mechanisms for ${gene.geneSymbol}. Top: ${result.results[0]?.name || "N/A"}.`,
+        data: { goal: selectedGoal, topMechanisms: result.results.slice(0, 5).map((m: any) => ({ id: m.id, name: m.name, score: m.score })) },
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
