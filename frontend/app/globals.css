@@ -19,6 +19,53 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+.dark body,
+.dark {
+  background-color: #0f172a;
+  color: #e2e8f0;
+}
+
+.dark .bg-white { background-color: #1e293b; }
+.dark .bg-\[#F5F6FA\] { background-color: #0f172a; }
+.dark .bg-slate-50 { background-color: #1e293b; }
+.dark .bg-slate-100 { background-color: #334155; }
+.dark .bg-red-50 { background-color: #450a0a; }
+.dark .bg-emerald-50 { background-color: #052e16; }
+.dark .bg-indigo-50 { background-color: #1e1b4b; }
+.dark .bg-amber-50 { background-color: #451a03; }
+
+.dark .text-slate-800 { color: #f1f5f9; }
+.dark .text-slate-700 { color: #e2e8f0; }
+.dark .text-slate-600 { color: #cbd5e1; }
+.dark .text-slate-500 { color: #94a3b8; }
+.dark .text-slate-400 { color: #64748b; }
+.dark .text-\[#101d46\] { color: #f1f5f9; }
+.dark .text-\[#4a5d8a\] { color: #94a3b8; }
+.dark .text-\[#0d2b64\] { color: #94a3b8; }
+
+.dark .border-slate-200 { border-color: #334155; }
+.dark .border-slate-100 { border-color: #1e293b; }
+
+.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]) { border-color: #1e293b; }
+
+.dark .placeholder-slate-400 { color: #475569; }
+
+.dark .hover\:bg-slate-50:hover { background-color: #1e293b; }
+.dark .hover\:bg-slate-100:hover { background-color: #334155; }
+
+.dark input,
+.dark select,
+.dark textarea {
+  background-color: #0f172a;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #475569;
+}
+
 .card-scroll::-webkit-scrollbar {
   width: 4px;
 }

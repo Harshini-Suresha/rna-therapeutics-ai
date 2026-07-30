@@ -12,7 +12,7 @@ export function Card({
 }) {
   return (
     <div
-      className={`border border-slate-200 bg-white rounded-xl ${className}`}
+      className={`border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-xl ${className}`}
     >
       {children}
     </div>
@@ -29,8 +29,8 @@ export function SectionHeader({
   right?: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-slate-100">
-      <h2 className="text-[14px] font-semibold text-slate-800">
+    <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-slate-100 dark:border-slate-700">
+      <h2 className="text-[14px] font-semibold text-slate-800 dark:text-slate-200">
         {step ? `${step}. ${title}` : title}
       </h2>
       {right}

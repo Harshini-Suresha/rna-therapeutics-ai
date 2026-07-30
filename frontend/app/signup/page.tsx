@@ -66,7 +66,7 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-[#F5F6FA]">
+    <div className="flex min-h-screen bg-[#F5F6FA] dark:bg-[#0f172a]">
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-navy-950 to-navy-900 items-center justify-center">
         <div className="max-w-md px-8 text-center">
           <div className="flex items-center justify-center gap-2.5 mb-6">
@@ -86,11 +86,11 @@ export default function SignupPage() {
         <div className="w-full max-w-sm">
           <div className="flex items-center gap-2 mb-8 lg:hidden">
             <Dna className="h-5 w-5 text-indigo-500" strokeWidth={2} />
-            <p className="text-[14px] font-bold text-slate-800">RNA Therapeutics Platform</p>
+            <p className="text-[14px] font-bold text-slate-800 dark:text-slate-200">RNA Therapeutics Platform</p>
           </div>
 
-          <h1 className="text-[22px] font-bold text-slate-900">Create account</h1>
-          <p className="mt-1 text-[13px] text-slate-500">Get started with the platform.</p>
+          <h1 className="text-[22px] font-bold text-slate-900 dark:text-slate-100">Create account</h1>
+          <p className="mt-1 text-[13px] text-slate-500 dark:text-slate-400">Get started with the platform.</p>
 
           {error && (
             <div className="mt-4 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-[12px] text-red-600">
@@ -101,35 +101,35 @@ export default function SignupPage() {
 
           <form onSubmit={handleSubmit} className="mt-6 space-y-4">
             <div>
-              <label className="mb-1 block text-[12px] font-medium text-slate-600">Full name</label>
+              <label className="mb-1 block text-[12px] font-medium text-slate-600 dark:text-slate-400">Full name</label>
               <input
                 type="text"
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-[13px] text-slate-800 outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15"
+                className="h-10 w-full rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 text-[13px] text-slate-800 dark:text-slate-200 outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15"
                 placeholder="Jane Doe"
               />
             </div>
             <div>
-              <label className="mb-1 block text-[12px] font-medium text-slate-600">Email</label>
+              <label className="mb-1 block text-[12px] font-medium text-slate-600 dark:text-slate-400">Email</label>
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-[13px] text-slate-800 outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15"
+                className="h-10 w-full rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 text-[13px] text-slate-800 dark:text-slate-200 outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15"
                 placeholder="you@example.com"
               />
             </div>
             <div>
-              <label className="mb-1 block text-[12px] font-medium text-slate-600">Password</label>
+              <label className="mb-1 block text-[12px] font-medium text-slate-600 dark:text-slate-400">Password</label>
               <input
                 type="password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-[13px] text-slate-800 outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15"
+                className="h-10 w-full rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 text-[13px] text-slate-800 dark:text-slate-200 outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15"
                 placeholder="At least 6 characters"
               />
             </div>
@@ -143,9 +143,9 @@ export default function SignupPage() {
             </button>
           </form>
 
-          <p className="mt-6 text-center text-[12px] text-slate-500">
+          <p className="mt-6 text-center text-[12px] text-slate-500 dark:text-slate-400">
             Already have an account?{" "}
-            <a href="/login" className="font-medium text-indigo-600 hover:text-indigo-700">Sign in</a>
+            <a href="/login" className="font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300">Sign in</a>
           </p>
         </div>
       </div>

@@ -104,25 +104,25 @@ export default function AccountMenu({
       </button>
 
       {open && (
-        <div className="absolute right-0 z-20 mt-2 w-64 border border-slate-200 bg-white shadow-lg">
+        <div className="absolute right-0 z-20 mt-2 w-64 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-lg">
           {/* User Header */}
-          <div className="border-b border-slate-100 px-4 py-3">
+          <div className="border-b border-slate-100 dark:border-slate-700 px-4 py-3">
             <div className="flex items-center gap-3">
               <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand text-[13px] font-semibold text-white shrink-0">
                 {initials}
               </span>
               <div className="min-w-0">
-                <p className="text-[12.5px] font-semibold text-slate-800 truncate">{name}</p>
+                <p className="text-[12.5px] font-semibold text-slate-800 dark:text-slate-200 truncate">{name}</p>
                 {(role || institution) && (
-                  <p className="text-[10.5px] text-slate-400 truncate">
+                  <p className="text-[10.5px] text-slate-400 dark:text-slate-500 truncate">
                     {role}{role && institution ? " \u00b7 " : ""}{institution}
                   </p>
                 )}
-                <p className="text-[10.5px] text-slate-400 truncate">{email}</p>
+                <p className="text-[10.5px] text-slate-400 dark:text-slate-500 truncate">{email}</p>
               </div>
             </div>
             {verified === false && (
-              <a href="/verify-email" className="mt-2 flex items-center gap-1.5 rounded-md bg-amber-50 border border-amber-200 px-2.5 py-1.5 text-[10.5px] text-amber-700 hover:bg-amber-100">
+              <a href="/verify-email" className="mt-2 flex items-center gap-1.5 rounded-md bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 px-2.5 py-1.5 text-[10.5px] text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900">
                 <span className="h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0" />
                 Email not verified — click to resend
               </a>
@@ -130,18 +130,18 @@ export default function AccountMenu({
           </div>
 
           {/* Workspace */}
-          <div className="border-b border-slate-100 px-4 py-2.5">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
+          <div className="border-b border-slate-100 dark:border-slate-700 px-4 py-2.5">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1.5">
               Workspace
             </p>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="flex h-5 w-5 items-center justify-center rounded bg-indigo-100 text-[9px] font-bold text-indigo-600">
+                <span className="flex h-5 w-5 items-center justify-center rounded bg-indigo-100 dark:bg-indigo-900 text-[9px] font-bold text-indigo-600 dark:text-indigo-300">
                   {institution ? institution.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase() : "WS"}
                 </span>
-                <span className="text-[11.5px] font-medium text-slate-700">{institution || "Workspace"}</span>
+                <span className="text-[11.5px] font-medium text-slate-700 dark:text-slate-300">{institution || "Workspace"}</span>
               </div>
-              <ChevronRight className="h-3 w-3 text-slate-300" />
+              <ChevronRight className="h-3 w-3 text-slate-300 dark:text-slate-600" />
             </div>
           </div>
 
@@ -153,18 +153,18 @@ export default function AccountMenu({
                 <button
                   key={item.label}
                   onClick={() => navigate(item.href)}
-                  className="flex w-full items-center gap-2.5 rounded px-3 py-1.5 text-[11.5px] text-slate-700 hover:bg-slate-50"
+                  className="flex w-full items-center gap-2.5 rounded px-3 py-1.5 text-[11.5px] text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
                 >
-                  <Icon className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                  <Icon className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500 shrink-0" />
                   {item.label}
                 </button>
               );
             })}
 
-            <div className="my-1.5 border-t border-slate-100" />
+            <div className="my-1.5 border-t border-slate-100 dark:border-slate-700" />
 
             {/* Saved Work */}
-            <p className="px-3 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+            <p className="px-3 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
               Saved Work
             </p>
             {SAVED_ITEMS.map((item) => {
@@ -173,18 +173,18 @@ export default function AccountMenu({
                 <button
                   key={item.label}
                   onClick={() => navigate(item.href)}
-                  className="flex w-full items-center gap-2.5 rounded px-3 py-1.5 text-[11.5px] text-slate-700 hover:bg-slate-50"
+                  className="flex w-full items-center gap-2.5 rounded px-3 py-1.5 text-[11.5px] text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
                 >
-                  <Icon className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                  <Icon className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500 shrink-0" />
                   {item.label}
                 </button>
               );
             })}
 
-            <div className="my-1.5 border-t border-slate-100" />
+            <div className="my-1.5 border-t border-slate-100 dark:border-slate-700" />
 
             {/* Preferences */}
-            <p className="px-3 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+            <p className="px-3 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
               Preferences
             </p>
             {PREFERENCES.map((item) => {
@@ -193,15 +193,15 @@ export default function AccountMenu({
                 <button
                   key={item.label}
                   onClick={() => navigate(item.href)}
-                  className="flex w-full items-center gap-2.5 rounded px-3 py-1.5 text-[11.5px] text-slate-700 hover:bg-slate-50"
+                  className="flex w-full items-center gap-2.5 rounded px-3 py-1.5 text-[11.5px] text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
                 >
-                  <Icon className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                  <Icon className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500 shrink-0" />
                   {item.label}
                 </button>
               );
             })}
 
-            <div className="my-1.5 border-t border-slate-100" />
+            <div className="my-1.5 border-t border-slate-100 dark:border-slate-700" />
 
             {/* Bottom Items */}
             {BOTTOM_ITEMS.map((item) => {
@@ -210,17 +210,17 @@ export default function AccountMenu({
                 <button
                   key={item.label}
                   onClick={() => navigate(item.href)}
-                  className="flex w-full items-center gap-2.5 rounded px-3 py-1.5 text-[11.5px] text-slate-700 hover:bg-slate-50"
+                  className="flex w-full items-center gap-2.5 rounded px-3 py-1.5 text-[11.5px] text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
                 >
-                  <Icon className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                  <Icon className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500 shrink-0" />
                   {item.label}
                 </button>
               );
             })}
 
-            <div className="my-1.5 border-t border-slate-100" />
+            <div className="my-1.5 border-t border-slate-100 dark:border-slate-700" />
 
-            <button onClick={handleLogout} className="flex w-full items-center gap-2.5 rounded px-3 py-1.5 text-left text-[11.5px] text-red-600 hover:bg-red-50">
+            <button onClick={handleLogout} className="flex w-full items-center gap-2.5 rounded px-3 py-1.5 text-left text-[11.5px] text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950">
               <LogOut className="h-3.5 w-3.5 shrink-0" />
               Sign Out
             </button>
