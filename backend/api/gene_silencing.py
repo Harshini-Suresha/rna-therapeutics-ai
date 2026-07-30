@@ -29,6 +29,7 @@ class CandidateRequest(BaseModel):
     delivery_context: Optional[str] = None
     defect_type: Optional[str] = None
     silencing_scope: Optional[str] = None
+    known_variant: Optional[str] = None
 
 
 @router.get("/api/gene-silencing/target/{ensembl_gene_id}")
@@ -69,6 +70,7 @@ async def generate_aso_candidates(payload: CandidateRequest):
             delivery_context=payload.delivery_context,
             defect_type=payload.defect_type,
             silencing_scope=payload.silencing_scope,
+            known_variant=payload.known_variant,
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc

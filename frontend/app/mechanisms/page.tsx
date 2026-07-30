@@ -149,6 +149,7 @@ export default function MechanismSelectionPage() {
           silencingScope: selectedGoal === "TG01" ? silencingScope : null,
           defectType: selectedGoal === "TG01" ? defectType : null,
           therapeuticGoal: selectedGoal,
+          knownVariant,
         })
       );
     }

@@ -77,6 +77,10 @@ export interface AssoCandidate {
   defectNucleasePreference: number;
   defectChemPreference: number;
   defectNotes: string;
+  knownVariant: string;
+  alleleSpecific: boolean;
+  alleleBonus: number;
+  alleleNotes: string;
 }
 
 export interface GenerateResponse {

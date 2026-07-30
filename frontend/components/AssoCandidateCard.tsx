@@ -244,6 +244,20 @@ export default function AssoCandidateCard({
               {candidate.chemBonus !== 0 && <Td label="Chemistry Bonus" value={`+${candidate.chemBonus}`} />}
               {candidate.modBonus !== 0 && <Td label="Modification Bonus" value={`+${candidate.modBonus}`} />}
               {candidate.cpgPenalty > 0 && <Td label="CpG Immune Penalty" value={`-${candidate.cpgPenalty}`} warn />}
+
+              {/* ALLELE-SPECIFIC */}
+              {candidate.knownVariant && (
+                <>
+                  <TableSection title="Allele-Specific Design" />
+                  <Td label="Known Variant" value={candidate.knownVariant} highlight />
+                  <Td label="Allele-Specific Targeting" value={candidate.alleleSpecific ? "Yes" : "No"} highlight={candidate.alleleSpecific} />
+                  {candidate.alleleBonus !== 0 && <Td label="Allele Bonus" value={`+${candidate.alleleBonus}`} />}
+                  <tr className="border-b border-slate-100">
+                    <td className="py-1.5 pr-4 text-[11px] text-slate-500">Allele Notes</td>
+                    <td className="py-1.5 text-right text-[10.5px] text-slate-500 italic max-w-[250px]">{candidate.alleleNotes}</td>
+                  </tr>
+                </>
+              )}
             </tbody>
           </table>
         </div>
@@ -262,7 +276,7 @@ export default function AssoCandidateCard({
               <div>
                 <p className="font-bold text-slate-700 mb-1">Composite Quality Score</p>
                 <code className="block rounded bg-slate-100 px-3 py-2 text-[10px] font-mono text-slate-600">
-                  Score = GC×0.30 + Tm×0.40 − SelfDimer×200 − PolyG×15 + ChemBonus + ModBonus − CpG
+                  Score = GC×0.30 + Tm×0.40 − SelfDimer×200 − PolyG×15 + ChemBonus + ModBonus − CpG + TissueAdjustments + DefectAdjustments + AlleleBonus
                 </code>
                 <ul className="mt-1.5 space-y-0.5 text-[10px]">
                   <li><strong>GC Content (×0.30):</strong> max(0, 100 − |GC% − 50%| × 400). Peaks at 50%.</li>
@@ -272,6 +286,7 @@ export default function AssoCandidateCard({
                   <li><strong>Chemistry:</strong> LNA +5, 2'-OMe +3, siRNA +2, PMO −3.</li>
                   <li><strong>Modifications:</strong> PS +4, LNA wings +5, 2'-OMe +3, PMO core +2, PNA +3.</li>
                   <li><strong>CpG:</strong> (count − 2) × 5 if {'>'}2 CpGs (TLR9 immune stimulation).</li>
+                  <li><strong>Allele-Specific:</strong> +5 to +20 for SNPs, +10 for indels, +5 bonus for gapmer+PS chemistry.</li>
                 </ul>
               </div>
               <div>

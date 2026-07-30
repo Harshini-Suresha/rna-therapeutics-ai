@@ -39,6 +39,7 @@ export async function generateCandidates(params: {
   deliveryContext?: string;
   defectType?: string;
   silencingScope?: string;
+  knownVariant?: string;
 }): Promise<GenerateResponse> {
   const res = await fetch(`${API_BASE}/api/gene-silencing/generate`, {
     method: "POST",
@@ -53,6 +54,7 @@ export async function generateCandidates(params: {
       delivery_context: params.deliveryContext || null,
       defect_type: params.defectType || null,
       silencing_scope: params.silencingScope || null,
+      known_variant: params.knownVariant || null,
     }),
   });
   if (!res.ok) {

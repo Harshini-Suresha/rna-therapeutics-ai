@@ -47,6 +47,7 @@ export default function GeneSilencingPage() {
   const [chemistry, setChemistry] = useState("gapmer");
   const [selectedMods, setSelectedMods] = useState<string[]>(["phosphorothioate"]);
   const [deliveryContext, setDeliveryContext] = useState("");
+  const [knownVariant, setKnownVariant] = useState("");
 
   const [results, setResults] = useState<GenerateResponse | null>(null);
   const [genLoading, setGenLoading] = useState(false);
@@ -66,6 +67,7 @@ export default function GeneSilencingPage() {
         setSilencingScope(parsed.silencingScope ?? null);
         setDefectType(parsed.defectType ?? null);
         setTherapeuticGoal(parsed.therapeuticGoal ?? null);
+        setKnownVariant(parsed.knownVariant ?? "");
         if (parsed.silencingScope === "total_knockdown") {
           setIsTotalKnockdown(true);
         }
@@ -140,6 +142,7 @@ export default function GeneSilencingPage() {
         deliveryContext: deliveryContext || undefined,
         defectType: defectType || undefined,
         silencingScope: silencingScope || undefined,
+        knownVariant: knownVariant || undefined,
       });
       setResults(res);
       saveReport({

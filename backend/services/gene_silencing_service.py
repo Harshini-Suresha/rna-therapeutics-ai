@@ -556,6 +556,105 @@ def _mechanism_design_constraints(mechanism_id: str, aso_length: int, chemistry:
     raise ValueError(f"Unsupported gene-silencing mechanism: {mechanism_id}")
 
 
+def _allele_specific_scoring(
+    candidate_seq: str,
+    known_variant: str | None,
+    exon_seq: str,
+    chemistry: str,
+    modifications: list[str],
+) -> dict:
+    """Score allele-specific targeting based on the known variant.
+
+    If a known_variant is provided, the ASO should ideally discriminate
+    between the mutant and wild-type allele. This is most effective for:
+    - SNPs within the target region
+    - Deletions/insertions that shift the binding site
+
+    Returns allele_bonus (score adjustment) and notes about the design.
+    """
+    result = {"alleleBonus": 0, "alleleSpecific": False, "alleleNotes": ""}
+
+    if not known_variant:
+        return result
+
+    variant = known_variant.strip().upper()
+
+    # Parse common variant formats
+    # HGVS: c.1521_1523delCTT, p.Phe508del, c.1521C>T, rs12345
+    # Simple: c.1521C>T, delCTT, insAG, C>T
+
+    has_snp = False
+    has_deletion = False
+    has_insertion = False
+    variant_base = None
+    reference_base = None
+
+    # Check for point mutation (C>T, G>A, etc.)
+    if ">" in variant:
+        has_snp = True
+        parts = variant.split(">")
+        if len(parts) == 2:
+            reference_base = parts[0][-1] if parts[0] else None
+            variant_base = parts[1][0] if parts[1] else None
+
+    # Check for deletion
+    if "DEL" in variant:
+        has_deletion = True
+    elif "INS" in variant:
+        has_insertion = True
+    elif "_" in variant and ("DEL" in variant or len(variant.split("_")) > 1):
+        has_deletion = True
+
+    # Allele-specific bonus calculations
+    if has_snp and reference_base and variant_base:
+        # For SNPs, check if the candidate overlaps the variant position
+        # and preferentially targets the mutant allele
+        for i in range(len(candidate_seq) - 5):
+            window = candidate_seq[i:i+6]
+            if reference_base * 3 in window or variant_base * 3 in window:
+                # The candidate overlaps a region with the variant base
+                result["alleleBonus"] = 15
+                result["alleleSpecific"] = True
+                result["alleleNotes"] = (
+                    f"Allele-specific design targeting {known_variant}. "
+                    f"Candidate overlaps the variant position and should "
+                    f"discriminate mutant from wild-type allele."
+                )
+                break
+        else:
+            # No overlap found, but still an allele-specific design
+            result["alleleBonus"] = 5
+            result["alleleSpecific"] = True
+            result["alleleNotes"] = (
+                f"Allele-specific design for {known_variant}. "
+                f"Candidate does not directly overlap the variant position; "
+                f"consider repositioning for better discrimination."
+            )
+    elif has_deletion or has_insertion:
+        # For indels, allele-specific bonus is moderate
+        result["alleleBonus"] = 10
+        result["alleleSpecific"] = True
+        result["alleleNotes"] = (
+            f"Allele-specific design for {known_variant}. "
+            f"Indel-based discrimination may use flanking sequence differences."
+        )
+    else:
+        # Generic variant (rsID or unparseable)
+        result["alleleBonus"] = 5
+        result["alleleSpecific"] = True
+        result["alleleNotes"] = (
+            f"Design targets region near {known_variant}. "
+            f"Verify allele-specificity with experimental validation."
+        )
+
+    # Additional bonus for gapmer/PS chemistry (better allele discrimination)
+    if chemistry == "gapmer" and "phosphorothioate" in modifications:
+        result["alleleBonus"] += 5
+        result["alleleNotes"] += " Gapmer + PS chemistry enhances allele discrimination."
+
+    return result
+
+
 def generate_candidates(
     target_exon_indices: list[int] | None,
     aso_length: int,
@@ -567,6 +666,7 @@ def generate_candidates(
     delivery_context: str | None = None,
     defect_type: str | None = None,
     silencing_scope: str | None = None,
+    known_variant: str | None = None,
 ) -> list[dict]:
     """Generate candidate ASOs for the selected mechanism and target region.
 
@@ -754,6 +854,14 @@ def generate_candidates(
             mw = _molecular_weight(candidate_seq)
             ext_coeff = _extinction_coefficient(candidate_seq)
 
+            # Allele-specific scoring
+            allele = _allele_specific_scoring(
+                candidate_seq, known_variant, exon_seq, chemistry, modifications
+            )
+
+            # Apply allele-specific bonus to quality score
+            adjusted_quality = min(100, quality + allele["alleleBonus"])
+
             candidates.append({
                 "sequence": _reverse_complement(candidate_seq),
                 "length": aso_length,
@@ -761,7 +869,7 @@ def generate_candidates(
                 "meltingTemp": tm,
                 "selfComplementScore": round(sc, 4),
                 "polygTracts": pg,
-                "qualityScore": round(quality, 1),
+                "qualityScore": round(adjusted_quality, 1),
                 "targetRegion": region_label,
                 "chemistry": chemistry,
                 "modifications": modifications,
@@ -803,6 +911,10 @@ def generate_candidates(
                 "defectNucleasePreference": defect_nuclease,
                 "defectChemPreference": defect_chem,
                 "defectNotes": defect["defect_notes"],
+                "knownVariant": known_variant or "",
+                "alleleSpecific": allele["alleleSpecific"],
+                "alleleBonus": allele["alleleBonus"],
+                "alleleNotes": allele["alleleNotes"],
             })
 
     # Sort by quality descending, return top 10
