@@ -15,14 +15,14 @@ function ConfidenceBadge({ score }: { score: number }) {
         : "bg-red-50 text-red-600 border-red-200";
   return (
     <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${cls}`}>
-      {label}
+      {label} Confidence
     </span>
   );
 }
 
-function ScoreBar({ value, max = 100, warn }: { value: number; max?: number; warn?: boolean }) {
+function ScoreBar({ value, max = 100 }: { value: number; max?: number }) {
   const pct = Math.min(100, (value / max) * 100);
-  const color = warn ? "bg-amber-400" : pct >= 70 ? "bg-emerald-400" : pct >= 40 ? "bg-blue-400" : "bg-slate-300";
+  const color = pct >= 70 ? "bg-emerald-400" : pct >= 50 ? "bg-blue-400" : pct >= 30 ? "bg-amber-400" : "bg-red-400";
   return (
     <div className="flex items-center gap-2">
       <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
@@ -33,39 +33,33 @@ function ScoreBar({ value, max = 100, warn }: { value: number; max?: number; war
   );
 }
 
-function Row({ label, value, unit, warn, highlight }: { label: string; value: string | number; unit?: string; warn?: boolean; highlight?: boolean }) {
+function Td({ label, value, unit, warn, highlight, bar }: { label: string; value?: string | number | null; unit?: string; warn?: boolean; highlight?: boolean; bar?: number }) {
+  if (value === null || value === undefined) return null;
   return (
-    <div className="flex items-center justify-between border-b border-slate-100 py-1.5 last:border-0">
-      <span className="text-[11px] text-slate-500">{label}</span>
-      <span className={`text-[11.5px] font-semibold ${highlight ? "text-brand" : warn ? "text-amber-600" : "text-slate-700"}`}>
-        {value}{unit && <span className="text-[10px] font-normal text-slate-400 ml-0.5">{unit}</span>}
-      </span>
-    </div>
+    <tr className="border-b border-slate-100 last:border-0">
+      <td className="py-1.5 pr-4 text-[11px] text-slate-500 whitespace-nowrap">{label}</td>
+      <td className="py-1.5 text-right">
+        {bar !== undefined ? (
+          <div className="flex items-center justify-end gap-2">
+            <ScoreBar value={bar} />
+          </div>
+        ) : (
+          <span className={`text-[11.5px] font-semibold ${highlight ? "text-brand" : warn ? "text-amber-600" : "text-slate-700"}`}>
+            {value}{unit && <span className="text-[10px] font-normal text-slate-400 ml-0.5">{unit}</span>}
+          </span>
+        )}
+      </td>
+    </tr>
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function TableSection({ title, colSpan = 1 }: { title: string; colSpan?: number }) {
   return (
-    <div>
-      <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{title}</p>
-      <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-1">
-        {children}
-      </div>
-    </div>
-  );
-}
-
-function ScoreSection({ title, value, bar }: { title: string; value: number; bar?: boolean }) {
-  const label = value >= 70 ? "Excellent" : value >= 50 ? "Good" : value >= 30 ? "Fair" : "Poor";
-  const color = value >= 70 ? "text-emerald-600" : value >= 50 ? "text-blue-600" : value >= 30 ? "text-amber-600" : "text-red-500";
-  return (
-    <div className="flex items-center justify-between border-b border-slate-100 py-1.5 last:border-0">
-      <span className="text-[11px] text-slate-500">{title}</span>
-      <div className="flex items-center gap-2">
-        {bar && <ScoreBar value={value} />}
-        <span className={`text-[10.5px] font-medium ${color}`}>{label}</span>
-      </div>
-    </div>
+    <tr>
+      <td colSpan={colSpan} className="bg-slate-100/50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+        {title}
+      </td>
+    </tr>
   );
 }
 
@@ -95,10 +89,17 @@ export default function AssoCandidateCard({
           ? "Moderate"
           : "High";
 
+  const nucleaseLabel = candidate.nucleaseResistance >= 80 ? "Excellent" : candidate.nucleaseResistance >= 60 ? "Good" : candidate.nucleaseResistance >= 40 ? "Moderate" : "Low";
+  const uptakeLabel = candidate.cellularUptake >= 70 ? "High" : candidate.cellularUptake >= 50 ? "Moderate" : "Low";
+  const bbbLabel = candidate.bbbCrossing >= 60 ? "Good" : candidate.bbbCrossing >= 30 ? "Limited" : "Poor";
+  const offTargetLabel = candidate.offTargetRisk <= 20 ? "Low" : candidate.offTargetRisk <= 40 ? "Moderate" : "High";
+  const immuneLabel = candidate.immuneStimulation <= 15 ? "Low" : candidate.immuneStimulation <= 35 ? "Moderate" : "High";
+  const synthesisLabel = candidate.synthesisDifficulty <= 30 ? "Standard" : candidate.synthesisDifficulty <= 55 ? "Moderate" : "Complex";
+
   return (
     <Card className="overflow-hidden">
       <div className="flex flex-col gap-0 p-0">
-        {/* Header bar */}
+        {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-5 py-3">
           <div className="flex items-center gap-3">
             <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand/10 text-[12px] font-bold text-brand">
@@ -108,7 +109,7 @@ export default function AssoCandidateCard({
               <div className="flex items-center gap-2">
                 <span className="text-[13px] font-semibold text-slate-800">{candidate.chemistry.toUpperCase()}</span>
                 <span className="text-[11px] text-slate-400">·</span>
-                <span className="text-[11px] text-slate-500">{candidate.length} nt oligonucleotide</span>
+                <span className="text-[11px] text-slate-500">{candidate.length} nt</span>
                 <ConfidenceBadge score={candidate.qualityScore} />
               </div>
               <p className="text-[10.5px] text-slate-400 mt-0.5">{candidate.targetRegion}</p>
@@ -118,142 +119,170 @@ export default function AssoCandidateCard({
             onClick={copySequence}
             className="flex items-center gap-1 rounded-md border border-slate-200 px-2.5 py-1.5 text-[11px] text-slate-500 hover:bg-white transition-colors"
           >
-            {copied ? (
-              <><Check className="h-3 w-3 text-emerald-500" /> Copied</>
-            ) : (
-              <><Copy className="h-3 w-3" /> Copy seq</>
-            )}
+            {copied ? <><Check className="h-3 w-3 text-emerald-500" /> Copied</> : <><Copy className="h-3 w-3" /> Copy seq</>}
           </button>
         </div>
 
         {/* Sequence */}
         <div className="border-b border-slate-100 px-5 py-3">
-          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Sequence (5'→3')</p>
-          <div className="rounded-lg bg-slate-900 px-4 py-2.5 font-mono text-[13px] text-emerald-400 break-all leading-relaxed tracking-widest">
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Antisense Sequence (5'→3')</p>
+          <div className="rounded-lg bg-slate-900 px-4 py-2.5 font-mono text-[13px] text-emerald-400 break-all leading-relaxed tracking-widest select-all">
             {candidate.sequence}
           </div>
-          <div className="mt-1.5 flex gap-4 text-[10px] text-slate-400">
-            <span>MW: {candidate.molecularWeight?.toLocaleString()} Da</span>
-            <span>ε₂₆₀: {candidate.extinctionCoefficient?.toLocaleString()} L/mol·cm</span>
-            <span>Duplex: {candidate.duplexStability}</span>
+          <div className="mt-1.5 flex flex-wrap gap-x-5 gap-y-1 text-[10px] text-slate-400">
+            <span>Molecular Weight: <strong className="text-slate-600">{candidate.molecularWeight?.toLocaleString()} Da</strong></span>
+            <span>Extinction Coefficient: <strong className="text-slate-600">{candidate.extinctionCoefficient?.toLocaleString()} L/mol·cm</strong></span>
+            <span>Duplex Stability: <strong className="text-slate-600">{candidate.duplexStability}</strong></span>
           </div>
         </div>
 
-        {/* Three-column table layout */}
-        <div className="grid grid-cols-1 divide-y divide-slate-100 md:grid-cols-3 md:divide-y-0 md:divide-x">
-          {/* Column 1 — Biophysical */}
-          <div className="px-5 py-3 space-y-3">
-            <Section title="Biophysical Properties">
-              <Row label="GC Content" value={`${candidate.gcContent}%`} />
-              <Row label="Melting Temperature" value={candidate.meltingTemp} unit="°C" />
-              <Row label="Self-dimer Risk" value={selfDimerLabel} />
-              <Row label="Poly-G Tracts" value={candidate.polygTracts} warn={candidate.polygTracts > 0} />
-              <Row label="Binding Energy" value={candidate.bindingEnergy} unit="kcal/mol" />
-            </Section>
-
-            <Section title="Sequence Composition">
-              <Row label="CpG Dinucleotides" value={candidate.cpgCount} warn={candidate.cpgCount >= 3} />
-              <Row label="Longest Homopolymer" value={candidate.longestHomopolymer} unit="bp" warn={candidate.longestHomopolymer >= 4} />
-              <Row label="Purine Content" value={`${(candidate.purineContent * 100).toFixed(1)}%`} />
-              <Row label="GC Skew" value={candidate.gcSkew.toFixed(3)} />
-              <Row label="Complexity" value={candidate.sequenceComplexity.toFixed(2)} warn={candidate.sequenceComplexity < 0.7} />
-            </Section>
-          </div>
-
-          {/* Column 2 — Target & Design */}
-          <div className="px-5 py-3 space-y-3">
-            <Section title="Target Information">
-              {candidate.exonNumber != null && (
-                <Row label="Target Exon" value={`Exon ${candidate.exonNumber}`} highlight />
-              )}
-              {candidate.exonLength != null && (
-                <Row label="Exon Length" value={candidate.exonLength} unit="bp" />
-              )}
-              <Row label="Position" value={candidate.targetRegion} />
-              <Row label="Chemistry" value={candidate.chemistry} />
+        {/* Large table */}
+        <div className="px-5 py-3">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="border-b-2 border-slate-200">
+                <th className="pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">Property</th>
+                <th className="pb-2 text-right text-[10px] font-bold uppercase tracking-wider text-slate-400">Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              {/* IDENTIFICATION */}
+              <TableSection title="Identification" />
+              <Td label="Rank" value={`#${rank}`} highlight />
+              <Td label="Chemistry" value={candidate.chemistry} />
+              <Td label="Oligo Length" value={candidate.length} unit="nt" />
+              <Td label="Target Region" value={candidate.targetRegion} />
+              {candidate.exonNumber != null && <Td label="Target Exon" value={`Exon ${candidate.exonNumber}`} highlight />}
+              {candidate.exonLength != null && <Td label="Exon Length" value={candidate.exonLength} unit="bp" />}
               {candidate.modifications.length > 0 && (
-                <div className="flex items-center justify-between border-b border-slate-100 py-1.5 last:border-0">
-                  <span className="text-[11px] text-slate-500">Modifications</span>
-                  <div className="flex flex-wrap gap-1 justify-end">
-                    {candidate.modifications.map((m) => (
-                      <span key={m} className="rounded bg-indigo-50 px-1.5 py-0.5 text-[9.5px] font-medium text-indigo-600">
-                        {m}
-                      </span>
-                    ))}
-                  </div>
-                </div>
+                <tr className="border-b border-slate-100">
+                  <td className="py-1.5 pr-4 text-[11px] text-slate-500">Modifications</td>
+                  <td className="py-1.5 text-right">
+                    <div className="flex flex-wrap gap-1 justify-end">
+                      {candidate.modifications.map((m) => (
+                        <span key={m} className="rounded bg-indigo-50 px-1.5 py-0.5 text-[9.5px] font-medium text-indigo-600">{m}</span>
+                      ))}
+                    </div>
+                  </td>
+                </tr>
               )}
-            </Section>
 
-            <Section title="Drug-like Properties">
-              <ScoreSection title="Drug Likeness" value={candidate.drugLikeness} bar />
-              <ScoreSection title="Nuclease Resistance" value={candidate.nucleaseResistance} bar />
-              <ScoreSection title="Cellular Uptake" value={candidate.cellularUptake} bar />
-              <ScoreSection title="BBB Crossing" value={candidate.bbbCrossing} bar />
-            </Section>
-          </div>
+              {/* BIOPHYSICAL */}
+              <TableSection title="Biophysical Properties" />
+              <Td label="GC Content" value={`${candidate.gcContent}%`} warn={candidate.gcContent < 40 || candidate.gcContent > 60} />
+              <Td label="Melting Temperature (Tm)" value={candidate.meltingTemp} unit="°C" />
+              <Td label="Self-dimer Score" value={candidate.selfComplementScore.toFixed(4)} />
+              <Td label="Self-dimer Risk" value={selfDimerLabel} warn={selfDimerLabel === "High" || selfDimerLabel === "Moderate"} />
+              <Td label="Poly-G Tracts (≥3 G)" value={candidate.polygTracts} warn={candidate.polygTracts > 0} />
+              <Td label="Estimated ΔG" value={candidate.bindingEnergy} unit="kcal/mol" />
 
-          {/* Column 3 — Risk & Quality */}
-          <div className="px-5 py-3 space-y-3">
-            <Section title="Risk Assessment">
-              <ScoreSection title="Off-target Risk" value={100 - candidate.offTargetRisk} bar />
-              <ScoreSection title="Immune Stimulation" value={100 - candidate.immuneStimulation} bar />
-              <ScoreSection title="Synthesis Feasibility" value={100 - candidate.synthesisDifficulty} bar />
-            </Section>
+              {/* SEQUENCE COMPOSITION */}
+              <TableSection title="Sequence Composition" />
+              <Td label="CpG Dinucleotides" value={candidate.cpgCount} warn={candidate.cpgCount >= 3} />
+              <Td label="CpG Immune Risk" value={candidate.cpgCount >= 3 ? "Elevated" : "Normal"} warn={candidate.cpgCount >= 3} />
+              <Td label="Longest Homopolymer Run" value={candidate.longestHomopolymer} unit="bp" warn={candidate.longestHomopolymer >= 4} />
+              <Td label="Purine Content (A+G)" value={`${(candidate.purineContent * 100).toFixed(1)}%`} />
+              <Td label="Pyrimidine Content (C+T)" value={`${((1 - candidate.purineContent) * 100).toFixed(1)}%`} />
+              <Td label="GC Skew" value={candidate.gcSkew.toFixed(3)} />
+              <Td label="Sequence Complexity" value={candidate.sequenceComplexity.toFixed(3)} warn={candidate.sequenceComplexity < 0.7} />
+              <Td label="Repetitive Elements" value={candidate.longestHomopolymer >= 4 ? "Detected" : "None"} warn={candidate.longestHomopolymer >= 4} />
 
-            <Section title="Quality Score Breakdown">
-              <Row label="Final Score" value={candidate.qualityScore} unit="/100" highlight />
-              <Row label="GC Score (×0.30)" value={candidate.gcScore} />
-              <Row label="Tm Score (×0.40)" value={candidate.tmScore} />
-              <Row label="Self-dimer Penalty" value={`-${candidate.selfComplementPenalty}`} warn={candidate.selfComplementPenalty > 0} />
-              <Row label="Poly-G Penalty" value={`-${candidate.polygPenalty}`} warn={candidate.polygPenalty > 0} />
-              {candidate.chemBonus !== 0 && (
-                <Row label="Chemistry Bonus" value={`+${candidate.chemBonus}`} />
-              )}
-              {candidate.modBonus !== 0 && (
-                <Row label="Modification Bonus" value={`+${candidate.modBonus}`} />
-              )}
-              {candidate.cpgPenalty > 0 && (
-                <Row label="CpG Immune Risk" value={`-${candidate.cpgPenalty}`} warn />
-              )}
-            </Section>
-          </div>
+              {/* THERMODYNAMICS */}
+              <TableSection title="Thermodynamic Profile" />
+              <Td label="Wallace Tm" value={candidate.meltingTemp} unit="°C" />
+              <Td label="GC Score (×0.30)" value={candidate.gcScore} />
+              <Td label="Tm Score (×0.40)" value={candidate.tmScore} />
+              <Td label="Duplex Stability" value={candidate.duplexStability} />
+              <Td label="MW" value={candidate.molecularWeight?.toLocaleString()} unit="Da" />
+              <Td label="Extinction Coeff (ε₂₆₀)" value={candidate.extinctionCoefficient?.toLocaleString()} unit="L/mol·cm" />
+
+              {/* DRUG-LIKE PROPERTIES */}
+              <TableSection title="Drug-like Properties" />
+              <Td label="Drug Likeness Score" bar={candidate.drugLikeness} />
+              <Td label="Nuclease Resistance" bar={candidate.nucleaseResistance} />
+              <Td label="Nuclease Rating" value={nucleaseLabel} />
+              <Td label="Cellular Uptake" bar={candidate.cellularUptake} />
+              <Td label="Uptake Rating" value={uptakeLabel} />
+              <Td label="BBB Crossing Potential" bar={candidate.bbbCrossing} />
+              <Td label="BBB Rating" value={bbbLabel} />
+              <Td label="In Vivo Stability" value={nucleaseLabel} />
+
+              {/* RISK ASSESSMENT */}
+              <TableSection title="Risk Assessment" />
+              <Td label="Off-target Risk" bar={100 - candidate.offTargetRisk} />
+              <Td label="Off-target Rating" value={offTargetLabel} warn={offTargetLabel === "High"} />
+              <Td label="Immune Stimulation Risk" bar={100 - candidate.immuneStimulation} />
+              <Td label="Immune Rating" value={immuneLabel} warn={immuneLabel === "High"} />
+              <Td label="Synthesis Feasibility" bar={100 - candidate.synthesisDifficulty} />
+              <Td label="Synthesis Rating" value={synthesisLabel} warn={synthesisLabel === "Complex"} />
+              <Td label="Toxicity Flags" value={candidate.cpgCount >= 3 ? "CpG-mediated" : candidate.polygTracts > 1 ? "Poly-G aggregation" : "None flagged"} warn={candidate.cpgCount >= 3 || candidate.polygTracts > 1} />
+
+              {/* QUALITY SCORING */}
+              <TableSection title="Composite Quality Score" />
+              <Td label="FINAL SCORE" value={candidate.qualityScore} unit="/100" highlight />
+              <Td label="GC Content Score (×0.30)" value={candidate.gcScore} />
+              <Td label="Melting Temp Score (×0.40)" value={candidate.tmScore} />
+              <Td label="Self-dimer Penalty" value={`-${candidate.selfComplementPenalty}`} warn={candidate.selfComplementPenalty > 0} />
+              <Td label="Poly-G Penalty" value={`-${candidate.polygPenalty}`} warn={candidate.polygPenalty > 0} />
+              {candidate.chemBonus !== 0 && <Td label="Chemistry Bonus" value={`+${candidate.chemBonus}`} />}
+              {candidate.modBonus !== 0 && <Td label="Modification Bonus" value={`+${candidate.modBonus}`} />}
+              {candidate.cpgPenalty > 0 && <Td label="CpG Immune Penalty" value={`-${candidate.cpgPenalty}`} warn />}
+            </tbody>
+          </table>
         </div>
 
-        {/* Formula explanation — toggle */}
+        {/* Formula explanation */}
         <div className="border-t border-slate-100 px-5 py-2">
           <button
             onClick={() => setShowBreakdown(!showBreakdown)}
             className="flex items-center gap-1 text-[10px] text-slate-400 hover:text-slate-600"
           >
             <Info className="h-3 w-3" />
-            {showBreakdown ? "Hide formula" : "How is Composite Quality calculated?"}
+            {showBreakdown ? "Hide formulas & scoring details" : "Show scoring formulas & methodology"}
           </button>
           {showBreakdown && (
-            <div className="mt-2 rounded-lg border border-slate-100 bg-slate-50 px-4 py-3 text-[10.5px] text-slate-500 leading-relaxed">
-              <p className="font-semibold text-slate-600 mb-1">Composite Quality Formula</p>
-              <code className="block rounded bg-slate-100 px-2 py-1.5 text-[10px] font-mono text-slate-600 mb-2">
-                Score = GC×0.30 + Tm×0.40 − SelfDimer − PolyG + ChemBonus + ModBonus − CpG
-              </code>
-              <ul className="space-y-0.5 text-[10px]">
-                <li><strong>GC Content (×0.30):</strong> Peaks at 50%. Score = max(0, 100 − |GC−50%|×400)</li>
-                <li><strong>Melting Temp (×0.40):</strong> Peaks at 52°C. Score = max(0, 100 − |Tm−52|×3)</li>
-                <li><strong>Self-dimer:</strong> Palindromic 4-mer fraction × 200</li>
-                <li><strong>Poly-G:</strong> G-tract count × 15</li>
-                <li><strong>Chemistry Bonus:</strong> LNA +5, 2'-OMe +3, siRNA +2, PMO −3</li>
-                <li><strong>Modification Bonus:</strong> PS +4, LNA wings +5, 2'-OMe +3, PMO core +2, PNA +3</li>
-                <li><strong>CpG Penalty:</strong> (CpG count − 2) × 5 if >2 CpGs</li>
-              </ul>
-              <p className="mt-2 font-semibold text-slate-600 mb-1">Drug-like Property Scores</p>
-              <ul className="space-y-0.5 text-[10px]">
-                <li><strong>Drug Likeness:</strong> Weighted combo of quality (35%), nuclease resistance (25%), uptake (20%), low off-target (20%)</li>
-                <li><strong>Nuclease Resistance:</strong> Based on chemistry + modifications (PS, LNA, PNA all increase)</li>
-                <li><strong>Cellular Uptake:</strong> Based on chemistry and length (shorter = better uptake)</li>
-                <li><strong>BBB Crossing:</strong> Most ASOs don't cross well; PMO+CPP and PNA improve this</li>
-                <li><strong>Off-target Risk:</strong> Low sequence complexity + poly-G = higher risk</li>
-                <li><strong>Immune Stimulation:</strong> CpG dinucleotides activate TLR9; gapmers more immunostimulatory than PMOs</li>
-                <li><strong>Synthesis Feasibility:</strong> Homopolymer runs, high GC, LNA, and PNA increase difficulty</li>
-              </ul>
+            <div className="mt-3 rounded-lg border border-slate-100 bg-slate-50 px-5 py-4 text-[10.5px] text-slate-500 leading-relaxed space-y-4">
+              <div>
+                <p className="font-bold text-slate-700 mb-1">Composite Quality Score</p>
+                <code className="block rounded bg-slate-100 px-3 py-2 text-[10px] font-mono text-slate-600">
+                  Score = GC×0.30 + Tm×0.40 − SelfDimer×200 − PolyG×15 + ChemBonus + ModBonus − CpG
+                </code>
+                <ul className="mt-1.5 space-y-0.5 text-[10px]">
+                  <li><strong>GC Content (×0.30):</strong> max(0, 100 − |GC% − 50%| × 400). Peaks at 50%.</li>
+                  <li><strong>Melting Temp (×0.40):</strong> max(0, 100 − |Tm − 52°C| × 3). Peaks at 52°C.</li>
+                  <li><strong>Self-dimer:</strong> Fraction of palindromic 4-mers × 200.</li>
+                  <li><strong>Poly-G:</strong> Count of G-tracts (≥3 consecutive G) × 15.</li>
+                  <li><strong>Chemistry:</strong> LNA +5, 2'-OMe +3, siRNA +2, PMO −3.</li>
+                  <li><strong>Modifications:</strong> PS +4, LNA wings +5, 2'-OMe +3, PMO core +2, PNA +3.</li>
+                  <li><strong>CpG:</strong> (count − 2) × 5 if >2 CpGs (TLR9 immune stimulation).</li>
+                </ul>
+              </div>
+              <div>
+                <p className="font-bold text-slate-700 mb-1">Drug Likeness Score</p>
+                <code className="block rounded bg-slate-100 px-3 py-2 text-[10px] font-mono text-slate-600">
+                  DrugLike = Quality×0.35 + Nuclease×0.25 + Uptake×0.20 + (100−OffTarget)×0.20
+                </code>
+              </div>
+              <div>
+                <p className="font-bold text-slate-700 mb-1">Property Scores</p>
+                <ul className="space-y-0.5 text-[10px]">
+                  <li><strong>Nuclease Resistance:</strong> Base 20 + chemistry score + modification scores (PS +25, LNA +20, PNA +35).</li>
+                  <li><strong>Cellular Uptake:</strong> Chemistry factor + length factor (shorter = better).</li>
+                  <li><strong>BBB Crossing:</strong> Base 10 + PMO+CPP +15, PNA +15, short length +10.</li>
+                  <li><strong>Off-target:</strong> Base 20 + low complexity +30, poly-G ×10, short length +15.</li>
+                  <li><strong>Immune Stimulation:</strong> Base 5 + CpG ×15 + gapmer chemistry +10.</li>
+                  <li><strong>Synthesis:</strong> Base 10 + homopolymer ×5 + high GC +15 + LNA/PNA modifiers.</li>
+                </ul>
+              </div>
+              <div>
+                <p className="font-bold text-slate-700 mb-1">Thermodynamic Calculations</p>
+                <ul className="space-y-0.5 text-[10px]">
+                  <li><strong>Tm (Wallace rule):</strong> 2×(A+T) + 4×(G+C) for short oligos ≤20mer.</li>
+                  <li><strong>ΔG:</strong> Empirical estimate from GC% and Tm (kcal/mol).</li>
+                  <li><strong>MW:</strong> Sum of nucleotide MWs (A=331.2, T=322.2, G=347.2, C=307.2) minus water for phosphodiester bonds.</li>
+                  <li><strong>ε₂₆₀:</strong> Nearest-neighbor method for UV absorbance at 260nm.</li>
+                </ul>
+              </div>
             </div>
           )}
         </div>
