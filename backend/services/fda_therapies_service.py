@@ -119,11 +119,15 @@ def _match_gene(drug_entry: tuple, gene_symbol: str) -> bool:
     return False
 
 
-def _is_oligonucleotide_intervention(name: str, title: str, gene_symbol: str) -> bool:
+def _is_oligonucleotide_intervention(name: str, title: str, gene_symbol: str, intervention_type: str = "") -> bool:
     """Check if an intervention name or study title suggests oligonucleotide therapy for a specific gene."""
     name_lower = name.lower()
     title_lower = title.lower()
     gene_upper = gene_symbol.upper()
+
+    # Skip non-drug interventions (procedures, devices, biologicals, etc.)
+    if intervention_type and intervention_type.upper() not in ("DRUG", "BIOLOGICAL", ""):
+        return False
 
     # Direct keyword matching in intervention name
     oligo_keywords = [
@@ -153,9 +157,9 @@ def _is_oligonucleotide_intervention(name: str, title: str, gene_symbol: str) ->
     title_upper = title.upper()
     has_gene_in_title = gene_upper in title_upper
     has_oligo_in_title = any(term in title_lower for term in [
-        "antisense", "oligonucleotide", "sirna", "si-rna", "rna",
-        "gene silencing", "gene knockdown", "splice", "exon skip",
-        "rnase", "mrna target", "therapeutic",
+        "antisense", "oligonucleotide", "sirna", "si-rna",
+        "gene silencing", "gene knockdown", "exon skip",
+        "rnase h", "splice switching",
     ])
 
     # Only match if BOTH gene and oligonucleotide context are present in title
@@ -245,7 +249,7 @@ def _search_clinicaltrials(gene_symbol: str, disease_name: str = None) -> List[d
                     name = intervention.get("name", "")
                     int_type = intervention.get("type", "")
 
-                    if _is_oligonucleotide_intervention(name, title, gene_symbol):
+                    if _is_oligonucleotide_intervention(name, title, gene_symbol, int_type):
                         therapies.append({
                             "name": name,
                             "indication": disease_name or gene_symbol,
@@ -321,11 +325,11 @@ def _search_pubmed_oligos(gene_symbol: str) -> List[dict]:
     """Search PubMed for oligonucleotide therapies targeting a gene."""
     therapies = []
     try:
-        # Multiple search queries for comprehensive coverage
+        # Search for clinical trials and therapeutic studies only
         queries = [
-            f"{gene_symbol} antisense oligonucleotide clinical trial",
-            f"{gene_symbol} siRNA therapy clinical",
-            f"{gene_symbol} oligonucleotide therapeutic",
+            f"{gene_symbol} antisense oligonucleotide therapy",
+            f"{gene_symbol} siRNA treatment clinical",
+            f"{gene_symbol} oligonucleotide drug",
         ]
 
         all_ids = set()
@@ -350,7 +354,7 @@ def _search_pubmed_oligos(gene_symbol: str) -> List[dict]:
 
         if all_ids:
             # Fetch article details in batches
-            ids_list = list(all_ids)[:15]
+            ids_list = list(all_ids)[:10]
             ids = ",".join(ids_list)
             detail_resp = requests.get(
                 "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi",
@@ -368,20 +372,31 @@ def _search_pubmed_oligos(gene_symbol: str) -> List[dict]:
                         article = detail_data.get("result", {}).get(uid, {})
                         title = article.get("title", "")
                         pub_date = article.get("pubdate", "")
+                        pub_type = article.get("pubtype", [])
 
                         if title:
                             title_upper = title.upper()
                             gene_upper = gene_symbol.upper()
 
+                            # Skip review articles
+                            if any(pt in pub_type for pt in ["Review", "Systematic Review"]):
+                                continue
+
                             # Check if the title mentions the gene AND oligonucleotide terms
                             has_gene = gene_upper in title_upper
                             has_oligo = any(term in title_upper for term in [
                                 "ANTISENSE", "OLIGONUCLEOTIDE", "SIRNA", "SI-RNA",
-                                "ASO", "RNA", "GENE SILENCING", "SPLICE",
-                                "EXON SKIPPING", "THERAPEUTIC",
+                                "ASO", "GENE SILENCING", "SPLICE SWITCHING",
+                                "EXON SKIPPING", "RNA THERAPEUTIC",
                             ])
 
-                            if has_gene and has_oligo:
+                            # Also require therapy/treatment context
+                            has_therapy = any(term in title_upper for term in [
+                                "THERAPY", "TREATMENT", "THERAPEUTIC", "DRUG",
+                                "CLINICAL TRIAL", "PATIENT", "EFFICACY",
+                            ])
+
+                            if has_gene and has_oligo and has_therapy:
                                 therapies.append({
                                     "name": f"Published: {title[:80]}...",
                                     "indication": f"Research for {gene_symbol}",
