@@ -107,6 +107,30 @@ export default function BasicInfoForm({
           {loading ? "Loading Gene..." : "Load Gene"}
         </button>
       </div>
+
+      {/* Prominent loading bar */}
+      {loading && (
+        <div className="px-5 pb-4">
+          <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3">
+            <div className="flex items-center gap-3 mb-2">
+              <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+              <p className="text-[12.5px] font-semibold text-blue-700">
+                Fetching gene data from Ensembl & Open Targets...
+              </p>
+            </div>
+            <p className="text-[11px] text-blue-500 mb-2">
+              Retrieving transcript structure, disease associations, pathways, expression data, and clinical annotations.
+            </p>
+            <div className="h-2 w-full overflow-hidden rounded-full bg-blue-100">
+              <div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 animate-loading-bar" />
+            </div>
+            <div className="mt-2 flex justify-between text-[10px] text-blue-400">
+              <span>Querying Ensembl REST API</span>
+              <span>May take 10-30 seconds</span>
+            </div>
+          </div>
+        </div>
+      )}
     </Card>
   );
 }
