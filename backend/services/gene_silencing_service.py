@@ -365,6 +365,76 @@ def _duplex_stability(gc: float, tm: float, length: int) -> str:
         return "Weak"
 
 
+def _tissue_scores(delivery_context: str | None, chemistry: str, length: int) -> dict:
+    """Calculate tissue-specific scoring adjustments.
+
+    Returns a dict with uptake_modifier, bbb_modifier, immune_modifier,
+    and tissue_notes based on the target tissue/organ.
+    """
+    ctx = (delivery_context or "").lower().strip()
+
+    # Default tissue profiles: uptake, bbb, immune
+    tissue_profiles = {
+        "liver":        {"uptake": 15, "bbb": 0,  "immune": -5, "notes": "High hepatic uptake; PNPLA3 and ASGR-mediated endocytosis favor liver ASOs."},
+        "kidney":       {"uptake": 10, "bbb": 0,  "immune": 0,  "notes": "Good renal tubular uptake but rapid glomerular filtration clearance."},
+        "cns":          {"uptake": -10, "bbb": 20, "immune": -10, "notes": "Requires BBB crossing; intrathecal delivery common. PMO+CPP or LNA preferred."},
+        "brain":        {"uptake": -10, "bbb": 20, "immune": -10, "notes": "Requires BBB crossing; intrathecal delivery common. PMO+CPP or LNA preferred."},
+        "muscle":       {"uptake": 5, "bbb": 0,  "immune": 0,  "notes": "Moderate uptake; large tissue mass dilutes dose. DMD exon-skipping validated."},
+        "skeletal muscle": {"uptake": 5, "bbb": 0, "immune": 0, "notes": "Moderate uptake; large tissue mass dilutes dose. DMD exon-skipping validated."},
+        "heart":        {"uptake": 3, "bbb": 0,  "immune": -3, "notes": "Limited cardiac uptake; systemic delivery reaches myocardium at high doses."},
+        "lung":         {"uptake": 8, "bbb": 0,  "immune": 5,  "notes": "Accessible via inhalation; mucus barrier for systemic delivery. Good for local."},
+        "eye":          {"uptake": 12, "bbb": 0,  "immune": 15, "notes": "Immune-privileged site; intravitreal delivery. Local exposure with minimal systemic."},
+        "retina":       {"uptake": 12, "bbb": 0,  "immune": 15, "notes": "Immune-privileged site; intravitreal delivery. Local exposure with minimal systemic."},
+        "spinal cord":  {"uptake": -5, "bbb": 15, "immune": -5, "notes": "Intrathecal delivery required; limited diffusion from CSF."},
+        "tumor":        {"uptake": 5, "bbb": 0,  "immune": 10, "notes": "Tumor microenvironment may enhance uptake; immune stimulation can be beneficial."},
+        "blood":        {"uptake": 8, "bbb": 0,  "immune": 8,  "notes": "Hematopoietic cells readily take up ASOs; immune stimulation risk."},
+        "bone marrow":  {"uptake": 8, "bbb": 0,  "immune": 8,  "notes": "Hematopoietic cells readily take up ASOs; immune stimulation risk."},
+        "pancreas":     {"uptake": 5, "bbb": 0,  "immune": 0,  "notes": "Limited pancreatic uptake; systemic delivery required."},
+        "skin":         {"uptake": 10, "bbb": 0,  "immune": 5,  "notes": "Topical or intradermal delivery; good local exposure."},
+        "gut":          {"uptake": 8, "bbb": 0,  "immune": 10, "notes": "Oral delivery challenging; enema or local delivery preferred."},
+        "intestine":    {"uptake": 8, "bbb": 0,  "immune": 10, "notes": "Oral delivery challenging; enema or local delivery preferred."},
+    }
+
+    # Find best matching tissue
+    profile = None
+    for tissue_key, prof in tissue_profiles.items():
+        if tissue_key in ctx:
+            profile = prof
+            break
+
+    if not profile:
+        # Default profile for unknown tissue
+        profile = {"uptake": 0, "bbb": 0, "immune": 0, "notes": "No tissue-specific adjustments applied."}
+
+    # Chemistry-tissue interactions
+    chem_bonus = 0
+    if ctx in ("cns", "brain", "spinal cord"):
+        if chemistry in ("pmo", "lna_gapmer"):
+            chem_bonus = 8  # LNA/PMO better for CNS
+        elif chemistry == "gapmer":
+            chem_bonus = -3  # Standard gapmer less ideal for CNS
+    elif ctx in ("liver",):
+        if chemistry == "gapmer":
+            chem_bonus = 5  # Gapmers well-validated for liver
+    elif ctx in ("eye", "retina"):
+        if chemistry == "pmo":
+            chem_bonus = 5  # PMOs used in retinal diseases
+
+    # Length-tissue interaction
+    length_modifier = 0
+    if ctx in ("cns", "brain", "spinal cord") and length > 20:
+        length_modifier = -5  # Longer ASOs cross BBB worse
+
+    return {
+        "uptake_modifier": profile["uptake"],
+        "bbb_modifier": profile["bbb"],
+        "immune_modifier": profile["immune"],
+        "chem_tissue_bonus": chem_bonus,
+        "length_modifier": length_modifier,
+        "tissue_notes": profile["notes"],
+    }
+
+
 def _estimated_binding_energy(gc_content: float, tm: float) -> float:
     """Estimated binding free energy (kcal/mol) from GC% and Tm."""
     # Simplified nearest-neighbor approximation
@@ -415,6 +485,7 @@ def generate_candidates(
     mrna_sequence: str | None,
     exons: list[dict],
     mechanism_id: str,
+    delivery_context: str | None = None,
 ) -> list[dict]:
     """Generate candidate ASOs for the selected mechanism and target region.
 
@@ -554,7 +625,15 @@ def generate_candidates(
             # CpG penalty (immune stimulation risk)
             cpg_penalty = max(0, (cpg - 2)) * 5
 
-            quality = max(0, min(100, gc_score * 0.30 + tm_score * 0.40 - sc_penalty - pg_penalty + chem_bonus + mod_bonus - cpg_penalty))
+            # Tissue-specific scoring adjustments
+            tissue = _tissue_scores(delivery_context, chemistry, aso_length)
+            tissue_uptake = tissue["uptake_modifier"]
+            tissue_bbb = tissue["bbb_modifier"]
+            tissue_immune = tissue["immune_modifier"]
+            tissue_chem = tissue["chem_tissue_bonus"]
+            tissue_len = tissue["length_modifier"]
+
+            quality = max(0, min(100, gc_score * 0.30 + tm_score * 0.40 - sc_penalty - pg_penalty + chem_bonus + mod_bonus - cpg_penalty + tissue_uptake + tissue_bbb + tissue_immune + tissue_chem + tissue_len))
 
             if is_total_knockdown:
                 region_label = f"Full Transcript offset +{offset}"
@@ -624,6 +703,13 @@ def generate_candidates(
                 "immuneStimulation": immune_risk,
                 "drugLikeness": drug_like,
                 "duplexStability": stability,
+                "deliveryContext": delivery_context or "",
+                "tissueUptakeModifier": tissue_uptake,
+                "tissueBbbModifier": tissue_bbb,
+                "tissueImmuneModifier": tissue_immune,
+                "tissueChemBonus": tissue_chem,
+                "tissueLengthModifier": tissue_len,
+                "tissueNotes": tissue["tissue_notes"],
             })
 
     # Sort by quality descending, return top 10

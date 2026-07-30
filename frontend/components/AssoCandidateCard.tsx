@@ -217,6 +217,23 @@ export default function AssoCandidateCard({
               <Td label="Synthesis Rating" value={synthesisLabel} warn={synthesisLabel === "Complex"} />
               <Td label="Toxicity Flags" value={candidate.cpgCount >= 3 ? "CpG-mediated" : candidate.polygTracts > 1 ? "Poly-G aggregation" : "None flagged"} warn={candidate.cpgCount >= 3 || candidate.polygTracts > 1} />
 
+              {/* TISSUE CONTEXT */}
+              {candidate.deliveryContext && (
+                <>
+                  <TableSection title={`Tissue Context: ${candidate.deliveryContext}`} />
+                  <Td label="Target Tissue" value={candidate.deliveryContext} highlight />
+                  {candidate.tissueUptakeModifier !== 0 && <Td label="Tissue Uptake Modifier" value={`${candidate.tissueUptakeModifier > 0 ? "+" : ""}${candidate.tissueUptakeModifier}`} warn={candidate.tissueUptakeModifier < 0} />}
+                  {candidate.tissueBbbModifier !== 0 && <Td label="BBB Crossing Modifier" value={`+${candidate.tissueBbbModifier}`} />}
+                  {candidate.tissueImmuneModifier !== 0 && <Td label="Immune Modifier" value={`${candidate.tissueImmuneModifier > 0 ? "+" : ""}${candidate.tissueImmuneModifier}`} warn={candidate.tissueImmuneModifier < 0} />}
+                  {candidate.tissueChemBonus !== 0 && <Td label="Chemistry-Tissue Match" value={`+${candidate.tissueChemBonus}`} />}
+                  {candidate.tissueLengthModifier !== 0 && <Td label="Length Penalty" value={candidate.tissueLengthModifier} warn />}
+                  <tr className="border-b border-slate-100">
+                    <td className="py-1.5 pr-4 text-[11px] text-slate-500">Tissue Notes</td>
+                    <td className="py-1.5 text-right text-[10.5px] text-slate-500 italic max-w-[250px]">{candidate.tissueNotes}</td>
+                  </tr>
+                </>
+              )}
+
               {/* QUALITY SCORING */}
               <TableSection title="Composite Quality Score" />
               <Td label="FINAL SCORE" value={candidate.qualityScore} unit="/100" highlight />

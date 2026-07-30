@@ -64,6 +64,13 @@ export interface AssoCandidate {
   immuneStimulation: number;
   drugLikeness: number;
   duplexStability: string;
+  deliveryContext: string;
+  tissueUptakeModifier: number;
+  tissueBbbModifier: number;
+  tissueImmuneModifier: number;
+  tissueChemBonus: number;
+  tissueLengthModifier: number;
+  tissueNotes: string;
 }
 
 export interface GenerateResponse {

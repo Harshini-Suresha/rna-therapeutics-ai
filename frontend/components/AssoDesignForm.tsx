@@ -93,6 +93,8 @@ export default function AssoDesignForm({
   setChemistry,
   selectedMods,
   onToggleMod,
+  deliveryContext,
+  setDeliveryContext,
   onGenerate,
   loading,
   disabled,
@@ -105,6 +107,8 @@ export default function AssoDesignForm({
   setChemistry: (id: string) => void;
   selectedMods: string[];
   onToggleMod: (id: string) => void;
+  deliveryContext: string;
+  setDeliveryContext: (v: string) => void;
   onGenerate: () => void;
   loading: boolean;
   disabled: boolean;
@@ -166,6 +170,41 @@ export default function AssoDesignForm({
             />
           ))}
         </div>
+      </div>
+
+      {/* Delivery / Tissue Context */}
+      <div>
+        <label className="mb-1.5 block text-[12.5px] font-medium text-slate-600">
+          Target Tissue <span className="text-[11px] font-normal text-slate-400">(optional)</span>
+        </label>
+        <p className="mb-2 text-[11px] text-slate-400">
+          Select target tissue to apply tissue-specific scoring adjustments (uptake, BBB crossing, immune response).
+        </p>
+        <select
+          value={deliveryContext}
+          onChange={(e) => setDeliveryContext(e.target.value)}
+          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[12.5px] text-slate-700 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
+        >
+          <option value="">No tissue preference (default)</option>
+          <option value="liver">Liver — High uptake, gapmer-validated</option>
+          <option value="kidney">Kidney — Good uptake, rapid clearance</option>
+          <option value="cns">CNS / Brain — Requires BBB crossing, intrathecal</option>
+          <option value="muscle">Skeletal Muscle — Moderate uptake, large mass</option>
+          <option value="heart">Heart — Limited uptake, systemic delivery</option>
+          <option value="lung">Lung — Accessible via inhalation</option>
+          <option value="eye">Eye / Retina — Immune-privileged, intravitreal</option>
+          <option value="tumor">Tumor — Microenvironment-enhanced uptake</option>
+          <option value="blood">Blood / Bone Marrow — Hematopoietic cells</option>
+          <option value="skin">Skin — Topical/intradermal delivery</option>
+          <option value="pancreas">Pancreas — Limited uptake</option>
+          <option value="gut">Gut / Intestine — Oral delivery challenging</option>
+          <option value="spinal cord">Spinal Cord — Intrathecal required</option>
+        </select>
+        {deliveryContext && (
+          <p className="mt-1.5 text-[10.5px] text-slate-400 italic">
+            Tissue-specific adjustments will be applied to candidate scoring.
+          </p>
+        )}
       </div>
 
       {/* Generate button */}

@@ -44,6 +44,7 @@ export default function GeneSilencingPage() {
   const [asoLength, setAsoLength] = useState(18);
   const [chemistry, setChemistry] = useState("gapmer");
   const [selectedMods, setSelectedMods] = useState<string[]>(["phosphorothioate"]);
+  const [deliveryContext, setDeliveryContext] = useState("");
 
   const [results, setResults] = useState<GenerateResponse | null>(null);
   const [genLoading, setGenLoading] = useState(false);
@@ -132,6 +133,7 @@ export default function GeneSilencingPage() {
         asoLength,
         chemistry,
         modifications: selectedMods,
+        deliveryContext: deliveryContext || undefined,
       });
       setResults(res);
       saveReport({
@@ -260,6 +262,8 @@ export default function GeneSilencingPage() {
                     setChemistry={setChemistry}
                     selectedMods={selectedMods}
                     onToggleMod={handleToggleMod}
+                    deliveryContext={deliveryContext}
+                    setDeliveryContext={setDeliveryContext}
                     onGenerate={handleGenerate}
                     loading={genLoading}
                     disabled={!isTotalKnockdown && selectedExons.length === 0 || !target}

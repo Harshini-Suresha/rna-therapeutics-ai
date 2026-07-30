@@ -26,6 +26,7 @@ class CandidateRequest(BaseModel):
     aso_length: int = 18
     chemistry: str = "gapmer"
     modifications: list[str] = []
+    delivery_context: Optional[str] = None
 
 
 @router.get("/api/gene-silencing/target/{ensembl_gene_id}")
@@ -63,6 +64,7 @@ async def generate_aso_candidates(payload: CandidateRequest):
             mrna_sequence=target["mrnaSequence"],
             exons=target.get("exons", []),
             mechanism_id=payload.mechanism_id,
+            delivery_context=payload.delivery_context,
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
