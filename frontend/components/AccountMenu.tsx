@@ -13,9 +13,6 @@ import {
   Palette,
   Bell,
   Sliders,
-  Puzzle,
-  BookOpen,
-  MessageSquare,
   ChevronDown,
   ChevronRight,
 } from "lucide-react";
@@ -36,12 +33,6 @@ const PREFERENCES = [
   { label: "Theme", icon: Palette, href: "/settings/theme" },
   { label: "Notifications", icon: Bell, href: "/settings/notifications" },
   { label: "Preferences", icon: Sliders, href: "/settings/preferences" },
-  { label: "Integrations", icon: Puzzle, href: "/settings/integrations" },
-];
-
-const BOTTOM_ITEMS = [
-  { label: "Documentation", icon: BookOpen, href: "/help/docs" },
-  { label: "Feedback", icon: MessageSquare, href: "/help/feedback" },
 ];
 
 export default function AccountMenu({
@@ -180,23 +171,6 @@ export default function AccountMenu({
               Preferences
             </p>
             {PREFERENCES.map((item) => {
-              const Icon = item.icon;
-              return (
-                <button
-                  key={item.label}
-                  onClick={() => navigate(item.href)}
-                  className="flex w-full items-center gap-2.5 rounded px-3 py-1.5 text-[11.5px] text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
-                >
-                  <Icon className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500 shrink-0" />
-                  {item.label}
-                </button>
-              );
-            })}
-
-            <div className="my-1.5 border-t border-slate-100 dark:border-slate-700" />
-
-            {/* Bottom Items */}
-            {BOTTOM_ITEMS.map((item) => {
               const Icon = item.icon;
               return (
                 <button
