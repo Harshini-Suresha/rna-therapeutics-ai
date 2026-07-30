@@ -131,6 +131,7 @@ export default function TargetAnalysisCard({
               {target.exons.map((exon) => {
                 const idx = exon.index ?? 0;
                 const isSelected = selectedExons.includes(idx);
+                const len = exon.length;
                 return (
                   <button
                     key={exon.id ?? idx}
@@ -141,7 +142,7 @@ export default function TargetAnalysisCard({
                         : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                     }`}
                   >
-                    Exon {idx}
+                    Exon {idx}{len ? ` · ${len} bp` : ""}
                   </button>
                 );
               })}

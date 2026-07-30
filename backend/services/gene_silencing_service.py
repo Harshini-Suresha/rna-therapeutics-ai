@@ -330,9 +330,10 @@ def generate_candidates(
 
     # A missing list means total-transcript knockdown. Invalid exon numbers
     # are ignored rather than silently using an unrelated default region.
+    is_total_knockdown = target_exon_indices is None
     requested_exons = (
         list(range(1, exon_count + 1))
-        if target_exon_indices is None
+        if is_total_knockdown
         else target_exon_indices
     )
     target_indices = sorted({index for index in requested_exons if 0 < index <= exon_count})
@@ -383,8 +384,14 @@ def generate_candidates(
             pg_penalty = pg * 15
             quality = max(0, min(100, gc_score * 0.35 + tm_score * 0.45 - sc_penalty - pg_penalty))
 
-            if targeting_mode == "translation_start":
+            if is_total_knockdown:
+                region_label = f"Full Transcript offset +{offset}"
+                exon_num = None
+                exon_len = None
+            elif targeting_mode == "translation_start":
                 region_label = f"{target_label} offset +{offset}"
+                exon_num = None
+                exon_len = None
             else:
                 relative_pos = offset - exon_start
                 if relative_pos < 0:
@@ -393,9 +400,8 @@ def generate_candidates(
                     region_label = f"{target_label} 3' flank +{relative_pos}"
                 else:
                     region_label = f"{target_label} offset +{relative_pos}"
-
-            exon_num = int(target_label.removeprefix("Exon ")) if target_label.startswith("Exon ") else None
-            exon_len = (exon_end - exon_start) if (exon_start is not None and exon_end is not None) else None
+                exon_num = int(target_label.removeprefix("Exon ")) if target_label.startswith("Exon ") else None
+                exon_len = (exon_end - exon_start) if (exon_start is not None and exon_end is not None) else None
 
             candidates.append({
                 "sequence": _reverse_complement(candidate_seq),
