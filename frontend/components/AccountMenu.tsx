@@ -6,10 +6,6 @@ import {
   User,
   Settings,
   LogOut,
-  Building2,
-  FlaskConical,
-  BarChart3,
-  HardDrive,
   Star,
   Bookmark,
   FileText,
@@ -27,10 +23,6 @@ import { useAuth } from "@/contexts/AuthContext";
 
 const PROFILE_ITEMS = [
   { label: "Profile", icon: User, href: "/settings" },
-  { label: "Organization", icon: Building2, href: "/settings/organization" },
-  { label: "Research Interests", icon: FlaskConical, href: "/settings/interests" },
-  { label: "Storage", icon: HardDrive, href: "/settings/storage" },
-  { label: "Recent Activity", icon: BarChart3, href: "/settings/activity" },
 ];
 
 const SAVED_ITEMS = [
