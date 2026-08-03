@@ -6,6 +6,7 @@ import Sidebar from "@/components/Sidebar";
 import Topbar from "@/components/Topbar";
 import { Card } from "@/components/ui";
 import { fetchGene } from "@/lib/api";
+import { listProjects, ProjectSummary } from "@/lib/auth";
 import { GeneTargetObject } from "@/types/gene";
 
 export default function SearchPage() {
@@ -14,6 +15,7 @@ export default function SearchPage() {
   const query = searchParams.get("q") ?? "";
   const [searchText, setSearchText] = useState(query);
   const [geneResult, setGeneResult] = useState<GeneTargetObject | null>(null);
+  const [projectResults, setProjectResults] = useState<ProjectSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -26,6 +28,7 @@ export default function SearchPage() {
   useEffect(() => {
     if (!query) {
       setGeneResult(null);
+      setProjectResults([]);
       setError(null);
       setLoading(false);
       return;
@@ -45,6 +48,10 @@ export default function SearchPage() {
       .finally(() => {
         setLoading(false);
       });
+
+    listProjects(query).then((results) => {
+      setProjectResults(results);
+    });
   }, [query]);
 
   return (
@@ -125,14 +132,41 @@ export default function SearchPage() {
               </div>
               <div className="rounded-xl border border-slate-200 p-4">
                 <p className="text-[12px] font-semibold text-slate-700">Project match</p>
-                <p className="mt-2 text-[11px] text-slate-500">Projects are routed to the project page. Live project search is not yet available in the backend.</p>
-                <button
-                  type="button"
-                  onClick={() => router.push(`/projects?search=${encodeURIComponent(query)}`)}
-                  className="mt-4 inline-flex rounded-md border border-slate-300 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
-                >
-                  Browse projects
-                </button>
+                {projectResults.length > 0 ? (
+                  <div className="mt-2 space-y-2">
+                    {projectResults.slice(0, 5).map((p) => (
+                      <div
+                        key={p.id}
+                        className="rounded-lg border border-slate-200 bg-white p-3 hover:border-brand/30 transition-colors"
+                      >
+                        <p className="text-[12px] font-semibold text-slate-800">{p.name}</p>
+                        <div className="flex items-center gap-2 mt-1 text-[10.5px] text-slate-400">
+                          {p.geneSymbol && <span>{p.geneSymbol}</span>}
+                          {p.disease && <span>{p.disease}</span>}
+                          <span className="ml-auto">{p.status}</span>
+                        </div>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => router.push(`/projects?search=${encodeURIComponent(query)}`)}
+                      className="mt-2 inline-flex rounded-md border border-slate-300 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+                    >
+                      View all {projectResults.length} project{projectResults.length !== 1 ? "s" : ""}
+                    </button>
+                  </div>
+                ) : (
+                  <div>
+                    <p className="mt-2 text-[11px] text-slate-500">No matching projects found.</p>
+                    <button
+                      type="button"
+                      onClick={() => router.push(`/projects?search=${encodeURIComponent(query)}`)}
+                      className="mt-3 inline-flex rounded-md border border-slate-300 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+                    >
+                      Browse all projects
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -164,7 +198,7 @@ export default function SearchPage() {
               <ul className="mt-3 space-y-2 text-[11px] text-slate-600 list-disc list-inside">
                 <li>Gene searches resolve via the live backend and can be opened in the dashboard.</li>
                 <li>Target discovery results land on the existing target page.</li>
-                <li>Project search currently navigates to the project dashboard.</li>
+                <li>Project search queries the backend and shows matching projects inline.</li>
               </ul>
             </div>
           </Card>

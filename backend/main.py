@@ -38,6 +38,7 @@ try:  # ``uvicorn backend.main:app`` from the repository root
     from .api.auth import router as auth_router
     from .api.profile import router as profile_router
     from .api.reports import router as reports_router
+    from .api.projects import router as projects_router
 except ImportError:  # ``uvicorn main:app`` while working in backend/
     from services.notification_service import add_notification as _add_notification
     from services.gene_service import EnsemblLookupUnavailable, clean_synonyms, get_gene_metadata, get_gene_phenotypes, ensembl_gene_url
@@ -63,6 +64,7 @@ except ImportError:  # ``uvicorn main:app`` while working in backend/
     from api.auth import router as auth_router
     from api.profile import router as profile_router
     from api.reports import router as reports_router
+    from api.projects import router as projects_router
 
 
 logging.basicConfig(level=logging.INFO)
@@ -98,6 +100,7 @@ app.include_router(disease_search_router)
 app.include_router(auth_router)
 app.include_router(profile_router)
 app.include_router(reports_router)
+app.include_router(projects_router)
 
 
 @app.on_event("startup")

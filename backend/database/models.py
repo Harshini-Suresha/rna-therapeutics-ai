@@ -32,6 +32,7 @@ class User(Base):
     activity = relationship("RecentActivity", back_populates="user", cascade="all, delete-orphan")
     verification_tokens = relationship("VerificationToken", back_populates="user", cascade="all, delete-orphan")
     reports = relationship("Report", back_populates="user", cascade="all, delete-orphan")
+    projects = relationship("Project", back_populates="user", cascade="all, delete-orphan")
 
 
 class ResearchInterest(Base):
@@ -112,3 +113,25 @@ class VerificationToken(Base):
     used = Column(Integer, nullable=False, default=0)
 
     user = relationship("User", back_populates="verification_tokens")
+
+
+class Project(Base):
+    __tablename__ = "projects"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=False, default="")
+    organism = Column(String(100), nullable=False, default="homo_sapiens")
+    disease = Column(String(255), nullable=False, default="")
+    gene_symbol = Column(String(100), nullable=False, default="")
+    ensembl_id = Column(String(100), nullable=False, default="")
+    therapeutic_goal = Column(String(255), nullable=False, default="")
+    target_tissue = Column(String(255), nullable=False, default="")
+    cell_line = Column(String(255), nullable=False, default="")
+    notes = Column(Text, nullable=False, default="")
+    status = Column(String(50), nullable=False, default="active")
+    created_at = Column(Float, nullable=False, default=time.time)
+    updated_at = Column(Float, nullable=False, default=time.time)
+
+    user = relationship("User", back_populates="projects")

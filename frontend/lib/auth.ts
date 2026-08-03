@@ -238,3 +238,86 @@ export async function saveReport(report: {
 export async function deleteReport(id: number): Promise<void> {
   await authFetch(`/api/reports/${id}`, { method: "DELETE" });
 }
+
+// ── Projects ────────────────────────────────────────────────────────────────
+
+export interface ProjectSummary {
+  id: number;
+  name: string;
+  description: string;
+  organism: string;
+  disease: string;
+  geneSymbol: string;
+  therapeuticGoal: string;
+  status: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface ProjectDetail extends ProjectSummary {
+  ensemblId: string;
+  targetTissue: string;
+  cellLine: string;
+  notes: string;
+}
+
+export async function listProjects(search?: string): Promise<ProjectSummary[]> {
+  const url = search ? `/api/projects?search=${encodeURIComponent(search)}` : "/api/projects";
+  const res = await authFetch(url);
+  if (!res.ok) return [];
+  return res.json();
+}
+
+export async function getProject(id: number): Promise<ProjectDetail | null> {
+  const res = await authFetch(`/api/projects/${id}`);
+  if (!res.ok) return null;
+  return res.json();
+}
+
+export async function createProject(project: {
+  name: string;
+  description?: string;
+  organism?: string;
+  disease?: string;
+  geneSymbol?: string;
+  ensemblId?: string;
+  therapeuticGoal?: string;
+  targetTissue?: string;
+  cellLine?: string;
+  notes?: string;
+}): Promise<ProjectDetail | null> {
+  const res = await authFetch("/api/projects", {
+    method: "POST",
+    body: JSON.stringify(project),
+  });
+  if (!res.ok) return null;
+  return res.json();
+}
+
+export async function updateProject(
+  id: number,
+  data: Partial<{
+    name: string;
+    description: string;
+    organism: string;
+    disease: string;
+    geneSymbol: string;
+    ensemblId: string;
+    therapeuticGoal: string;
+    targetTissue: string;
+    cellLine: string;
+    notes: string;
+    status: string;
+  }>
+): Promise<ProjectDetail | null> {
+  const res = await authFetch(`/api/projects/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) return null;
+  return res.json();
+}
+
+export async function deleteProject(id: number): Promise<void> {
+  await authFetch(`/api/projects/${id}`, { method: "DELETE" });
+}
