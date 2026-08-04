@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+*.pyo
+.pretrained/
+data/
+checkpoints/*.pth
+logs/
+*.log

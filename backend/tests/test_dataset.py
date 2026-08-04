@@ -1,7 +1,27 @@
+import os
+
 from backend.datasets.huesken import HueskenDataset
-from backend.datasets.torch_dataset import ASODataset
+from backend.datasets.torch_dataset import ASODataset, ASOEmbeddingDataset
+from backend.features.embed_cache import CACHE_FILE
 
 from torch.utils.data import DataLoader
+
+
+def test_embedding_dataset():
+    if not os.path.exists(CACHE_FILE):
+        print("Skipping — no embedding cache found")
+        return
+
+    dataset = HueskenDataset("OligoFormer/data/Hu.csv")
+    emb_dataset = ASOEmbeddingDataset(dataset, cache_path=CACHE_FILE)
+
+    x, y = emb_dataset[0]
+
+    print("x.shape:", x.shape)
+    print("y:", y)
+
+    assert x.shape == (1280,)
+    assert y.shape == ()
 
 
 def test_torch_dataset():
@@ -38,6 +58,7 @@ def test_dataloader():
 
 
 if __name__ == "__main__":
+    test_embedding_dataset()
     test_torch_dataset()
     test_dataloader()
     print("All dataset tests passed!")
