@@ -1,22 +1,23 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Bell, Search } from "lucide-react";
 import HelpMenu from "@/components/HelpMenu";
 import NotificationPanel from "@/components/NotificationPanel";
 import AccountMenu from "@/components/AccountMenu";
 import { useAuth } from "@/contexts/AuthContext";
+import { useClientSearchParams } from "@/utils/useClientSearchParams";
 
 export default function Topbar() {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const searchParams = useClientSearchParams();
   const { user, loading: authLoading } = useAuth();
   const [showNotifications, setShowNotifications] = useState(false);
   const [searchText, setSearchText] = useState("");
 
   useEffect(() => {
-    const query = searchParams.get("q") ?? "";
+    const query = searchParams?.get("q") ?? "";
     setSearchText(query);
   }, [searchParams]);
 

@@ -1,14 +1,15 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useClientSearchParams } from "@/utils/useClientSearchParams";
 import { Dna, Loader2, CheckCircle, AlertCircle } from "lucide-react";
 import { verifyEmail, resendVerification } from "@/lib/auth";
 
 function VerifyContent() {
-  const searchParams = useSearchParams();
+  const searchParams = useClientSearchParams();
   const router = useRouter();
-  const token = searchParams.get("token");
+  const token = searchParams?.get("token");
 
   const [status, setStatus] = useState<"loading" | "success" | "error" | "no-token">("loading");
   const [message, setMessage] = useState("");
@@ -123,13 +124,5 @@ function VerifyContent() {
 }
 
 export default function VerifyEmailPage() {
-  return (
-    <Suspense fallback={
-      <div className="flex min-h-screen bg-[#F5F6FA] items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
-      </div>
-    }>
-      <VerifyContent />
-    </Suspense>
-  );
+  return <VerifyContent />;
 }

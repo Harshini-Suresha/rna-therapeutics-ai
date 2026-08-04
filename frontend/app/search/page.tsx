@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
+import { useClientSearchParams } from "@/utils/useClientSearchParams"
 import Sidebar from "@/components/Sidebar";
 import Topbar from "@/components/Topbar";
 import { Card } from "@/components/ui";
@@ -10,9 +11,9 @@ import { listProjects, ProjectSummary } from "@/lib/auth";
 import { GeneTargetObject } from "@/types/gene";
 
 export default function SearchPage() {
-  const searchParams = useSearchParams();
+  const searchParams = useClientSearchParams();
   const router = useRouter();
-  const query = searchParams.get("q") ?? "";
+  const query = searchParams?.get("q") ?? "";
   const [searchText, setSearchText] = useState(query);
   const [geneResult, setGeneResult] = useState<GeneTargetObject | null>(null);
   const [projectResults, setProjectResults] = useState<ProjectSummary[]>([]);
