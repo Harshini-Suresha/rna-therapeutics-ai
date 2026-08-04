@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import time
 
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
 
 from database.db import Base
@@ -135,3 +135,50 @@ class Project(Base):
     updated_at = Column(Float, nullable=False, default=time.time)
 
     user = relationship("User", back_populates="projects")
+
+
+class GeneFeatureBackup(Base):
+    """Last-known-good gene structural feature analysis, keyed by gene.
+
+    Used as a resilience backup so TG02 (Gene Function) keeps working for
+    every gene when the Ensembl REST site is unreachable or a symbol cannot
+    be resolved — the most recent successful analysis is replayed instead.
+    """
+
+    __tablename__ = "gene_feature_backups"
+
+    id = Column(Integer, primary_key=True, index=True)
+    organism = Column(String(100), nullable=False)
+    gene_symbol = Column(String(100), nullable=False)
+    ensembl_id = Column(String(100), nullable=False, default="")
+    result = Column(Text, nullable=False, default="{}")
+    created_at = Column(Float, nullable=False, default=time.time)
+    updated_at = Column(Float, nullable=False, default=time.time)
+
+    __table_args__ = (
+        UniqueConstraint("organism", "gene_symbol", name="uq_gene_feature_backup"),
+    )
+
+
+class GeneLookupCache(Base):
+    """Cached gene metadata keyed by organism + gene symbol.
+
+    The full Ensembl expand=1 payload for a gene is expensive to build (e.g.
+    DMD is ~300 KB and can take >15 s cold). Storing it means each gene is
+    fetched from Ensembl once, then served instantly — and it doubles as a
+    backup so a slow or unreachable Ensembl site never degrades the gene
+    detail page for genes seen before.
+    """
+
+    __tablename__ = "gene_lookup_cache"
+
+    id = Column(Integer, primary_key=True, index=True)
+    organism = Column(String(100), nullable=False)
+    gene_symbol = Column(String(100), nullable=False)
+    payload = Column(Text, nullable=False, default="{}")
+    created_at = Column(Float, nullable=False, default=time.time)
+    updated_at = Column(Float, nullable=False, default=time.time)
+
+    __table_args__ = (
+        UniqueConstraint("organism", "gene_symbol", name="uq_gene_lookup_cache"),
+    )

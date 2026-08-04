@@ -15,7 +15,7 @@ from typing import Optional
 
 try:  # ``uvicorn backend.main:app`` from the repository root
     from .services.notification_service import add_notification as _add_notification
-    from .services.gene_service import EnsemblLookupUnavailable, clean_synonyms, get_gene_metadata, get_gene_phenotypes, ensembl_gene_url
+    from .services.gene_service import EnsemblLookupUnavailable, clean_synonyms, get_gene_metadata, get_gene_phenotypes, ensembl_gene_url, build_gene_fallback_payload
     from .services.enrichment_service import get_gene_enrichment, get_aso_analysis
     from .services.constraint_service import get_human_constraint_metrics
     from .services.clinical_service import get_clinical_details
@@ -41,7 +41,7 @@ try:  # ``uvicorn backend.main:app`` from the repository root
     from .api.projects import router as projects_router
 except ImportError:  # ``uvicorn main:app`` while working in backend/
     from services.notification_service import add_notification as _add_notification
-    from services.gene_service import EnsemblLookupUnavailable, clean_synonyms, get_gene_metadata, get_gene_phenotypes, ensembl_gene_url
+    from services.gene_service import EnsemblLookupUnavailable, clean_synonyms, get_gene_metadata, get_gene_phenotypes, ensembl_gene_url, build_gene_fallback_payload
     from services.enrichment_service import get_gene_enrichment, get_aso_analysis
     from services.constraint_service import get_human_constraint_metrics
     from services.clinical_service import get_clinical_details
@@ -300,6 +300,13 @@ async def fetch_gene_from_ncbi(session: aiohttp.ClientSession, gene_symbol: str,
         else:
             genomic_start = genomic_stop = None
 
+        # NCBI reports minus-strand genes with chrstart > chrstop; infer strand
+        # so the gene page no longer shows a blank Strand field for fallbacks.
+        if genomic_start is not None and genomic_stop is not None and genomic_start != genomic_stop:
+            inferred_strand = -1 if genomic_start > genomic_stop else 1
+        else:
+            inferred_strand = None
+
         return {
             "id": f"NCBI:{ncbi_gene_id}",
             "officialSymbol": official_symbol,
@@ -307,9 +314,9 @@ async def fetch_gene_from_ncbi(session: aiohttp.ClientSession, gene_symbol: str,
             "seq_region_name": chromosome,
             "start": genomic_start,
             "end": genomic_stop,
-            "cytoband": None,
+            "cytoband": result.get("chromosomeLocation"),
             "genomeBuild": None,
-            "strand": None,
+            "strand": inferred_strand,
             "biotype": result.get("type_of_gene", "protein_coding"),
             "synonyms": aliases,
             "nomenclatureId": None,
@@ -598,7 +605,10 @@ async def initialize_target(payload: TargetRequest):
         gene_type_display = meta.get("biotype") or meta.get("geneType") or "protein_coding"
 
         start, end = meta.get("start"), meta.get("end")
-        gene_length = (end - start + 1) if (start is not None and end is not None) else None
+        # abs() guards against providers (e.g. NCBI fallback) that report
+        # minus-strand genes with start > end, which would otherwise render a
+        # negative gene length.
+        gene_length = (abs(end - start) + 1) if (start is not None and end is not None) else None
         exon_count = meta.get("exonCount")
         protein_length = meta.get("proteinLength")
         cds_length = (protein_length * 3 + 3) if protein_length else None
@@ -664,7 +674,7 @@ async def initialize_target(payload: TargetRequest):
         else:
             nuclear_retention_index = round(min(0.15 + 0.1 * (n_introns / 10), 0.3), 2)
 
-        return {
+        payload_dict = {
             "organism": species,
             "diseaseName": payload.disease_name.strip() if payload.disease_name else None,
             "geneSymbol": official_symbol,
@@ -682,7 +692,7 @@ async def initialize_target(payload: TargetRequest):
             "strand": strand_display,
             "geneType": gene_type_display,
             "synonyms": synonyms_list,
-            "source": ["Ensembl"],
+            "source": ["Ensembl"] if str(gene_id).startswith("ENSG") else (["NCBI"] if str(gene_id).startswith("NCBI:") else ["Ensembl"]),
             "taxonId": str(taxon_id),
 
             "canonicalTranscript": meta.get("canonicalTranscript"),
@@ -887,6 +897,24 @@ async def initialize_target(payload: TargetRequest):
                 for p in (disease_info.get("diseases", []) or [])
             ],
         }
+
+        fallback_payload = build_gene_fallback_payload(
+            meta=meta,
+            official_symbol=official_symbol,
+            gene_name=payload_dict.get("geneName") or meta.get("geneName") or official_symbol,
+            gene_id=gene_id,
+            is_human=is_human,
+            enrichment_data=enrichment_data,
+            protein_props=protein_props,
+            protein_db=protein_db,
+            clinical_details=clinical_details,
+            disease_resolved=disease_resolved,
+        )
+        for key, value in fallback_payload.items():
+            if value is not None and not payload_dict.get(key):
+                payload_dict[key] = value
+
+        return payload_dict
     except HTTPException:
         raise
     except EnsemblLookupUnavailable as e:
