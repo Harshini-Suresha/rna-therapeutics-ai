@@ -7,8 +7,8 @@ data:
 
 model:
   type: "BaselineMLP"
-  input_dim: 1280  # 2 × 640 RNA-FM embeddings (siRNA + mRNA)
-  hidden_dim: 64
+  input_dim: 1291  # 2 × 640 RNA-FM (siRNA + mRNA) + 11 accessibility
+  hidden_dim: 128
   output_dim: 1
 
 rnafm:
@@ -30,4 +30,4 @@ train:
 paths:
   checkpoint_dir: "backend/checkpoints"
   log_dir: "backend/logs"
-  checkpoint_name: "rnafm_baseline"
+  checkpoint_name: "rnafm_accessibility"

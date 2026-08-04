@@ -1,4 +1,5 @@
 from backend.features.vienna import ViennaRNAFeatures
+from backend.features.accessibility import AccessibilityFeatures
 
 
 class FeatureExtractor:
@@ -34,7 +35,7 @@ class FeatureExtractor:
     def extract(sample):
         thermo = ViennaRNAFeatures.ensemble(sample["mrna_sequence"])
 
-        return {
+        base = {
             "gc_content": FeatureExtractor.gc_content(sample["mrna_sequence"]),
             "length": FeatureExtractor.sequence_length(sample["mrna_sequence"]),
             "au_content": FeatureExtractor.au_content(sample["mrna_sequence"]),
@@ -45,3 +46,11 @@ class FeatureExtractor:
             "ensemble_energy": thermo["ensemble_energy"],
             "centroid_distance": thermo["centroid_distance"],
         }
+
+        acc = AccessibilityFeatures.compute(
+            sample["mrna_sequence"],
+            sample["aso_sequence"],
+        )
+        base.update(acc)
+
+        return base

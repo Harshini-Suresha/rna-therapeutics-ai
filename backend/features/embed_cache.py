@@ -3,9 +3,24 @@ import torch
 
 from backend.datasets.huesken import HueskenDataset
 from backend.features.rnafm import RNAFMEmbedder
+from backend.features.accessibility import AccessibilityFeatures
 
 CACHE_DIR = "backend/data"
 CACHE_FILE = os.path.join(CACHE_DIR, "hu_embeddings.pt")
+
+ACCESSIBILITY_KEYS = [
+    "accessibility_mean",
+    "accessibility_min",
+    "accessibility_max",
+    "accessibility_global_mean",
+    "accessibility_global_min",
+    "accessibility_global_max",
+    "sliding_window_mean",
+    "positional_entropy_mean",
+    "positional_entropy_global_mean",
+    "binding_site_start",
+    "binding_site_end",
+]
 
 
 def precompute_embeddings(
@@ -14,8 +29,13 @@ def precompute_embeddings(
     cache_path: str = CACHE_FILE,
     batch_size: int = 64,
 ) -> str:
-    """Precompute RNA-FM embeddings for all siRNA and mRNA sequences
-    in the Huesken dataset. Caches results to disk as a .pt file.
+    """Precompute RNA-FM embeddings and accessibility features for all
+    siRNA and mRNA sequences in the Huesken dataset.
+
+    Caches results to disk as a .pt file containing:
+      - embeddings:    (N, 1280)  — siRNA(640) + mRNA(640)
+      - accessibility: (N, 11)    — RNAplfold-style features
+      - labels:        (N,)       — continuous efficacy
 
     Returns the path to the cache file.
     """
@@ -26,6 +46,7 @@ def precompute_embeddings(
 
     n = len(dataset)
     embeddings = torch.zeros(n, 2 * embedder.embedding_dim)
+    accessibility = torch.zeros(n, len(ACCESSIBILITY_KEYS))
     labels = torch.zeros(n)
 
     si_rna_seqs = [dataset[i]["aso_sequence"] for i in range(n)]
@@ -44,22 +65,52 @@ def precompute_embeddings(
         print(f"Processed {end}/{n} sequences", end="\r")
 
     print()
+    print("Computing accessibility features...")
 
-    torch.save({"embeddings": embeddings, "labels": labels}, cache_path)
-    print(f"Cache saved to {cache_path}  (shape: {embeddings.shape})")
+    for i in range(n):
+        acc = AccessibilityFeatures.compute(mrna_seqs[i], si_rna_seqs[i])
+        accessibility[i] = torch.tensor(
+            [acc[k] for k in ACCESSIBILITY_KEYS], dtype=torch.float32
+        )
+
+        if (i + 1) % 100 == 0:
+            print(f"Accessibility: {i + 1}/{n}", end="\r")
+
+    print()
+
+    torch.save(
+        {
+            "embeddings": embeddings,
+            "accessibility": accessibility,
+            "labels": labels,
+        },
+        cache_path,
+    )
+
+    total_dim = embeddings.shape[1] + accessibility.shape[1]
+    print(
+        f"Cache saved to {cache_path}  "
+        f"(embeddings: {embeddings.shape}, "
+        f"accessibility: {accessibility.shape}, "
+        f"combined: {total_dim}-dim)"
+    )
 
     return cache_path
 
 
 def load_embeddings(cache_path: str = CACHE_FILE):
-    """Load precomputed embeddings from cache."""
+    """Load precomputed embeddings and accessibility from cache."""
     if not os.path.exists(cache_path):
         raise FileNotFoundError(
             f"No embedding cache found at {cache_path}. "
             f"Run precompute_embeddings() first."
         )
     data = torch.load(cache_path, weights_only=True)
-    return data["embeddings"], data["labels"]
+    return (
+        data["embeddings"],
+        data["accessibility"],
+        data["labels"],
+    )
 
 
 if __name__ == "__main__":
