@@ -4,7 +4,8 @@
   "name": "microRNA Inhibition (Anti-miR / AntagomiR)",
   "category": "microRNA modulation",
   "therapeuticGoalIds": [
-    "TG01"
+    "TG01",
+    "TG05"
   ],
   "therapeuticGoalDescription": "Inhibit a pathogenic microRNA to restore expression of its downstream target genes.",
   "molecularDefect": "Diseases caused by overexpression or aberrant activity of a pathogenic microRNA.",

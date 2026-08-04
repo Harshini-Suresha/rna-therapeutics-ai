@@ -18,11 +18,17 @@ export async function fetchGeneFeatures(params: {
   organism?: string;
   ensemblId?: string | null;
   tissueTpm?: number | null;
+  exonCount?: number | null;
+  totalTranscripts?: number | null;
+  geneType?: string | null;
 }): Promise<GeneFeaturesResponse> {
   const query = new URLSearchParams({ gene_symbol: params.geneSymbol });
   if (params.organism) query.set("organism", params.organism);
   if (params.ensemblId) query.set("ensembl_id", params.ensemblId);
   if (params.tissueTpm != null) query.set("tissue_tpm", String(params.tissueTpm));
+  if (params.exonCount != null) query.set("exon_count", String(params.exonCount));
+  if (params.totalTranscripts != null) query.set("total_transcripts", String(params.totalTranscripts));
+  if (params.geneType) query.set("gene_type", params.geneType);
 
   const res = await fetch(`${API_BASE}/api/mechanisms/gene-features?${query}`, {
     cache: "no-store",
@@ -97,6 +103,84 @@ export async function rankRnaProcessingMechanisms(params: {
       target_exon: params.targetExon || null,
       delivery_context: params.deliveryContext || null,
       known_variant: params.knownVariant || null,
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail || "Could not rank mechanisms.");
+  }
+  return res.json();
+}
+
+export async function rankRnaEditingMechanisms(params: {
+  geneSymbol: string;
+  editType: string;
+  variantHgvs?: string | null;
+  enzymeRecruitment?: string | null;
+  deliveryContext?: string | null;
+  guideLength?: number | null;
+  mismatchPocket?: string | null;
+  maxBystanderEdits?: number | null;
+  splicingDirection?: string | null;
+  intronSite?: string | null;
+  abdLength?: number | null;
+  exonCount?: number | null;
+  intronCount?: number | null;
+  totalTranscripts?: number | null;
+}): Promise<MechanismRankingResponse> {
+  const res = await fetch(`${API_BASE}/api/mechanisms/rna-editing`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      gene_symbol: params.geneSymbol,
+      edit_type: params.editType,
+      variant_hgvs: params.variantHgvs || null,
+      enzyme_recruitment: params.enzymeRecruitment || null,
+      delivery_context: params.deliveryContext || null,
+      guide_length: params.guideLength ?? null,
+      mismatch_pocket: params.mismatchPocket || null,
+      max_bystander_edits: params.maxBystanderEdits ?? null,
+      splicing_direction: params.splicingDirection || null,
+      intron_site: params.intronSite || null,
+      abd_length: params.abdLength ?? null,
+      exon_count: params.exonCount ?? null,
+      intron_count: params.intronCount ?? null,
+      total_transcripts: params.totalTranscripts ?? null,
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail || "Could not rank mechanisms.");
+  }
+  return res.json();
+}
+
+export async function rankRnaNeutralizationMechanisms(params: {
+  geneSymbol: string;
+  molecularDefect: string;
+  neutralizationMode: string;
+  repeatUnit?: string | null;
+  estimatedRepeatCount?: string | null;
+  stericChemistry?: string | null;
+  targetRbp?: string | null;
+  oligoLength?: number | null;
+  deliveryContext?: string | null;
+  targetGeneType?: string | null;
+}): Promise<MechanismRankingResponse> {
+  const res = await fetch(`${API_BASE}/api/mechanisms/rna-neutralization`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      gene_symbol: params.geneSymbol,
+      molecular_defect: params.molecularDefect,
+      neutralization_mode: params.neutralizationMode,
+      repeat_unit: params.repeatUnit || null,
+      estimated_repeat_count: params.estimatedRepeatCount || null,
+      steric_chemistry: params.stericChemistry || null,
+      target_rbp: params.targetRbp || null,
+      oligo_length: params.oligoLength ?? null,
+      delivery_context: params.deliveryContext || null,
+      target_gene_type: params.targetGeneType || null,
     }),
   });
   if (!res.ok) {

@@ -4,7 +4,8 @@
   "name": "RNA Aptamer Therapeutics",
   "category": "Ligand Binding / Molecular Inhibition",
   "therapeuticGoalIds": [
-    "TG09"
+    "TG09",
+    "TG05"
   ],
   "therapeuticGoalDescription": "Modulate disease by specifically binding and inhibiting (or occasionally activating) extracellular or intracellular target molecules without altering gene expression.",
   "molecularDefect": "Diseases driven by excessive protein activity, ligand–receptor interactions, or dysregulated signaling pathways.",

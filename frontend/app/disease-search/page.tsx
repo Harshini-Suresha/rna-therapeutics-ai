@@ -23,6 +23,8 @@ import {
   Layers,
   BarChart3,
   Network,
+  Sparkles,
+  AlertTriangle,
 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import Topbar from "@/components/Topbar";
@@ -88,7 +90,7 @@ function Td({ label, value, link }: { label: string; value?: string | null; link
   if (!value) return null;
   return (
     <tr className="border-b border-slate-100 last:border-0">
-      <td className="py-2 pr-4 text-[11.5px] font-medium text-slate-500 whitespace-nowrap w-[180px]">{label}</td>
+      <td className="py-2 pr-4 text-[11.5px] font-semibold text-slate-700 whitespace-nowrap w-[180px]">{label}</td>
       <td className="py-2 text-[12px] text-slate-700">
         {link ? (
           <a href={link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-brand hover:underline">
@@ -303,6 +305,53 @@ function GeneRow({ gene, index, expanded, onToggle, onUseGene }: {
                   </div>
                 </div>
               )}
+              {gene.hallmarks && gene.hallmarks.length > 0 && (
+                <div>
+                  <p className="mb-1.5 flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-wide text-slate-500">
+                    <Sparkles className="h-3 w-3" /> Hallmarks ({gene.hallmarks.length})
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {gene.hallmarks.slice(0, 8).map((h, i) => (
+                      <span key={i} className="rounded-full bg-amber-50 px-2 py-0.5 text-[10.5px] text-amber-700">{h}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {gene.chemicalProbes && gene.chemicalProbes.length > 0 && (
+                <div>
+                  <p className="mb-1.5 flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-wide text-slate-500">
+                    <FlaskConical className="h-3 w-3" /> Chemical probes ({gene.chemicalProbes.length})
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {gene.chemicalProbes.slice(0, 12).map((p, i) => (
+                      <a
+                        key={i}
+                        href={`https://www.ebi.ac.uk/chembl/g/#/molecule/${p.drugId}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 rounded-full bg-cyan-50 px-2 py-0.5 font-mono text-[10.5px] text-cyan-700 hover:bg-cyan-100 transition-colors"
+                      >
+                        {p.drugId}
+                        {p.isHighQuality && (
+                          <span className="rounded-full bg-cyan-100 px-1 py-px text-[9px] font-semibold uppercase">HQ</span>
+                        )}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {gene.safetyLiabilities && gene.safetyLiabilities.length > 0 && (
+                <div>
+                  <p className="mb-1.5 flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-wide text-slate-500">
+                    <AlertTriangle className="h-3 w-3" /> Safety liabilities ({gene.safetyLiabilities.length})
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {gene.safetyLiabilities.slice(0, 10).map((s, i) => (
+                      <span key={i} className="rounded-full bg-red-50 px-2 py-0.5 text-[10.5px] text-red-700">{s}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="flex flex-wrap items-center gap-3 text-[10.5px] text-slate-400">
                 {gene.ensemblId && (
                   <a
@@ -313,6 +362,12 @@ function GeneRow({ gene, index, expanded, onToggle, onUseGene }: {
                   >
                     {gene.ensemblId} <ExternalLink className="h-2.5 w-2.5" />
                   </a>
+                )}
+                {gene.genomicLocation?.chromosome && (
+                  <span className="font-mono">
+                    Chr {gene.genomicLocation.chromosome}:{gene.genomicLocation.start?.toLocaleString() ?? "?"}–
+                    {gene.genomicLocation.end?.toLocaleString() ?? "?"}
+                  </span>
                 )}
                 {gene.biotype && <span>Biotype: {gene.biotype}</span>}
               </div>
@@ -340,7 +395,12 @@ function DrugRow({ drug, index, expanded, onToggle }: {
             {index + 1}
           </span>
         </td>
-        <td className="py-2 pr-4 text-[12px] font-medium text-slate-700">{drug.name}</td>
+        <td className="py-2 pr-4">
+          <p className="text-[12px] font-medium text-slate-700">{drug.name}</p>
+          {drug.tradeNames && drug.tradeNames.length > 0 && (
+            <p className="mt-0.5 text-[10.5px] text-slate-400">{drug.tradeNames.join(", ")}</p>
+          )}
+        </td>
         <td className="py-2 pr-4">
           {drug.drugType ? (
             <span className="inline-flex items-center rounded bg-sky-50 px-1.5 py-0.5 text-[10px] font-medium text-sky-700">{drug.drugType}</span>
@@ -394,6 +454,31 @@ function DrugRow({ drug, index, expanded, onToggle }: {
                   ))}
                 </ul>
               )}
+              {drug.approvedIndications && drug.approvedIndications.length > 0 && (
+                <div>
+                  <p className="mb-1 text-[10.5px] font-semibold uppercase tracking-wide text-emerald-600">
+                    Approved indications ({drug.approvedIndications.length})
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {drug.approvedIndications.map((ind, i) => (
+                      <span key={i} className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10.5px] font-medium text-emerald-700">{ind}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {(drug.tradeNames && drug.tradeNames.length > 0) || (drug.synonyms && drug.synonyms.length > 0) ? (
+                <div>
+                  <p className="mb-1 text-[10.5px] font-semibold uppercase tracking-wide text-slate-500">Names & synonyms</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {drug.tradeNames?.map((tn, i) => (
+                      <span key={`tn${i}`} className="rounded-full bg-sky-50 px-2 py-0.5 text-[10.5px] font-medium text-sky-700">{tn}</span>
+                    ))}
+                    {drug.synonyms?.map((s, i) => (
+                      <span key={`s${i}`} className="rounded-full bg-slate-100 px-2 py-0.5 text-[10.5px] text-slate-600">{s}</span>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
               {drug.clinicalReports && drug.clinicalReports.length > 0 && (
                 <div>
                   <p className="mb-1 text-[10.5px] font-semibold uppercase tracking-wide text-slate-500">Clinical reports ({drug.clinicalReports.length})</p>
@@ -516,6 +601,50 @@ export default function DiseaseSearchResultsPage() {
     const counts: Record<string, number> = {};
     for (const g of detail?.genes ?? []) {
       counts[g.biotype || "unknown"] = (counts[g.biotype || "unknown"] ?? 0) + 1;
+    }
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  }, [detail]);
+
+  const targetClassSummary = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const g of detail?.genes ?? []) {
+      for (const tc of g.targetClass ?? []) {
+        counts[tc] = (counts[tc] ?? 0) + 1;
+      }
+    }
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  }, [detail]);
+
+  const tractabilitySummary = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const g of detail?.genes ?? []) {
+      for (const t of g.tractability ?? []) {
+        const modality = TRACTABILITY_MODALITY[t.modality] ?? t.modality;
+        counts[modality] = (counts[modality] ?? 0) + 1;
+      }
+    }
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  }, [detail]);
+
+  const mousePhenotypeSummary = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const g of detail?.genes ?? []) {
+      for (const mp of g.mousePhenotypes ?? []) {
+        counts[mp] = (counts[mp] ?? 0) + 1;
+      }
+    }
+    return Object.entries(counts)
+      .map(([phenotype, count]) => ({ phenotype, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+  }, [detail]);
+
+  const constraintSummary = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const g of detail?.genes ?? []) {
+      for (const type of Object.keys(g.constraint ?? {})) {
+        counts[type] = (counts[type] ?? 0) + 1;
+      }
     }
     return Object.entries(counts).sort((a, b) => b[1] - a[1]);
   }, [detail]);
@@ -708,6 +837,114 @@ export default function DiseaseSearchResultsPage() {
                   />
                 </div>
 
+                {/* Gene-level summary cards */}
+                {(targetClassSummary.length > 0 ||
+                  tractabilitySummary.length > 0 ||
+                  mousePhenotypeSummary.length > 0 ||
+                  constraintSummary.length > 0) && (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                    {targetClassSummary.length > 0 && (
+                      <Card className="p-0 overflow-hidden">
+                        <div className="border-b border-slate-100 px-5 py-3">
+                          <div className="flex items-center gap-2">
+                            <Layers className="h-4 w-4 text-indigo-500" />
+                            <p className="text-[13px] font-semibold text-slate-800">Target Classes</p>
+                          </div>
+                          <p className="mt-0.5 text-[11.5px] text-slate-400">
+                            Protein class distribution across {totalGenes} associated genes.
+                          </p>
+                        </div>
+                        <div className="px-5 py-3">
+                          <div className="flex flex-wrap gap-1.5">
+                            {targetClassSummary.map(([tc, count]) => (
+                              <span key={tc} className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-50 px-2.5 py-1 text-[11px] text-indigo-700">
+                                {tc}
+                                <span className="rounded-full bg-indigo-100 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums">{count}</span>
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </Card>
+                    )}
+
+                    {tractabilitySummary.length > 0 && (
+                      <Card className="p-0 overflow-hidden">
+                        <div className="border-b border-slate-100 px-5 py-3">
+                          <div className="flex items-center gap-2">
+                            <FlaskConical className="h-4 w-4 text-emerald-500" />
+                            <p className="text-[13px] font-semibold text-slate-800">Tractability</p>
+                          </div>
+                          <p className="mt-0.5 text-[11.5px] text-slate-400">
+                            Drug modalities available for the associated genes.
+                          </p>
+                        </div>
+                        <div className="px-5 py-3">
+                          <div className="flex flex-wrap gap-1.5">
+                            {tractabilitySummary.map(([modality, count]) => (
+                              <span key={modality} className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] text-emerald-700">
+                                {modality}
+                                <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums">{count}</span>
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </Card>
+                    )}
+
+                    {mousePhenotypeSummary.length > 0 && (
+                      <Card className="p-0 overflow-hidden">
+                        <div className="border-b border-slate-100 px-5 py-3">
+                          <div className="flex items-center gap-2">
+                            <MousePointer2 className="h-4 w-4 text-slate-500" />
+                            <p className="text-[13px] font-semibold text-slate-800">Top Mouse Phenotypes</p>
+                          </div>
+                          <p className="mt-0.5 text-[11.5px] text-slate-400">
+                            Most frequent phenotypes across mouse models of the associated genes.
+                          </p>
+                        </div>
+                        <div className="px-5 py-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2">
+                            {mousePhenotypeSummary.map((p) => (
+                              <div key={p.phenotype} className="flex items-center gap-2">
+                                <span className="flex-1 truncate text-[11px] text-slate-600" title={p.phenotype}>
+                                  {p.phenotype}
+                                </span>
+                                <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-slate-600">
+                                  {p.count}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </Card>
+                    )}
+
+                    {constraintSummary.length > 0 && (
+                      <Card className="p-0 overflow-hidden">
+                        <div className="border-b border-slate-100 px-5 py-3">
+                          <div className="flex items-center gap-2">
+                            <Gauge className="h-4 w-4 text-rose-500" />
+                            <p className="text-[13px] font-semibold text-slate-800">Genetic Constraint</p>
+                          </div>
+                          <p className="mt-0.5 text-[11.5px] text-slate-400">
+                            Genes with gnomAD constraint evidence by type (LoF, missense, synonymous).
+                          </p>
+                        </div>
+                        <div className="px-5 py-3">
+                          <div className="flex flex-wrap gap-1.5">
+                            {constraintSummary.map(([type, count]) => (
+                              <span key={type} className="inline-flex items-center gap-1.5 rounded-full bg-rose-50 px-2.5 py-1 text-[11px] text-rose-700">
+                                {type === "lof" ? "LoF" : type === "mis" ? "Missense" : type === "syn" ? "Synonymous" : type}
+                                <span className="rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums">{count}</span>
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </Card>
+                    )}
+                  </div>
+                )}
+
                 {/* Evidence landscape */}
                 {evidenceSummary.length > 0 && (
                   <Card className="p-0 overflow-hidden">
@@ -767,7 +1004,7 @@ export default function DiseaseSearchResultsPage() {
                         <Pill className="h-4 w-4 text-emerald-600" />
                         <p className="text-[13px] font-semibold text-slate-800">Known Drugs / Clinical Candidates ({detail.knownDrugs.length})</p>
                       </div>
-                      <p className="mt-0.5 text-[11.5px] text-slate-400">Click a row to see mechanism of action and clinical reports.</p>
+                      <p className="mt-0.5 text-[11.5px] text-slate-400">Click a row to see mechanism of action, approved indications and clinical reports.</p>
                       {stageSummary.length > 0 && (
                         <div className="mt-2 flex flex-wrap gap-1.5">
                           {stageSummary.map(([stage, count]) => (
@@ -823,7 +1060,7 @@ export default function DiseaseSearchResultsPage() {
                       <p className="text-[13px] font-semibold text-slate-800">Associated Genes ({detail.genes.length})</p>
                     </div>
                     <p className="mt-0.5 text-[11.5px] text-slate-400">
-                      Ranked by evidence-based association score (0–1). Click a row to expand function, evidence breakdown, pathways, mouse models and genetic constraint. Higher score = stronger evidence linking the gene to this disease.
+                      Ranked by evidence-based association score (0–1). Click a row to expand function, evidence breakdown, pathways, mouse models, genetic constraint, genomic location, chemical probes and safety liabilities. Higher score = stronger evidence linking the gene to this disease.
                     </p>
                     {biotypeSummary.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-1.5">

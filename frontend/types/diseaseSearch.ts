@@ -11,6 +11,16 @@ export interface DiseaseGeneMatch {
   constraint?: Record<string, { exp: number | null; obs: number | null; oe: number | null }>;
   mousePhenotypes?: string[];
   pathways?: { pathway: string; pathwayId: string; topLevelTerm?: string | null }[];
+  genomicLocation?: { chromosome: string | null; start: number | null; end: number | null } | null;
+  hallmarks?: string[];
+  chemicalProbes?: { drugId: string; isHighQuality: boolean }[];
+  safetyLiabilities?: string[];
+  aliases?: string[];
+  uniprotId?: string | null;
+  literatureCount?: number | null;
+  isEssential?: boolean | null;
+  associatedDiseaseCount?: number | null;
+  interactionCount?: number | null;
 }
 
 export interface DiseaseSearchResponse {
@@ -35,6 +45,12 @@ export interface KnownDrug {
   phase: number | null;
   status: string | null;
   drugType?: string | null;
+  id?: string | null;
+  tradeNames?: string[];
+  synonyms?: string[];
+  approvedIndications?: string[];
+  indicationCount?: number;
+  warnings?: { warningType: string; efoTerm?: string | null; description?: string | null }[];
   mechanismsOfAction?: {
     actionTypes?: string[];
     targetTypes?: string[];

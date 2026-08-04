@@ -58,14 +58,16 @@ def _ensembl_get(path: str, params: dict | None = None) -> dict | list | None:
 
 
 def _get_transcripts(gene_id: str) -> list[dict]:
-    """Fetch all transcripts for a gene from Ensembl."""
-    data = _ensembl_get(f"/overlap/translation/{gene_id}", {"feature": "translation"})
-    if isinstance(data, list):
-        return data
+    """Fetch all transcripts for a gene from Ensembl.
 
+    Uses the expand=1 gene lookup, which returns the transcript list under
+    the (singular) "Transcript" key — each transcript carries its own
+    "Exon" array. The /overlap/translation endpoint only accepts
+    translation IDs (ENSP...), not gene IDs, so it cannot be used here.
+    """
     data = _ensembl_get(f"/lookup/id/{gene_id}", {"expand": "1"})
     if isinstance(data, dict):
-        return data.get("Transcripts", []) or []
+        return data.get("Transcript", []) or []
     return []
 
 
@@ -77,10 +79,17 @@ def _get_regulatory_features(region: str) -> list[dict]:
     return []
 
 
-def _check_overlapping_nats(gene_id: str, species: str) -> dict:
+def _check_overlapping_nats(
+    gene_id: str, species: str, gene_data: dict | None = None
+) -> dict:
     """
     Check for overlapping natural antisense transcripts.
     Uses Ensembl overlap API to find antisense lncRNAs.
+
+    hasOverlappingNat is None when the gene cannot be resolved (unknown
+    symbol, missing coordinates, or Ensembl unavailable) — callers treat
+    that as "unverified" rather than a definitive negative, so NAT
+    silencing stays available for genes that can't be checked.
     """
     result = {
         "hasOverlappingNat": False,
@@ -88,8 +97,14 @@ def _check_overlapping_nats(gene_id: str, species: str) -> dict:
         "natGenes": [],
     }
 
-    gene_data = _ensembl_get(f"/lookup/id/{gene_id}")
+    if not gene_id:
+        result["hasOverlappingNat"] = None
+        return result
+
+    if gene_data is None:
+        gene_data = _ensembl_get(f"/lookup/id/{gene_id}")
     if not gene_data or not isinstance(gene_data, dict):
+        result["hasOverlappingNat"] = None
         return result
 
     chrom = gene_data.get("seq_region_name")
@@ -98,6 +113,7 @@ def _check_overlapping_nats(gene_id: str, species: str) -> dict:
     strand = gene_data.get("strand")
 
     if not all([chrom, start, end, strand]):
+        result["hasOverlappingNat"] = None
         return result
 
     # Query overlapping features in the region
@@ -132,35 +148,64 @@ def _check_overlapping_nats(gene_id: str, species: str) -> dict:
     return result
 
 
-def _estimate_uorf_potential(transcripts: list[dict]) -> dict:
+def _estimate_uorf_potential(
+    transcripts: list[dict], total_transcripts: int | None = None
+) -> dict:
     """
     Estimate whether a gene likely has uORFs based on transcript structure.
     Genes with longer 5' UTRs and multiple transcripts are more likely to
     contain functional uORFs.
+
+    total_transcripts may come from the main gene pipeline (which already
+    queried Ensembl) when the live transcript fetch here comes up empty.
     """
+    if total_transcripts is None:
+        total_transcripts = len(transcripts)
+
     result = {
         "hasUorfPotential": False,
         "longestUtr5": 0,
-        "transcriptCount": len(transcripts),
+        "transcriptCount": total_transcripts,
     }
 
-    # Heuristic: genes with >2 transcripts and complex 5' UTRs are more likely
+    # Heuristic: genes with >1 transcript and complex 5' UTRs are more likely
     # to have uORFs. We can't parse actual uORFs without sequence data, but
     # we can flag genes with sufficient transcript complexity.
-    if len(transcripts) >= 2:
+    if total_transcripts >= 2:
         result["hasUorfPotential"] = True
 
     return result
 
 
-def _check_splicing_complexity(transcripts: list[dict], exon_count: int | None) -> dict:
+def _max_exon_count(transcripts: list[dict]) -> int | None:
+    """Largest exon count across a gene's transcripts (from expand=1 lookup)."""
+    counts = [
+        len(t.get("Exon") or [])
+        for t in transcripts
+        if isinstance(t, dict) and t.get("Exon")
+    ]
+    return max(counts) if counts else None
+
+
+def _check_splicing_complexity(
+    transcripts: list[dict],
+    exon_count: int | None = None,
+    total_transcripts: int | None = None,
+) -> dict:
     """
     Determine whether a gene has sufficient splicing complexity for TANGO.
     - Needs multiple transcripts (evidence of alternative splicing)
     - Needs >1 exon (can't have poison exons in single-exon genes)
+
+    exon_count / total_transcripts fall back to pipeline-computed values
+    when the live transcript fetch here is empty.
     """
-    transcript_count = len(transcripts)
-    has_alt_splicing = transcript_count > 1
+    if total_transcripts is None:
+        total_transcripts = len(transcripts)
+    if exon_count is None:
+        exon_count = _max_exon_count(transcripts)
+
+    has_alt_splicing = total_transcripts > 1
     has_introns = (exon_count or 0) > 1
 
     # Look for transcripts with "retained_intron" or "nonsense_mediated_decay" biotype
@@ -173,7 +218,7 @@ def _check_splicing_complexity(transcripts: list[dict], exon_count: int | None) 
 
     return {
         "hasPoisonExonPotential": has_alt_splicing and has_introns,
-        "transcriptCount": transcript_count,
+        "transcriptCount": total_transcripts,
         "hasNmdTranscripts": has_nmd_variants,
         "hasIntrons": has_introns,
         "exonCount": exon_count,
@@ -185,9 +230,22 @@ def analyze_gene_features(
     organism: str = "homo_sapiens",
     ensembl_id: str | None = None,
     tissue_tpm: float | None = None,
+    exon_count: int | None = None,
+    total_transcripts: int | None = None,
+    gene_type: str | None = None,
 ) -> dict:
     """
     Analyze a gene's structural features to determine TG02 mechanism availability.
+
+    Designed to work for every gene:
+      - Structural hints already computed by the main gene pipeline
+        (exon_count / total_transcripts) are used first; Ensembl is only
+        queried to fill in the gaps.
+      - If the gene cannot be resolved or verified (unknown symbol,
+        non-Ensembl species, or Ensembl unavailable), structure-dependent
+        mechanisms are NOT hard-excluded. They are reported as available
+        with an honest "could not verify" note, so the TG02 ranking still
+        returns candidates for all genes instead of silently dropping them.
 
     Returns a dict with:
     - features: per-mechanism availability flags
@@ -203,66 +261,83 @@ def analyze_gene_features(
         if isinstance(lookup, dict) and lookup.get("id"):
             ensembl_id = lookup["id"]
 
-    if not ensembl_id:
-        return {
-            "features": {
-                "saRNA": {"available": True, "reason": "All genes have promoter regions"},
-                "uORF": {"available": False, "reason": "Could not verify gene structure"},
-                "TANGO": {"available": False, "reason": "Could not verify gene structure"},
-                "NAT": {"available": False, "reason": "Could not verify gene structure"},
-                "miRNA_block": {"available": True, "reason": "Most mRNAs have 3' UTR miRNA sites"},
-                "miRNA_replacement": {"available": True, "reason": "Applicable when a regulatory miRNA is deficient"},
-            },
-            "warnings": [],
-            "geneInfo": {"ensemblId": None, "transcriptCount": 0, "exonCount": None},
+    transcripts = _get_transcripts(ensembl_id) if ensembl_id else []
+    gene_data = _ensembl_get(f"/lookup/id/{ensembl_id}") if ensembl_id else None
+
+    # Prefer pipeline-computed structural hints; fill gaps from Ensembl.
+    if exon_count is None:
+        exon_count = _max_exon_count(transcripts)
+    if total_transcripts is None:
+        total_transcripts = len(transcripts)
+
+    # We can make a real structural determination when we have transcript
+    # evidence or the pipeline's structural counts.
+    can_verify_structure = bool(transcripts) or exon_count is not None or (total_transcripts or 0) > 0
+    gene_verified = bool(gene_data) or bool(transcripts)
+
+    if can_verify_structure:
+        splicing = _check_splicing_complexity(transcripts, exon_count, total_transcripts)
+        uorf = _estimate_uorf_potential(transcripts, total_transcripts)
+    else:
+        splicing = {
+            "hasPoisonExonPotential": None,
+            "transcriptCount": 0,
+            "hasNmdTranscripts": False,
+            "hasIntrons": None,
+            "exonCount": None,
+        }
+        uorf = {
+            "hasUorfPotential": None,
+            "longestUtr5": 0,
+            "transcriptCount": 0,
         }
 
-    # Fetch transcript data
-    transcripts = _get_transcripts(ensembl_id)
+    nats = _check_overlapping_nats(ensembl_id, organism, gene_data)
 
-    # Get gene metadata for exon count
-    gene_data = _ensembl_get(f"/lookup/id/{ensembl_id}")
-    exon_count = None
-    if isinstance(gene_data, dict):
-        exon_count = gene_data.get("Exon")
+    unverified_reason = (
+        "Could not verify gene structure from Ensembl — treated as potentially "
+        "applicable for this gene; requires experimental validation."
+    )
 
-    # Check structural features
-    splicing = _check_splicing_complexity(transcripts, exon_count)
-    uorf = _estimate_uorf_potential(transcripts)
-    nats = _check_overlapping_nats(ensembl_id, organism)
-
-    # Build feature availability map
+    # Build feature availability map. A tri-state value (True/False/None) keeps
+    # "verified absent" distinct from "could not verify".
     features = {
         "saRNA": {
             "available": True,
             "reason": "All protein-coding genes have promoter regions that can be targeted by saRNA",
         },
-        "uORF": {
-            "available": uorf["hasUorfPotential"],
-            "reason": (
-                "Gene has multiple transcripts suggesting complex 5' UTR regulation"
-                if uorf["hasUorfPotential"]
-                else "Gene has few transcripts; validated uORFs not confirmed (requires experimental evidence)"
-            ),
-        },
-        "TANGO": {
-            "available": splicing["hasPoisonExonPotential"],
-            "reason": (
+        "uORF": _feature_entry(
+            uorf["hasUorfPotential"],
+            "Gene has multiple transcripts suggesting complex 5' UTR regulation",
+            "Gene has few transcripts; validated uORFs not confirmed (requires experimental evidence)",
+            unverified_reason,
+        ),
+        "TANGO": _feature_entry(
+            splicing["hasPoisonExonPotential"],
+            (
                 f"Gene has {splicing['transcriptCount']} transcripts with introns — "
-                + ("including NMD-associated variants" if splicing["hasNmdTranscripts"] else "alternative splicing may produce poison exons")
-                if splicing["hasPoisonExonPotential"]
-                else "Single-exon gene or insufficient splicing complexity for poison exon targeting"
+                + (
+                    "including NMD-associated variants"
+                    if splicing["hasNmdTranscripts"]
+                    else "alternative splicing may produce poison exons"
+                )
             ),
-        },
-        "NAT": {
-            "available": nats["hasOverlappingNat"],
-            "reason": (
+            "Single-exon gene or insufficient splicing complexity for poison exon targeting",
+            unverified_reason,
+        ),
+        "NAT": _feature_entry(
+            nats["hasOverlappingNat"],
+            (
                 f"Found {nats['natCount']} overlapping antisense transcript(s)"
-                + (f": {', '.join(g['description'][:60] for g in nats['natGenes'][:3])}" if nats["natGenes"] else "")
-                if nats["hasOverlappingNat"]
-                else "No overlapping natural antisense transcripts detected in genomic databases"
+                + (
+                    f": {', '.join(g['description'][:60] for g in nats['natGenes'][:3])}"
+                    if nats["natGenes"]
+                    else ""
+                )
             ),
-        },
+            "No overlapping natural antisense transcripts detected in genomic databases",
+            "Could not verify overlapping antisense transcripts from Ensembl — NAT silencing treated as potentially applicable; requires experimental validation",
+        ),
         "miRNA_block": {
             "available": True,
             "reason": "Most protein-coding mRNAs contain miRNA binding sites in their 3' UTR",
@@ -301,10 +376,31 @@ def analyze_gene_features(
         "warnings": warnings,
         "geneInfo": {
             "ensemblId": ensembl_id,
-            "transcriptCount": splicing["transcriptCount"],
+            "transcriptCount": total_transcripts or 0,
             "exonCount": splicing["exonCount"],
             "hasIntrons": splicing["hasIntrons"],
             "hasNmdTranscripts": splicing["hasNmdTranscripts"],
-            "overlappingNats": nats["natCount"],
+            "overlappingNats": nats["natCount"] or 0,
+            "verified": gene_verified,
+            "geneType": gene_type,
         },
     }
+
+
+def _feature_entry(
+    available: bool | None,
+    reason_yes: str,
+    reason_no: str,
+    reason_unknown: str,
+) -> dict:
+    """Map a tri-state availability value to a feature dict.
+
+    None means the structural check could not be run — treat the mechanism
+    as available (so it is not silently dropped from the ranking) with an
+    honest note rather than a definitive negative.
+    """
+    if available is None:
+        return {"available": True, "reason": reason_unknown}
+    if available:
+        return {"available": True, "reason": reason_yes}
+    return {"available": False, "reason": reason_no}

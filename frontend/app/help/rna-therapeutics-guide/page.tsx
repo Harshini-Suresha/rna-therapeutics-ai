@@ -5,7 +5,7 @@ const GOALS = [
   { id: "TG01", name: "Gene Silencing", desc: "Reduce expression of a pathogenic gene or transcript through transcriptional or post-transcriptional mechanisms.", status: "Live in Mechanism Selection" },
   { id: "TG04", name: "RNA Processing Modulation", desc: "Correct or redirect splicing (exon skipping/inclusion), block cryptic splice sites, or modulate polyadenylation.", status: "Live in Mechanism Selection" },
   { id: "TG02", name: "Gene Activation / Upregulation", desc: "Increase expression of an underexpressed gene, e.g. targeting antisense long non-coding RNAs.", status: "Live in Mechanism Selection" },
-  { id: "TG03", name: "RNA Editing / Correction", desc: "Direct site-specific editing of RNA (e.g. ADAR-recruiting ASOs) to correct a pathogenic base.", status: "Rulebook data only" },
+  { id: "TG03", name: "RNA Editing / Correction", desc: "Direct site-specific editing of RNA (e.g. ADAR-recruiting ASOs, APOBEC/RESCUE, trans-splicing) to correct a pathogenic base or replace a mutated transcript segment.", status: "Live in Mechanism Selection" },
   { id: "TG05", name: "Protein Replacement (mRNA)", desc: "Deliver an mRNA encoding a missing or defective protein.", status: "Rulebook data only" },
   { id: "TG06", name: "Isoform Engineering", desc: "Shift the balance between naturally occurring splice isoforms toward a more favorable one.", status: "Rulebook data only" },
 ];

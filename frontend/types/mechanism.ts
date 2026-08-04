@@ -14,6 +14,17 @@ export interface MechanismOptions {
   rnaProcessing: {
     spliceDefectTypes: MechanismOption[];
   };
+  rnaEditing: {
+    editTypes: MechanismOption[];
+    enzymeRecruitment: MechanismOption[];
+    mismatchPocket: MechanismOption[];
+    splicingDirections: MechanismOption[];
+  };
+  rnaNeutralization: {
+    molecularDefects: MechanismOption[];
+    neutralizationModes: MechanismOption[];
+    stericChemistries: MechanismOption[];
+  };
   deliveryContexts: MechanismOption[];
 }
 
@@ -55,6 +66,23 @@ export interface MechanismRankingResponse {
     deliveryContext: string | null;
     knownVariant?: string | null;
     knownRegulatoryElement?: string | null;
+    editType?: string;
+    variantHgvs?: string | null;
+    enzymeRecruitment?: string | null;
+    guideLength?: number | null;
+    mismatchPocket?: string | null;
+    maxBystanderEdits?: number | null;
+    splicingDirection?: string | null;
+    intronSite?: string | null;
+    abdLength?: number | null;
+    molecularDefect?: string;
+    neutralizationMode?: string;
+    repeatUnit?: string | null;
+    estimatedRepeatCount?: string | null;
+    stericChemistry?: string | null;
+    targetRbp?: string | null;
+    oligoLength?: number | null;
+    targetGeneType?: string | null;
   };
   results: RankedMechanism[];
 }

@@ -21,6 +21,8 @@ import {
   rankGeneSilencingMechanisms,
   rankGeneUpregulationMechanisms,
   rankRnaProcessingMechanisms,
+  rankRnaEditingMechanisms,
+  rankRnaNeutralizationMechanisms,
   getGoalLabel,
 } from "@/lib/mechanismApi";
 import { saveReport } from "@/lib/auth";
@@ -211,6 +213,27 @@ export default function MechanismSelectionPage() {
   const [spliceDefectType, setSpliceDefectType] = useState("");
   const [targetExon, setTargetExon] = useState("");
 
+  // TG03 fields
+  const [editType, setEditType] = useState("");
+  const [variantHgvs, setVariantHgvs] = useState("");
+  const [enzymeRecruitment, setEnzymeRecruitment] = useState("");
+  const [guideLength, setGuideLength] = useState<number>(71);
+  const [mismatchPocket, setMismatchPocket] = useState("");
+  const [maxBystanderEdits, setMaxBystanderEdits] = useState<number>(0);
+  const [splicingDirection, setSplicingDirection] = useState("");
+  const [intronSite, setIntronSite] = useState("");
+  const [abdLength, setAbdLength] = useState<number>(150);
+
+  // TG05 fields
+  const [molecularDefect, setMolecularDefect] = useState("");
+  const [neutralizationMode, setNeutralizationMode] = useState("");
+  const [repeatUnit, setRepeatUnit] = useState("");
+  const [estimatedRepeatCount, setEstimatedRepeatCount] = useState("");
+  const [stericChemistry, setStericChemistry] = useState("");
+  const [targetRbp, setTargetRbp] = useState("");
+  const [oligoLength, setOligoLength] = useState<number | null>(null);
+  const [targetGeneType, setTargetGeneType] = useState("");
+
   // Shared fields
   const [deliveryContext, setDeliveryContext] = useState("");
   const [knownVariant, setKnownVariant] = useState("");
@@ -262,6 +285,9 @@ export default function MechanismSelectionPage() {
       organism: gene.organism || "homo_sapiens",
       ensemblId: gene.geneId,
       tissueTpm: gene.tissueTpm,
+      exonCount: gene.exonCount,
+      totalTranscripts: gene.totalTranscripts,
+      geneType: gene.geneType || undefined,
     })
       .then(setGeneFeatures)
       .catch(() => setGeneFeatures(null))
@@ -279,6 +305,23 @@ export default function MechanismSelectionPage() {
     setKnownRegulatoryElement("");
     setSpliceDefectType("");
     setTargetExon("");
+    setEditType("");
+    setVariantHgvs("");
+    setEnzymeRecruitment("");
+    setGuideLength(71);
+    setMismatchPocket("");
+    setMaxBystanderEdits(0);
+    setSplicingDirection("");
+    setIntronSite("");
+    setAbdLength(150);
+    setMolecularDefect("");
+    setNeutralizationMode("");
+    setRepeatUnit("");
+    setEstimatedRepeatCount("");
+    setStericChemistry("");
+    setTargetRbp("");
+    setOligoLength(null);
+    setTargetGeneType("");
     setDeliveryContext("");
     setKnownVariant("");
   }
@@ -324,6 +367,38 @@ export default function MechanismSelectionPage() {
           deliveryContext,
           knownVariant,
         });
+      } else if (selectedGoal === "TG03") {
+        if (!editType || !variantHgvs) return;
+        result = await rankRnaEditingMechanisms({
+          geneSymbol: gene.geneSymbol,
+          editType,
+          variantHgvs,
+          enzymeRecruitment,
+          deliveryContext,
+          guideLength,
+          mismatchPocket,
+          maxBystanderEdits,
+          splicingDirection,
+          intronSite,
+          abdLength,
+          exonCount: gene.exonCount,
+          intronCount: gene.intronCount,
+          totalTranscripts: gene.totalTranscripts,
+        });
+      } else if (selectedGoal === "TG05") {
+        if (!molecularDefect || !neutralizationMode) return;
+        result = await rankRnaNeutralizationMechanisms({
+          geneSymbol: gene.geneSymbol,
+          molecularDefect,
+          neutralizationMode,
+          repeatUnit,
+          estimatedRepeatCount,
+          stericChemistry,
+          targetRbp,
+          oligoLength,
+          deliveryContext,
+          targetGeneType,
+        });
       } else {
         return;
       }
@@ -357,6 +432,33 @@ export default function MechanismSelectionPage() {
           defectType: selectedGoal === "TG01" ? defectType : null,
           therapeuticGoal: selectedGoal,
           knownVariant,
+          ...(selectedGoal === "TG03"
+            ? {
+                editType,
+                variantHgvs,
+                enzymeRecruitment,
+                deliveryContext,
+                guideLength,
+                mismatchPocket,
+                maxBystanderEdits,
+                splicingDirection,
+                intronSite,
+                abdLength,
+              }
+            : {}),
+          ...(selectedGoal === "TG05"
+            ? {
+                molecularDefect,
+                neutralizationMode,
+                repeatUnit,
+                estimatedRepeatCount,
+                stericChemistry,
+                targetRbp,
+                oligoLength,
+                deliveryContext,
+                targetGeneType,
+              }
+            : {}),
         })
       );
     }
@@ -367,6 +469,8 @@ export default function MechanismSelectionPage() {
     if (selectedGoal === "TG01") return !defectType || !silencingScope;
     if (selectedGoal === "TG02") return !upregDefectType;
     if (selectedGoal === "TG04") return !spliceDefectType;
+    if (selectedGoal === "TG03") return !editType || !variantHgvs.trim();
+    if (selectedGoal === "TG05") return !molecularDefect || !neutralizationMode;
     return true;
   }
 
@@ -717,7 +821,480 @@ export default function MechanismSelectionPage() {
                 </div>
               )}
 
-              {selectedGoal !== "TG01" && selectedGoal !== "TG02" && selectedGoal !== "TG04" && (
+              {selectedGoal === "TG03" && (
+                <div className="space-y-4 px-6 pb-4">
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                    <div>
+                      <FieldLabel hint="Which RNA editing modality do you want to use to repair the transcript?">
+                        Editing Modality <span className="text-red-500">*</span>
+                      </FieldLabel>
+                      <select
+                        value={editType}
+                        onChange={(e) => {
+                          setEditType(e.target.value);
+                          clearRanking();
+                        }}
+                        className="w-full rounded-lg border border-slate-300 bg-white py-2.5 px-3 text-[13.5px] text-slate-700 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+                      >
+                        <option value="">Select editing modality</option>
+                        {options?.rnaEditing.editTypes.map((o) => (
+                          <option key={o.id} value={o.id}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <FieldLabel hint="The exact variant to correct, in HGVS notation">
+                        Target Variant (HGVS) <span className="text-red-500">*</span>
+                      </FieldLabel>
+                      <input
+                        value={variantHgvs}
+                        onChange={(e) => {
+                          setVariantHgvs(e.target.value);
+                          clearRanking();
+                        }}
+                        placeholder="e.g. c.82G>A"
+                        className="w-full rounded-lg border border-slate-300 bg-white py-2.5 px-3 text-[13.5px] text-slate-700 placeholder:text-slate-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+                      />
+                    </div>
+
+                    <div>
+                      <FieldLabel hint="General delivery/tissue context — a soft tie-breaker and used to gauge endogenous enzyme expression">
+                        Delivery / Tissue Context
+                      </FieldLabel>
+                      <select
+                        value={deliveryContext}
+                        onChange={(e) => {
+                          setDeliveryContext(e.target.value);
+                          clearRanking();
+                        }}
+                        className="w-full rounded-lg border border-slate-300 bg-white py-2.5 px-3 text-[13.5px] text-slate-700 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+                      >
+                        <option value="">Not specified</option>
+                        {options?.deliveryContexts.map((o) => (
+                          <option key={o.id} value={o.id}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {editType !== "trans_splicing" && (
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+                      <div>
+                        <FieldLabel hint="Which enzyme machinery should execute the edit? ADAR2 is CNS-enriched; APOBEC1 is gut/liver-enriched">
+                          Recruiting Enzyme Machinery
+                        </FieldLabel>
+                        <select
+                          value={enzymeRecruitment}
+                          onChange={(e) => {
+                            setEnzymeRecruitment(e.target.value);
+                            clearRanking();
+                          }}
+                          className="w-full rounded-lg border border-slate-300 bg-white py-2.5 px-3 text-[13.5px] text-slate-700 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+                        >
+                          <option value="">Not specified</option>
+                          {options?.rnaEditing.enzymeRecruitment.map((o) => (
+                            <option key={o.id} value={o.id}>
+                              {o.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <FieldLabel hint="Length of the guide RNA / editase oligo (30–120 nt)">
+                          Guide RNA Length (nt)
+                        </FieldLabel>
+                        <input
+                          type="number"
+                          min={30}
+                          max={120}
+                          value={guideLength}
+                          onChange={(e) => {
+                            setGuideLength(parseInt(e.target.value, 10));
+                            clearRanking();
+                          }}
+                          className="w-full rounded-lg border border-slate-300 bg-white py-2.5 px-3 text-[13.5px] text-slate-700 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+                        />
+                      </div>
+
+                      {editType === "a_to_i" && (
+                        <div>
+                          <FieldLabel hint="The orphan base opposite the target adenosine on the guide RNA — A-C mismatch reports the highest editing efficiency">
+                            Opposing Base Mismatch
+                          </FieldLabel>
+                          <select
+                            value={mismatchPocket}
+                            onChange={(e) => {
+                              setMismatchPocket(e.target.value);
+                              clearRanking();
+                            }}
+                            className="w-full rounded-lg border border-slate-300 bg-white py-2.5 px-3 text-[13.5px] text-slate-700 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+                          >
+                            <option value="">Not specified</option>
+                            {options?.rnaEditing.mismatchPocket.map((o) => (
+                              <option key={o.id} value={o.id}>
+                                {o.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      <div>
+                        <FieldLabel hint="Maximum allowable bystander A/C edits within ±20 bp of the target site">
+                          Max Bystander Edits
+                        </FieldLabel>
+                        <input
+                          type="number"
+                          min={0}
+                          value={maxBystanderEdits}
+                          onChange={(e) => {
+                            setMaxBystanderEdits(parseInt(e.target.value, 10) || 0);
+                            clearRanking();
+                          }}
+                          className="w-full rounded-lg border border-slate-300 bg-white py-2.5 px-3 text-[13.5px] text-slate-700 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {editType === "trans_splicing" && (
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+                      <div>
+                        <FieldLabel hint="Which end of the transcript are you replacing?">
+                          Splicing Direction
+                        </FieldLabel>
+                        <select
+                          value={splicingDirection}
+                          onChange={(e) => {
+                            setSplicingDirection(e.target.value);
+                            clearRanking();
+                          }}
+                          className="w-full rounded-lg border border-slate-300 bg-white py-2.5 px-3 text-[13.5px] text-slate-700 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+                        >
+                          <option value="">Not specified</option>
+                          {options?.rnaEditing.splicingDirections.map((o) => (
+                            <option key={o.id} value={o.id}>
+                              {o.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <FieldLabel hint="The intron junction adjacent to the mutated region (e.g. Intron 12 Acceptor Junction)">
+                          Intron Acceptor / Donor Site
+                        </FieldLabel>
+                        <input
+                          value={intronSite}
+                          onChange={(e) => {
+                            setIntronSite(e.target.value);
+                            clearRanking();
+                          }}
+                          placeholder="e.g. Intron 12 Acceptor Junction"
+                          className="w-full rounded-lg border border-slate-300 bg-white py-2.5 px-3 text-[13.5px] text-slate-700 placeholder:text-slate-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+                        />
+                      </div>
+
+                      <div>
+                        <FieldLabel hint="Length of the antisense binding domain complementary to the target intron (100–300 bp)">
+                          ABD Length (bp)
+                        </FieldLabel>
+                        <input
+                          type="number"
+                          min={100}
+                          max={300}
+                          value={abdLength}
+                          onChange={(e) => {
+                            setAbdLength(parseInt(e.target.value, 10));
+                            clearRanking();
+                          }}
+                          className="w-full rounded-lg border border-slate-300 bg-white py-2.5 px-3 text-[13.5px] text-slate-700 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {editType === "trans_splicing" && gene.exonCount !== null && gene.exonCount <= 1 && (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-[12.5px] text-amber-800">
+                      <strong>Warning:</strong> {gene.geneSymbol} appears to be a single-exon / intronless
+                      gene ({gene.exonCount} exon). Trans-splicing relies on spliceosomal intron junctions and
+                      is not applicable — the ranked mechanism will be marked ineligible.
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {selectedGoal === "TG05" && (
+                <div className="space-y-4 px-6 pb-4">
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                    <div>
+                      <FieldLabel hint="What kind of molecular defect is the RNA itself driving?">
+                        Molecular Defect Type <span className="text-red-500">*</span>
+                      </FieldLabel>
+                      <select
+                        value={molecularDefect}
+                        onChange={(e) => {
+                          setMolecularDefect(e.target.value);
+                          clearRanking();
+                        }}
+                        className="w-full rounded-lg border border-slate-300 bg-white py-2.5 px-3 text-[13.5px] text-slate-700 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+                      >
+                        <option value="">Select defect type</option>
+                        {options?.rnaNeutralization.molecularDefects.map((o) => (
+                          <option key={o.id} value={o.id}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <FieldLabel hint="Which neutralization strategy do you want to use?">
+                        Neutralization Mode <span className="text-red-500">*</span>
+                      </FieldLabel>
+                      <select
+                        value={neutralizationMode}
+                        onChange={(e) => {
+                          setNeutralizationMode(e.target.value);
+                          clearRanking();
+                        }}
+                        className="w-full rounded-lg border border-slate-300 bg-white py-2.5 px-3 text-[13.5px] text-slate-700 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+                      >
+                        <option value="">Select mode</option>
+                        {options?.rnaNeutralization.neutralizationModes.map((o) => (
+                          <option key={o.id} value={o.id}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <FieldLabel hint="General delivery/chemistry precedent — a soft tie-breaker, not a hard filter">
+                        Delivery / Tissue Context
+                      </FieldLabel>
+                      <select
+                        value={deliveryContext}
+                        onChange={(e) => {
+                          setDeliveryContext(e.target.value);
+                          clearRanking();
+                        }}
+                        className="w-full rounded-lg border border-slate-300 bg-white py-2.5 px-3 text-[13.5px] text-slate-700 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+                      >
+                        <option value="">Not specified</option>
+                        {options?.deliveryContexts.map((o) => (
+                          <option key={o.id} value={o.id}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {molecularDefect === "loss_of_function" && (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-[12.5px] text-amber-800">
+                      <strong>Note:</strong> A pure loss-of-function defect cannot be addressed by RNA
+                      neutralization — neutralizing the RNA cannot restore the missing protein. Ranked
+                      mechanisms will be marked ineligible; consider TG02 (Gene Activation) or TG08
+                      (Protein Replacement) instead.
+                    </div>
+                  )}
+
+                  {neutralizationMode === "steric_repeat_masking" && (
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                      <div>
+                        <FieldLabel hint="The pathogenic repeat motif in the transcript (e.g. CUG, CAG, GGGGCC)">
+                          Repeat Unit (optional)
+                        </FieldLabel>
+                        <input
+                          value={repeatUnit}
+                          onChange={(e) => {
+                            setRepeatUnit(e.target.value);
+                            clearRanking();
+                          }}
+                          placeholder="e.g. CUG"
+                          className="w-full rounded-lg border border-slate-300 bg-white py-2.5 px-3 text-[13.5px] text-slate-700 placeholder:text-slate-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+                        />
+                      </div>
+
+                      <div>
+                        <FieldLabel hint="Approximate number of repeat copies, e.g. '>50' or '55–200'">
+                          Estimated Repeat Count (optional)
+                        </FieldLabel>
+                        <input
+                          value={estimatedRepeatCount}
+                          onChange={(e) => {
+                            setEstimatedRepeatCount(e.target.value);
+                            clearRanking();
+                          }}
+                          placeholder="e.g. &gt;50 copies"
+                          className="w-full rounded-lg border border-slate-300 bg-white py-2.5 px-3 text-[13.5px] text-slate-700 placeholder:text-slate-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+                        />
+                      </div>
+
+                      <div>
+                        <FieldLabel hint="RNase H-independent chemistry for occupancy-only repeat masking">
+                          Steric Chemistry
+                        </FieldLabel>
+                        <select
+                          value={stericChemistry}
+                          onChange={(e) => {
+                            setStericChemistry(e.target.value);
+                            clearRanking();
+                          }}
+                          className="w-full rounded-lg border border-slate-300 bg-white py-2.5 px-3 text-[13.5px] text-slate-700 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+                        >
+                          <option value="">Not specified</option>
+                          {options?.rnaNeutralization.stericChemistries.map((o) => (
+                            <option key={o.id} value={o.id}>
+                              {o.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <FieldLabel hint="The RNA-binding protein sequestered by the toxic foci (e.g. MBNL1)">
+                          Target RBP (optional)
+                        </FieldLabel>
+                        <input
+                          value={targetRbp}
+                          onChange={(e) => {
+                            setTargetRbp(e.target.value);
+                            clearRanking();
+                          }}
+                          placeholder="e.g. MBNL1"
+                          className="w-full rounded-lg border border-slate-300 bg-white py-2.5 px-3 text-[13.5px] text-slate-700 placeholder:text-slate-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+                        />
+                      </div>
+
+                      <div>
+                        <FieldLabel hint="Oligo length in nucleotides (15–30 nt typical for repeat masking)">
+                          Oligo Length (nt)
+                        </FieldLabel>
+                        <input
+                          type="number"
+                          min={15}
+                          max={30}
+                          value={oligoLength ?? ""}
+                          onChange={(e) => {
+                            setOligoLength(e.target.value === "" ? null : parseInt(e.target.value, 10));
+                            clearRanking();
+                          }}
+                          className="w-full rounded-lg border border-slate-300 bg-white py-2.5 px-3 text-[13.5px] text-slate-700 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {neutralizationMode === "microrna_antagomir" && (
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                      <div>
+                        <FieldLabel hint="Chemistries suitable for anti-miR oligos (2'-O-MOE full-PS is the standard fully modified backbone)">
+                          Oligo Chemistry
+                        </FieldLabel>
+                        <select
+                          value={stericChemistry}
+                          onChange={(e) => {
+                            setStericChemistry(e.target.value);
+                            clearRanking();
+                          }}
+                          className="w-full rounded-lg border border-slate-300 bg-white py-2.5 px-3 text-[13.5px] text-slate-700 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+                        >
+                          <option value="">Not specified</option>
+                          {options?.rnaNeutralization.stericChemistries.map((o) => (
+                            <option key={o.id} value={o.id}>
+                              {o.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <FieldLabel hint="Antagomirs act on small non-coding RNAs — protein-coding mRNAs gate this mechanism ineligible">
+                          Target Gene Type (optional)
+                        </FieldLabel>
+                        <input
+                          value={targetGeneType}
+                          onChange={(e) => {
+                            setTargetGeneType(e.target.value);
+                            clearRanking();
+                          }}
+                          placeholder="e.g. microRNA (non-coding RNA)"
+                          className="w-full rounded-lg border border-slate-300 bg-white py-2.5 px-3 text-[13.5px] text-slate-700 placeholder:text-slate-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+                        />
+                      </div>
+
+                      <div>
+                        <FieldLabel hint="Length complementary to the mature miRNA (15–23 nt typical)">
+                          Oligo Length (nt)
+                        </FieldLabel>
+                        <input
+                          type="number"
+                          min={15}
+                          max={23}
+                          value={oligoLength ?? ""}
+                          onChange={(e) => {
+                            setOligoLength(e.target.value === "" ? null : parseInt(e.target.value, 10));
+                            clearRanking();
+                          }}
+                          className="w-full rounded-lg border border-slate-300 bg-white py-2.5 px-3 text-[13.5px] text-slate-700 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {neutralizationMode === "aptamer_decoy" && (
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      <div>
+                        <FieldLabel hint="The RNA-binding protein or toxic RNA the aptamer should sequester">
+                          Target RBP / RNA (optional)
+                        </FieldLabel>
+                        <input
+                          value={targetRbp}
+                          onChange={(e) => {
+                            setTargetRbp(e.target.value);
+                            clearRanking();
+                          }}
+                          placeholder="e.g. MBNL1"
+                          className="w-full rounded-lg border border-slate-300 bg-white py-2.5 px-3 text-[13.5px] text-slate-700 placeholder:text-slate-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+                        />
+                      </div>
+
+                      <div>
+                        <FieldLabel hint="Aptamer length in nucleotides (20–100 nt typical)">
+                          Aptamer Length (nt)
+                        </FieldLabel>
+                        <input
+                          type="number"
+                          min={20}
+                          max={100}
+                          value={oligoLength ?? ""}
+                          onChange={(e) => {
+                            setOligoLength(e.target.value === "" ? null : parseInt(e.target.value, 10));
+                            clearRanking();
+                          }}
+                          className="w-full rounded-lg border border-slate-300 bg-white py-2.5 px-3 text-[13.5px] text-slate-700 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {!molecularDefect && (
+                    <p className="text-[12px] text-slate-500 italic">
+                      Select a Molecular Defect Type above to see which neutralization mechanisms apply.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {selectedGoal !== "TG01" && selectedGoal !== "TG02" && selectedGoal !== "TG04" && selectedGoal !== "TG03" && selectedGoal !== "TG05" && (
                 <div className="px-6 pb-4">
                   <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
                     <p className="text-[13px] font-medium text-slate-600">
@@ -799,10 +1376,14 @@ export default function MechanismSelectionPage() {
 
           {selectedId && (
             <div className="flex justify-end pt-2">
-              {selectedGoal === "TG02" ? (
+              {selectedGoal === "TG02" || selectedGoal === "TG03" || selectedGoal === "TG05" ? (
                 <div className="flex items-center gap-3">
                   <p className="text-[12px] text-slate-500">
-                    The ASO design pipeline for gene upregulation mechanisms is under development.
+                    {selectedGoal === "TG03"
+                      ? "The ASO design pipeline for RNA editing mechanisms (guide RNA / PTM design) is under development."
+                      : selectedGoal === "TG05"
+                      ? "The ASO design pipeline for RNA neutralization mechanisms (steric blocker / antagomir / aptamer design) is under development."
+                      : "The ASO design pipeline for gene upregulation mechanisms is under development."}
                   </p>
                   <span className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-5 py-3 text-[13px] font-medium text-slate-400">
                     Design pipeline coming soon

@@ -474,6 +474,7 @@ def _tissue_scores(delivery_context: str | None, chemistry: str, length: int) ->
         "lung":         {"uptake": 12, "bbb": 0,  "immune": 8,  "notes": "Accessible via inhalation; mucus barrier for systemic delivery. Good for local."},
         "eye":          {"uptake": 18, "bbb": 0,  "immune": 10, "notes": "Immune-privileged site; intravitreal delivery. Local exposure with minimal systemic."},
         "retina":       {"uptake": 18, "bbb": 0,  "immune": 10, "notes": "Immune-privileged site; intravitreal delivery. Local exposure with minimal systemic."},
+        "ocular":       {"uptake": 18, "bbb": 0,  "immune": 10, "notes": "Immune-privileged site; intravitreal delivery. Local exposure with minimal systemic."},
         "spinal cord":  {"uptake": -8, "bbb": 20, "immune": -8, "notes": "Intrathecal delivery required; limited diffusion from CSF."},
         "tumor":        {"uptake": 8, "bbb": 0,  "immune": 15, "notes": "Tumor microenvironment may enhance uptake; immune stimulation can be beneficial."},
         "blood":        {"uptake": 12, "bbb": 0,  "immune": 12, "notes": "Hematopoietic cells readily take up ASOs; immune stimulation risk."},
@@ -482,6 +483,8 @@ def _tissue_scores(delivery_context: str | None, chemistry: str, length: int) ->
         "skin":         {"uptake": 15, "bbb": 0,  "immune": 8,  "notes": "Topical or intradermal delivery; good local exposure."},
         "gut":          {"uptake": 10, "bbb": 0,  "immune": 12, "notes": "Oral delivery challenging; enema or local delivery preferred."},
         "intestine":    {"uptake": 10, "bbb": 0,  "immune": 12, "notes": "Oral delivery challenging; enema or local delivery preferred."},
+        "local_intramuscular": {"uptake": 8, "bbb": 0, "immune": 0, "notes": "Moderate uptake; large tissue mass dilutes dose. DMD exon-skipping validated."},
+        "intramuscular": {"uptake": 8, "bbb": 0, "immune": 0, "notes": "Moderate uptake; large tissue mass dilutes dose. DMD exon-skipping validated."},
     }
 
     # Find best matching tissue
@@ -511,12 +514,12 @@ def _tissue_scores(delivery_context: str | None, chemistry: str, length: int) ->
             chem_bonus = 8   # LNA also works well for liver
         elif chemistry == "sirna":
             chem_bonus = 10  # siRNA liver-targeted (e.g., patisiran)
-    elif ctx in ("eye", "retina"):
+    elif ctx in ("eye", "retina", "ocular"):
         if chemistry == "pmo":
             chem_bonus = 10  # PMOs used in retinal diseases (e.g., eteplirsen)
         elif chemistry == "2ome":
             chem_bonus = 8   # 2'-OMe used in intravitreal ASOs
-    elif ctx in ("muscle", "skeletal muscle"):
+    elif ctx in ("muscle", "skeletal muscle", "local_intramuscular", "intramuscular"):
         if chemistry in ("pmo",):
             chem_bonus = 10  # PMO exon-skipping for DMD
         elif chemistry == "gapmer":
@@ -559,7 +562,9 @@ def _defect_scores(defect_type: str | None, silencing_scope: str | None, chemist
     - Toxic RNA: degrade the toxic RNA transcript
     - Splice defect: correct splicing (steric blocking, not cleavage)
     """
-    defect = (defect_type or "").lower().strip()
+    # Canonical defect ids use underscores (gain_of_function, viral_toxic_rna);
+    # labels use spaces/hyphens. Normalize so both forms match the branches below.
+    defect = (defect_type or "").lower().strip().replace("_", "-").replace(" ", "-")
     scope = (silencing_scope or "").lower().strip()
 
     scores = {
@@ -575,31 +580,45 @@ def _defect_scores(defect_type: str | None, silencing_scope: str | None, chemist
         scores["nuclease_preference"] = 10 if nuclease_score >= 70 else -5
         scores["defect_notes"] = "Loss-of-function: aggressive knockdown preferred. High nuclease resistance favors efficacy."
 
-    elif "gain-of-function" in defect or "gof" in defect:
-        # GoF: need substantial reduction; gapmer preferred
-        scores["defect_bonus"] = 6
-        if chemistry == "gapmer" or chemistry == "lna_gapmer":
-            scores["chemistry_preference"] = 10
-        scores["defect_notes"] = "Gain-of-function: substantial protein reduction needed. Gapmer/LNA chemistry preferred for potent knockdown."
-
     elif "haploinsufficiency" in defect:
         # Haploinsufficiency: silencing ASOs are contraindicated; warn
         scores["defect_bonus"] = -15
         scores["defect_notes"] = "Haploinsufficiency: gene silencing may worsen the phenotype. Consider upregulation mechanisms instead."
 
-    elif "dominant-negative" in defect or "dominant negative" in defect:
+    elif "dominant" in defect:
         # Dominant-negative: allele-specific silencing preferred
         scores["defect_bonus"] = 6
         scores["defect_notes"] = "Dominant-negative: allele-specific silencing of the mutant allele preferred. Consider variant-specific ASO design."
 
-    elif "toxic rna" in defect or "toxic gain" in defect or "rna toxicity" in defect:
-        # Toxic RNA: degrade the toxic transcript; RNAse H preferred
+    elif "gain-of-function" in defect or "gof" in defect:
+        # GoF: need substantial reduction; gapmer preferred
+        scores["defect_bonus"] = 6
+        if chemistry in ("gapmer", "lna_gapmer"):
+            scores["chemistry_preference"] = 10
+        scores["defect_notes"] = "Gain-of-function: substantial protein reduction needed. Gapmer/LNA chemistry preferred for potent knockdown."
+
+    elif "toxic" in defect or "viral" in defect:
+        # Toxic RNA (viral_toxic_rna): degrade the toxic transcript; RNAse H preferred
         scores["defect_bonus"] = 10
         if chemistry in ("gapmer", "lna_gapmer"):
             scores["chemistry_preference"] = 12
         scores["defect_notes"] = "Toxic RNA: transcript degradation preferred. RNase H-recruiting gapmers are most effective."
 
-    elif "splice" in defect or "splicing" in defect:
+    elif "mirna-dysregulation" in defect or "mirna-dysreg" in defect:
+        # Pathogenic miRNA dysregulation (mirna_dysregulation): anti-miR silencing
+        scores["defect_bonus"] = 10
+        if chemistry in ("pmo", "2ome"):
+            scores["chemistry_preference"] = 10
+        scores["defect_notes"] = "Pathogenic microRNA dysregulation: anti-miR silencing of the toxic miRNA preferred. Steric-blocking chemistry suitable."
+
+    elif "overexpression" in defect or "oncogene" in defect:
+        # Overexpression: aggressive knockdown required; gapmer preferred
+        scores["defect_bonus"] = 8
+        if chemistry in ("gapmer", "lna_gapmer"):
+            scores["chemistry_preference"] = 12
+        scores["defect_notes"] = "Gene overexpression: aggressive knockdown required. Gapmer/LNA chemistry preferred for deep reduction."
+
+    elif "splice" in defect or "exon" in defect or "pseudoexon" in defect or "apa" in defect:
         # Splice defect: steric blocking preferred, not cleavage
         scores["defect_bonus"] = 8
         if chemistry in ("pmo", "2ome"):
@@ -608,7 +627,7 @@ def _defect_scores(defect_type: str | None, silencing_scope: str | None, chemist
             scores["chemistry_preference"] = -10  # Gapmers cleave, not ideal for splice correction
         scores["defect_notes"] = "Splice defect: steric blocking (PMO/2'-OMe) preferred for splice correction. RNase H gapmers may be counterproductive."
 
-    elif "nonsense" in defect or "premature stop" in defect:
+    elif "nonsense" in defect or "premature" in defect:
         # Nonsense mutations: read-through or exon skipping
         scores["defect_bonus"] = 6
         scores["defect_notes"] = "Nonsense mutation: exon-skipping ASOs may bypass the premature stop codon."

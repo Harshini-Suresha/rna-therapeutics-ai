@@ -12,18 +12,23 @@ run in the opposite direction, rather than inventing a new query pattern.
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
+
 import requests
 
 OPEN_TARGETS_URL = "https://api.platform.opentargets.org/api/v4/graphql"
-_TIMEOUT = 10
+_TIMEOUT = 120
+TARGET_PAGE_SIZE = 500
+_TARGET_FETCH_WORKERS = 4
 
 
-def get_disease_detail(query: str, gene_limit: int = 30) -> dict:
+def get_disease_detail(query: str) -> dict:
     """
     Fuller disease lookup for the dedicated results page: resolves the
     free-text query to a disease (same as search_disease_genes), then
-    fetches description, therapeutic areas, a larger ranked gene list,
-    and known drugs where Open Targets has them.
+    fetches description, therapeutic areas, the full ranked gene list
+    (paginated until every associated target is returned), and known
+    drugs where Open Targets has them.
 
     Some of these fields (description, therapeuticAreas, knownDrugs) are
     less exhaustively tested against the live schema than the core
@@ -77,7 +82,7 @@ def get_disease_detail(query: str, gene_limit: int = 30) -> dict:
         result["diseaseName"] = hits[0]["name"]
 
         detail_query = """
-        query diseaseDetail($efoId: String!, $size: Int!) {
+        query diseaseDetail($efoId: String!) {
           disease(efoId: $efoId) {
             id
             name
@@ -90,25 +95,7 @@ def get_disease_detail(query: str, gene_limit: int = 30) -> dict:
             children { id name }
             dbXRefs
             similarEntities { category id score }
-            associatedTargets(page: {index: 0, size: $size}) {
-              count
-              rows {
-                score
-                datatypeScores { id score }
-                target {
-                  id
-                  approvedSymbol
-                  approvedName
-                  biotype
-                  functionDescriptions
-                  tractability { label modality value }
-                  geneticConstraint { constraintType exp obs oe }
-                  targetClass { label }
-                  mousePhenotypes { modelPhenotypeLabel }
-                  pathways { pathway pathwayId topLevelTerm }
-                }
-              }
-            }
+            associatedTargets { count }
             drugAndClinicalCandidates {
               count
               rows {
@@ -116,6 +103,10 @@ def get_disease_detail(query: str, gene_limit: int = 30) -> dict:
                   id
                   name
                   drugType
+                  synonyms { label }
+                  tradeNames { label }
+                  indications { rows { maxClinicalStage disease { name } } }
+                  drugWarnings { warningType efoTerm description }
                   mechanismsOfAction {
                     uniqueActionTypes
                     uniqueTargetTypes
@@ -139,7 +130,7 @@ def get_disease_detail(query: str, gene_limit: int = 30) -> dict:
         """
         resp2 = requests.post(
             OPEN_TARGETS_URL,
-            json={"query": detail_query, "variables": {"efoId": disease_id, "size": gene_limit}},
+            json={"query": detail_query, "variables": {"efoId": disease_id}},
             timeout=_TIMEOUT,
         )
         if resp2.status_code != 200:
@@ -150,6 +141,13 @@ def get_disease_detail(query: str, gene_limit: int = 30) -> dict:
             return result
 
         disease_data = (resp2_data.get("data") or {}).get("disease") or {}
+
+        # Fetch every associated target (not just the top page) via pagination.
+        target_total = (disease_data.get("associatedTargets") or {}).get("count")
+        target_rows, target_count = _fetch_all_targets(disease_id, target_total)
+        if target_rows is None:
+            return result
+        result["associatedTargetCount"] = target_count
 
         result["description"] = disease_data.get("description")
         result["literatureCount"] = (disease_data.get("literatureOcurrences") or {}).get("count")
@@ -215,8 +213,7 @@ def get_disease_detail(query: str, gene_limit: int = 30) -> dict:
                 similar_diseases.append({"id": sim.get("id", ""), "score": sim.get("score", 0)})
         result["relatedDiseases"] = similar_diseases[:10]
 
-        rows = (disease_data.get("associatedTargets") or {}).get("rows") or []
-        result["associatedTargetCount"] = (disease_data.get("associatedTargets") or {}).get("count")
+        rows = target_rows
         genes = []
         for row in rows:
             target = row.get("target") or {}
@@ -240,6 +237,16 @@ def get_disease_detail(query: str, gene_limit: int = 30) -> dict:
                     if mp.get("modelPhenotypeLabel")
                 ],
                 "pathways": _parse_pathways(target.get("pathways") or []),
+                "genomicLocation": _parse_genomic_location(target.get("genomicLocation")),
+                "hallmarks": _parse_hallmarks(target.get("hallmarks")),
+                "chemicalProbes": _parse_chemical_probes(target.get("chemicalProbes") or []),
+                "safetyLiabilities": _parse_safety_liabilities(target.get("safetyLiabilities") or []),
+                "aliases": _parse_aliases(target),
+                "uniprotId": _parse_uniprot(target.get("proteinIds") or []),
+                "literatureCount": (target.get("literatureOcurrences") or {}).get("count"),
+                "isEssential": target.get("isEssential"),
+                "associatedDiseaseCount": (target.get("associatedDiseases") or {}).get("count"),
+                "interactionCount": (target.get("interactions") or {}).get("count"),
             })
         result["genes"] = genes
 
@@ -254,21 +261,111 @@ def get_disease_detail(query: str, gene_limit: int = 30) -> dict:
                 continue
             seen_drugs.add(name.lower())
             stage = row.get("maxClinicalStage") or ""
+            drug_extras = _parse_drug_extras(drug)
             drugs.append({
                 "name": name,
+                "id": drug.get("id"),
                 "mechanismOfAction": None,
                 "phase": None,
                 "status": stage.replace("_", " ").title() if stage else None,
                 "drugType": drug.get("drugType"),
+                "tradeNames": drug_extras["tradeNames"],
+                "synonyms": drug_extras["synonyms"],
+                "approvedIndications": drug_extras["approvedIndications"],
+                "indicationCount": drug_extras["indicationCount"],
+                "warnings": _parse_drug_warnings(drug.get("drugWarnings") or []),
                 "mechanismsOfAction": _parse_moa(drug.get("mechanismsOfAction") or {}),
                 "clinicalReports": _parse_clinical_reports(row.get("clinicalReports") or []),
             })
-        result["knownDrugs"] = drugs[:20]
+        result["knownDrugs"] = drugs
 
         return result
 
     except requests.RequestException:
         return result
+
+
+def _fetch_all_targets(disease_id: str, total: int):
+    """
+    Fetch every associated target for a disease so the results page is
+    never truncated to a fixed-size first page.
+
+    Open Targets' associatedTargets paginates by 0-based page index and
+    rejects a single request whose response would be too large, so the
+    full field set is pulled page-by-page (size TARGET_PAGE_SIZE) with a
+    small worker pool. Returns (rows, total_count); both are None if any
+    page fails.
+    """
+    if not total:
+        return [], 0
+    page_count = (int(total) + TARGET_PAGE_SIZE - 1) // TARGET_PAGE_SIZE
+    query = """
+    query diseaseAllTargets($efoId: String!, $index: Int!, $size: Int!) {
+      disease(efoId: $efoId) {
+        associatedTargets(page: {index: $index, size: $size}) {
+          count
+          rows {
+            score
+            datatypeScores { id score }
+            target {
+              id
+              approvedSymbol
+              approvedName
+              biotype
+              functionDescriptions
+              tractability { label modality value }
+              geneticConstraint { constraintType exp obs oe }
+              targetClass { label }
+              mousePhenotypes { modelPhenotypeLabel }
+              pathways { pathway pathwayId topLevelTerm }
+              genomicLocation { chromosome start end }
+              hallmarks { attributes { name } }
+              chemicalProbes { drugId isHighQuality }
+              safetyLiabilities { event }
+              literatureOcurrences { count }
+              isEssential
+              nameSynonyms { label }
+              symbolSynonyms { label }
+              proteinIds { id source }
+              associatedDiseases { count }
+              interactions { count }
+            }
+          }
+        }
+      }
+    }
+    """
+
+    def fetch_page(page_index: int):
+        resp = requests.post(
+            OPEN_TARGETS_URL,
+            json={
+                "query": query,
+                "variables": {"efoId": disease_id, "index": page_index, "size": TARGET_PAGE_SIZE},
+            },
+            timeout=_TIMEOUT,
+        )
+        if resp.status_code != 200:
+            return None
+        data = resp.json()
+        if data.get("errors"):
+            return None
+        return ((data.get("data") or {}).get("disease") or {}).get("associatedTargets") or {}
+
+    all_rows = []
+    first = fetch_page(0)
+    if first is None:
+        return None, None
+    all_rows.extend(first.get("rows") or [])
+    total = first.get("count") or total
+    page_count = (int(total) + TARGET_PAGE_SIZE - 1) // TARGET_PAGE_SIZE
+    with ThreadPoolExecutor(max_workers=_TARGET_FETCH_WORKERS) as pool:
+        pages = list(pool.map(fetch_page, range(1, page_count)))
+    for page in pages:
+        if page is None:
+            return None, None
+        all_rows.extend(page.get("rows") or [])
+    return all_rows, total
 
 
 def _resolve_ancestor_names(ancestor_ids):
@@ -360,6 +457,97 @@ def _parse_pathways(pathways):
                 "topLevelTerm": p.get("topLevelTerm"),
             })
     return out
+
+
+def _parse_genomic_location(location):
+    if not location:
+        return None
+    return {
+        "chromosome": location.get("chromosome"),
+        "start": location.get("start"),
+        "end": location.get("end"),
+    }
+
+
+def _parse_hallmarks(hallmarks):
+    out = []
+    for h in (hallmarks or {}).get("attributes") or []:
+        if h and h.get("name"):
+            out.append(h["name"])
+    return out
+
+
+def _parse_chemical_probes(probes):
+    out = []
+    for p in probes or []:
+        if not p or not p.get("drugId"):
+            continue
+        out.append({
+            "drugId": p["drugId"],
+            "isHighQuality": bool(p.get("isHighQuality")),
+        })
+    return out
+
+
+def _parse_safety_liabilities(liabilities):
+    out = []
+    for l in liabilities or []:
+        if l and l.get("event"):
+            out.append(l["event"])
+    return out
+
+
+def _parse_aliases(target):
+    aliases = []
+    for s in (target.get("symbolSynonyms") or []) + (target.get("nameSynonyms") or []):
+        label = s.get("label") if isinstance(s, dict) else s
+        if not label:
+            continue
+        if label.lower() != (target.get("approvedSymbol") or "").lower() and label not in aliases:
+            aliases.append(label)
+        if len(aliases) >= 10:
+            break
+    return aliases
+
+
+def _parse_uniprot(protein_ids):
+    for p in protein_ids or []:
+        if p and p.get("source") == "uniprot_swissprot" and p.get("id"):
+            return p["id"]
+    return None
+
+
+def _parse_drug_warnings(warnings):
+    out = []
+    for w in warnings or []:
+        if w and w.get("warningType"):
+            out.append({
+                "warningType": w.get("warningType"),
+                "efoTerm": w.get("efoTerm"),
+                "description": w.get("description"),
+            })
+        if len(out) >= 8:
+            break
+    return out
+
+
+def _parse_drug_extras(drug):
+    trade_names = [t.get("label") for t in (drug.get("tradeNames") or []) if t.get("label")]
+    synonyms = [s.get("label") for s in (drug.get("synonyms") or []) if s.get("label")]
+    indications = []
+    for ind in (drug.get("indications") or {}).get("rows") or []:
+        disease = (ind.get("disease") or {}).get("name")
+        if disease:
+            indications.append({"disease": disease, "stage": ind.get("maxClinicalStage")})
+    approved = [
+        i["disease"] for i in indications if i.get("stage") == "APPROVAL"
+    ]
+    return {
+        "tradeNames": trade_names[:5],
+        "synonyms": synonyms[:5],
+        "approvedIndications": approved[:5],
+        "indicationCount": len(indications),
+    }
 
 
 def _parse_moa(moa):
