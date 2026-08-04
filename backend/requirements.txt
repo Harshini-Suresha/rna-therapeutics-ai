@@ -12,3 +12,5 @@ pysam
 pyensembl
 celery
 redis
+torch
+scikit-learn
