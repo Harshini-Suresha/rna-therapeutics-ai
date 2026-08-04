@@ -1,8 +1,17 @@
+export interface GeneOrtholog {
+  symbol: string;
+  id: string;
+  taxonId: number;
+  source: "ensembl" | "alliance" | "ncbi";
+  identity?: number | null;
+}
+
 export interface DiseaseGeneMatch {
   symbol: string;
   name: string | null;
   ensemblId: string | null;
   score: number | null;
+  ortholog?: GeneOrtholog | null;
   biotype?: string | null;
   function?: string | null;
   evidence?: Record<string, number>;
@@ -27,6 +36,8 @@ export interface DiseaseSearchResponse {
   diseaseId: string | null;
   diseaseName: string | null;
   genes: DiseaseGeneMatch[];
+  organism?: string;
+  orthologMapped?: number;
 }
 
 export interface ClinicalReport {
@@ -66,6 +77,8 @@ export interface DiseaseDetailResponse {
   therapeuticAreas: string[];
   genes: DiseaseGeneMatch[];
   knownDrugs: KnownDrug[];
+  organism?: string;
+  orthologMapped?: number;
   synonyms: { term: string; relation: string }[];
   phenotypes: { id: string; name: string }[];
   relatedDiseases: { id: string; score: number }[];

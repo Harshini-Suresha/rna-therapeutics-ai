@@ -30,7 +30,8 @@ import Sidebar from "@/components/Sidebar";
 import Topbar from "@/components/Topbar";
 import { Card } from "@/components/ui";
 import { fetchDiseaseDetail } from "@/lib/diseaseSearchApi";
-import { DiseaseDetailResponse, DiseaseGeneMatch, KnownDrug } from "@/types/diseaseSearch";
+import { getOrganism } from "@/lib/organisms";
+import { DiseaseDetailResponse, DiseaseGeneMatch, KnownDrug, GeneOrtholog } from "@/types/diseaseSearch";
 
 const PREFILL_KEY = "aso:prefillGeneSearch";
 
@@ -164,16 +165,44 @@ function ConstraintChips({ constraint }: { constraint?: DiseaseGeneMatch["constr
   );
 }
 
-function GeneRow({ gene, index, expanded, onToggle, onUseGene }: {
+function orthologSourceLabel(ortholog: GeneOrtholog): string {
+  if (ortholog.source === "alliance") return ortholog.id.split(":")[0];
+  if (ortholog.source === "ncbi") return "NCBI";
+  return "Ensembl";
+}
+
+function OrthologLink({ ortholog }: { ortholog: GeneOrtholog }) {
+  let href: string | null = null;
+  if (ortholog.id.startsWith("MGI:")) href = `https://www.informatics.jax.org/marker/${ortholog.id.replace("MGI:", "MGI:")}`;
+  else if (ortholog.id.startsWith("RGD:")) href = `https://rgd.mcw.edu/rgdweb/report/gene/main.html?id=${ortholog.id.replace("RGD:", "")}`;
+  else if (ortholog.id.startsWith("ZFIN:")) href = `https://zfin.org/${ortholog.id}`;
+  else if (ortholog.id.startsWith("FB:")) href = `https://flybase.org/reports/${ortholog.id}`;
+  else if (ortholog.id.startsWith("WB:")) href = `https://www.wormbase.org/species/all/gene/${ortholog.id}`;
+  else if (ortholog.id.startsWith("VGNC:")) href = `https://vertebrates.genenames.org/data/gene-symbol-report/#!/vgnc_id/${ortholog.id}`;
+  else if (ortholog.id.startsWith("ENS")) href = `https://www.ensembl.org/Gene/Summary?g=${ortholog.id}`;
+  else if (/^\d+$/.test(ortholog.id)) href = `https://www.ncbi.nlm.nih.gov/gene/${ortholog.id}`;
+  return href ? (
+    <a href={href} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-mono hover:text-brand transition-colors">
+      {ortholog.id} <ExternalLink className="h-2.5 w-2.5" />
+    </a>
+  ) : (
+    <span className="font-mono">{ortholog.id}</span>
+  );
+}
+
+function GeneRow({ gene, index, expanded, onToggle, onUseGene, organismId, organismName }: {
   gene: DiseaseGeneMatch;
   index: number;
   expanded: boolean;
   onToggle: () => void;
   onUseGene: () => void;
+  organismId: string;
+  organismName: string;
 }) {
   const scorePct = gene.score !== null ? Math.round(gene.score * 100) : 0;
   const scoreColor = scorePct >= 70 ? "bg-emerald-500" : scorePct >= 50 ? "bg-blue-500" : scorePct >= 30 ? "bg-amber-500" : "bg-slate-300";
   const topEvidence = EVIDENCE_LABELS.filter((e) => (gene.evidence?.[e.key] ?? 0) > 0).slice(0, 3);
+  const usable = organismId === "human" || Boolean(gene.ortholog);
   return (
     <>
       <tr
@@ -188,6 +217,17 @@ function GeneRow({ gene, index, expanded, onToggle, onUseGene }: {
         </td>
         <td className="py-2.5 pr-4">
           <p className="text-[12.5px] font-semibold text-slate-800">{gene.symbol}</p>
+          {gene.ortholog && (
+            <p className="mt-0.5 inline-flex items-center gap-1 rounded bg-brand/10 px-1.5 py-0.5 text-[10px] font-medium text-brand">
+              → {gene.ortholog.symbol}
+              <span className="font-mono font-normal text-brand/70">{orthologSourceLabel(gene.ortholog)}</span>
+            </p>
+          )}
+          {organismId !== "human" && !gene.ortholog && (
+            <p className="mt-0.5 text-[10px] text-slate-400" title="No ortholog found for this organism">
+              No {organismName} ortholog
+            </p>
+          )}
         </td>
         <td className="py-2.5 pr-4 text-[11.5px] text-slate-500 max-w-[200px] truncate" title={gene.name || ""}>
           {gene.name || "—"}
@@ -227,7 +267,9 @@ function GeneRow({ gene, index, expanded, onToggle, onUseGene }: {
         <td className="py-2.5 pr-5 text-right" onClick={(e) => e.stopPropagation()}>
           <button
             onClick={onUseGene}
-            className="rounded-lg border border-slate-200 px-3 py-1 text-[11px] font-medium text-slate-600 hover:border-brand hover:text-brand transition-colors"
+            disabled={!usable}
+            title={usable ? undefined : `No ${organismName} ortholog to add to the project`}
+            className="rounded-lg border border-slate-200 px-3 py-1 text-[11px] font-medium text-slate-600 hover:border-brand hover:text-brand transition-colors disabled:cursor-not-allowed disabled:opacity-40"
           >
             Use this gene
           </button>
@@ -363,6 +405,7 @@ function GeneRow({ gene, index, expanded, onToggle, onUseGene }: {
                     {gene.ensemblId} <ExternalLink className="h-2.5 w-2.5" />
                   </a>
                 )}
+                {gene.ortholog && <OrthologLink ortholog={gene.ortholog} />}
                 {gene.genomicLocation?.chromosome && (
                   <span className="font-mono">
                     Chr {gene.genomicLocation.chromosome}:{gene.genomicLocation.start?.toLocaleString() ?? "?"}–
@@ -520,6 +563,9 @@ export default function DiseaseSearchResultsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const query = searchParams.get("query") ?? "";
+  const organism = searchParams.get("organism") ?? "human";
+  const organismName = getOrganism(organism)?.commonName ?? organism;
+  const isHuman = organism === "human";
 
   const [detail, setDetail] = useState<DiseaseDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -535,7 +581,7 @@ export default function DiseaseSearchResultsPage() {
     }
     setLoading(true);
     setError(null);
-    fetchDiseaseDetail(query)
+    fetchDiseaseDetail(query, organism)
       .then((res) => {
         if (!res.diseaseId) {
           setError(`No matching disease found for "${query}".`);
@@ -544,12 +590,13 @@ export default function DiseaseSearchResultsPage() {
       })
       .catch(() => setError("Could not reach the disease search service."))
       .finally(() => setLoading(false));
-  }, [query]);
+  }, [query, organism]);
 
-  function handleUseGene(symbol: string) {
+  function handleUseGene(symbol: string, ortholog?: GeneOrtholog | null) {
+    const targetSymbol = ortholog?.symbol ?? symbol;
     sessionStorage.setItem(
       PREFILL_KEY,
-      JSON.stringify({ organism: "human", geneSymbol: symbol, diseaseName: detail?.diseaseName ?? query })
+      JSON.stringify({ organism, geneSymbol: targetSymbol, diseaseName: detail?.diseaseName ?? query })
     );
     router.push("/");
   }
@@ -669,7 +716,8 @@ export default function DiseaseSearchResultsPage() {
             {loading && (
               <Card className="flex items-center justify-center gap-2 p-10 text-slate-500">
                 <Loader2 className="h-5 w-5 animate-spin" />
-                Searching Open Targets for &ldquo;{query}&rdquo;...
+                Searching Open Targets for &ldquo;{query}&rdquo;
+                {!isHuman && `, then mapping to ${organismName} orthologs...`}
               </Card>
             )}
 
@@ -679,6 +727,29 @@ export default function DiseaseSearchResultsPage() {
                 {error}
               </div>
             )}
+
+            {!loading && detail && detail.diseaseId && !isHuman && (() => {
+              const mapped = detail.orthologMapped ?? 0;
+              return (
+                <div className="flex items-start gap-2 rounded-xl border border-brand/20 bg-brand/5 px-4 py-3 text-[12.5px] text-slate-600">
+                  <AlertTriangle className="h-4 w-4 shrink-0 text-brand" />
+                  {mapped === 0 ? (
+                    <p>
+                      Disease associations are human-based (Open Targets), and ortholog mapping is currently unavailable — so the
+                      genes below are <span className="font-medium text-slate-700">human</span> genes. Use them to identify your target,
+                      but the {organismName} symbols will only appear once mapping recovers.
+                    </p>
+                  ) : (
+                    <p>
+                      Disease associations are human-based (Open Targets). Genes shown are mapped to their{" "}
+                      <span className="font-medium text-slate-700">{organismName}</span> orthologs via Ensembl, the Alliance of Genome
+                      Resources, or NCBI — {mapped} gene{mapped === 1 ? "" : "s"} have a mapped {organismName} ortholog. Use the{" "}
+                      <span className="font-medium text-slate-700">{organismName}</span> symbol when adding a gene to your project.
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
 
             {!loading && detail && detail.diseaseId && (
               <>
@@ -1061,6 +1132,7 @@ export default function DiseaseSearchResultsPage() {
                     </div>
                     <p className="mt-0.5 text-[11.5px] text-slate-400">
                       Ranked by evidence-based association score (0–1). Click a row to expand function, evidence breakdown, pathways, mouse models, genetic constraint, genomic location, chemical probes and safety liabilities. Higher score = stronger evidence linking the gene to this disease.
+                      {!isHuman && ` For ${organismName}, the mapped ortholog symbol is shown under each gene.`}
                     </p>
                     {biotypeSummary.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-1.5">
@@ -1091,6 +1163,8 @@ export default function DiseaseSearchResultsPage() {
                             key={g.symbol}
                             gene={g}
                             index={gi}
+                            organismId={organism}
+                            organismName={organismName}
                             expanded={expandedGenes.has(g.symbol)}
                             onToggle={() =>
                               setExpandedGenes((prev) => {
@@ -1100,7 +1174,7 @@ export default function DiseaseSearchResultsPage() {
                                 return next;
                               })
                             }
-                            onUseGene={() => handleUseGene(g.symbol)}
+                            onUseGene={() => handleUseGene(g.symbol, g.ortholog)}
                           />
                         ))}
                         {detail.genes.length === 0 && (

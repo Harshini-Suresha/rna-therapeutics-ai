@@ -32,6 +32,39 @@ const CONFIRMED_TARGET_KEY = "aso:confirmedTarget";
 const SELECTED_MECHANISM_KEY = "aso:selectedMechanism";
 const SELECTED_GOAL_KEY = "aso:therapeuticGoal";
 const PROJECT_TARGET_TISSUE_KEY = "aso:projectTargetTissue";
+const GENE_FEATURES_BACKUP_PREFIX = "aso:geneFeaturesBackup:";
+
+interface StoredGeneFeatures extends GeneFeaturesResponse {
+  savedAt?: number;
+}
+
+function geneFeaturesBackupKey(organism: string, geneSymbol: string): string {
+  return `${GENE_FEATURES_BACKUP_PREFIX}${organism}:${geneSymbol.toLowerCase()}`;
+}
+
+// Keep the last-known-good gene feature analysis locally so the Gene Function
+// section still renders when the backend / Ensembl site is unreachable.
+function saveGeneFeaturesBackup(organism: string, geneSymbol: string, data: GeneFeaturesResponse) {
+  try {
+    localStorage.setItem(
+      geneFeaturesBackupKey(organism, geneSymbol),
+      JSON.stringify({ ...data, savedAt: Date.now() }),
+    );
+  } catch {
+    /* storage full or unavailable — ignore */
+  }
+}
+
+function loadGeneFeaturesBackup(organism: string, geneSymbol: string): StoredGeneFeatures | null {
+  try {
+    const raw = localStorage.getItem(geneFeaturesBackupKey(organism, geneSymbol));
+    if (!raw) return null;
+    const data = JSON.parse(raw) as StoredGeneFeatures;
+    return data && data.features ? data : null;
+  } catch {
+    return null;
+  }
+}
 
 // Map free-text target tissue to deliveryContext dropdown values
 function mapTargetTissueToDeliveryContext(tissue: string): string {
@@ -208,6 +241,7 @@ export default function MechanismSelectionPage() {
   const [knownRegulatoryElement, setKnownRegulatoryElement] = useState("");
   const [geneFeatures, setGeneFeatures] = useState<GeneFeaturesResponse | null>(null);
   const [geneFeaturesLoading, setGeneFeaturesLoading] = useState(false);
+  const [geneFeaturesNote, setGeneFeaturesNote] = useState<string | null>(null);
 
   // TG04 fields
   const [spliceDefectType, setSpliceDefectType] = useState("");
@@ -276,21 +310,53 @@ export default function MechanismSelectionPage() {
   useEffect(() => {
     if (selectedGoal !== "TG02" || !gene) {
       setGeneFeatures(null);
+      setGeneFeaturesNote(null);
       return;
     }
 
+    const organism = gene.organism || "homo_sapiens";
     setGeneFeaturesLoading(true);
     fetchGeneFeatures({
       geneSymbol: gene.geneSymbol,
-      organism: gene.organism || "homo_sapiens",
+      organism,
       ensemblId: gene.geneId,
       tissueTpm: gene.tissueTpm,
       exonCount: gene.exonCount,
       totalTranscripts: gene.totalTranscripts,
       geneType: gene.geneType || undefined,
     })
-      .then(setGeneFeatures)
-      .catch(() => setGeneFeatures(null))
+      .then((features) => {
+        if (features.source !== "backup") {
+          saveGeneFeaturesBackup(organism, gene.geneSymbol, features);
+        }
+        setGeneFeatures(features);
+        setGeneFeaturesNote(
+          features.source === "backup"
+            ? `The Ensembl site is unreachable right now — showing the last saved analysis for ${gene.geneSymbol}.`
+            : features.source === "fallback"
+              ? `Could not verify ${gene.geneSymbol} structure from Ensembl — showing a conservative estimate that requires experimental validation.`
+              : null,
+        );
+      })
+      .catch(() => {
+        // Backend / Ensembl entirely unreachable — replay the local backup.
+        const backup = loadGeneFeaturesBackup(organism, gene.geneSymbol);
+        if (backup) {
+          setGeneFeatures({
+            ...backup,
+            source: "backup",
+            backupTimestamp: backup.savedAt ?? Date.now(),
+          });
+          setGeneFeaturesNote(
+            `The Ensembl site is unreachable right now — showing the last saved analysis for ${gene.geneSymbol}.`,
+          );
+        } else {
+          setGeneFeatures(null);
+          setGeneFeaturesNote(
+            "Could not load gene features — structure-dependent mechanisms will be treated as potentially applicable.",
+          );
+        }
+      })
       .finally(() => setGeneFeaturesLoading(false));
   }, [selectedGoal, gene]);
 
@@ -714,6 +780,13 @@ export default function MechanismSelectionPage() {
                   </div>
 
                   {/* Mechanism availability — filtered by selected defect type */}
+                  {geneFeaturesNote && !geneFeaturesLoading && (
+                    <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-[12.5px] text-amber-800">
+                      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                      <span>{geneFeaturesNote}</span>
+                    </div>
+                  )}
+
                   {geneFeatures && !geneFeaturesLoading && (
                     <MechanismAvailabilityCards
                       features={geneFeatures.features}

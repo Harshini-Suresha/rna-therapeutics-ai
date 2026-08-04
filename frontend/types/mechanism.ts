@@ -119,7 +119,12 @@ export interface GeneFeaturesResponse {
     hasIntrons: boolean;
     hasNmdTranscripts: boolean;
     overlappingNats: number;
+    uorfCount?: number;
+    verified?: boolean;
+    geneType?: string | null;
   };
+  source?: "live" | "backup" | "fallback";
+  backupTimestamp?: number;
 }
 
 export interface TherapeuticGoal {

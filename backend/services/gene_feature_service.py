@@ -5,7 +5,9 @@ Queries Ensembl to determine whether a gene has the structural prerequisites
 for each upregulation mechanism:
 - A3 (TANGO): needs poison exons / non-productive splice variants
 - A4 (NAT): needs overlapping natural antisense transcripts
-- A5 (uORF): needs upstream open reading frames in 5' UTR
+- A5 (uORF): needs upstream open reading frames in 5' UTR — detected by
+  fetching spliced cDNA sequences and scanning each 5' UTR for ATG start
+  codons that close an in-frame stop codon before the main CDS
 - A6 (miRNA site block): needs 3' UTR with miRNA binding sites (always available)
 - A22 (miRNA replacement): always available (deficient miRNA)
 - A23 (promoter activation): always available (all genes have promoters)
@@ -13,14 +15,27 @@ for each upregulation mechanism:
 
 from __future__ import annotations
 
+import json
 import logging
 import re
+import threading
+import time
 from typing import Optional
 
 import requests
 
+from database.db import SessionLocal
+from database.models import GeneFeatureBackup
+
 ENSEMBL_REST = "https://rest.ensembl.org"
 ENSEMBL_TIMEOUT = 10
+
+# When the Ensembl REST site fails, remember when. During the cooldown window
+# we skip live queries entirely and serve the stored backup / fallback, so a
+# downed site never blocks Gene Function analysis for any gene.
+_ENSEMBL_DOWN_SINCE: float | None = None
+_ENSEMBL_DOWN_LOCK = threading.Lock()
+ENSEMBL_DOWN_COOLDOWN_SECONDS = 120
 
 logger = logging.getLogger(__name__)
 
@@ -41,20 +56,61 @@ _SPECIES_MAP = {
 }
 
 
-def _ensembl_get(path: str, params: dict | None = None) -> dict | list | None:
-    """GET from Ensembl REST API with timeout."""
+def _ensembl_request(
+    method: str,
+    path: str,
+    params: dict | None = None,
+    payload: dict | None = None,
+) -> dict | list | None:
+    """Call the Ensembl REST API with timeout and outage tracking.
+
+    Records failures so a downed site is not hammered on every gene; see
+    ``_ensembl_available``.
+    """
+    global _ENSEMBL_DOWN_SINCE
     try:
-        resp = requests.get(
-            f"{ENSEMBL_REST}{path}",
-            params=params or {},
-            headers={"Content-Type": "application/json"},
-            timeout=ENSEMBL_TIMEOUT,
-        )
+        kwargs = {
+            "headers": {"Content-Type": "application/json"},
+            "timeout": ENSEMBL_TIMEOUT,
+        }
+        if params:
+            kwargs["params"] = params
+        if payload:
+            kwargs["json"] = payload
+        resp = requests.request(method, f"{ENSEMBL_REST}{path}", **kwargs)
         if resp.status_code == 200:
+            with _ENSEMBL_DOWN_LOCK:
+                _ENSEMBL_DOWN_SINCE = None
             return resp.json()
+        if resp.status_code >= 500:
+            with _ENSEMBL_DOWN_LOCK:
+                if _ENSEMBL_DOWN_SINCE is None:
+                    _ENSEMBL_DOWN_SINCE = time.time()
     except (requests.RequestException, ValueError) as e:
-        logger.warning("Ensembl GET %s failed: %s", path, e)
+        logger.warning("Ensembl %s %s failed: %s", method, path, e)
+        with _ENSEMBL_DOWN_LOCK:
+            if _ENSEMBL_DOWN_SINCE is None:
+                _ENSEMBL_DOWN_SINCE = time.time()
     return None
+
+
+def _ensembl_get(path: str, params: dict | None = None) -> dict | list | None:
+    """GET from Ensembl REST API."""
+    return _ensembl_request("GET", path, params=params)
+
+
+def _ensembl_post(path: str, payload: dict | None = None) -> dict | list | None:
+    """POST to Ensembl REST API (used for batch sequence lookup)."""
+    return _ensembl_request("POST", path, payload=payload)
+
+
+def _ensembl_available() -> bool:
+    """True if Ensembl is reachable (or its outage cooldown has expired)."""
+    with _ENSEMBL_DOWN_LOCK:
+        down_since = _ENSEMBL_DOWN_SINCE
+    if down_since is None:
+        return True
+    return (time.time() - down_since) >= ENSEMBL_DOWN_COOLDOWN_SECONDS
 
 
 def _get_transcripts(gene_id: str) -> list[dict]:
@@ -116,9 +172,12 @@ def _check_overlapping_nats(
         result["hasOverlappingNat"] = None
         return result
 
-    # Query overlapping features in the region
+    # Query overlapping features in the region. Ensembl accepts the raw
+    # species slug (e.g. "homo_sapiens") in overlap/region URLs, so genes in
+    # species outside _SPECIES_MAP still resolve instead of silently being
+    # treated as human.
     region = f"{chrom}:{start - 50000}-{end + 50000}"
-    species_name = _SPECIES_MAP.get(species, "human")
+    species_name = _SPECIES_MAP.get(species, species)
 
     overlap_data = _ensembl_get(
         f"/overlap/region/{species_name}/{region}",
@@ -148,33 +207,112 @@ def _check_overlapping_nats(
     return result
 
 
-def _estimate_uorf_potential(
-    transcripts: list[dict], total_transcripts: int | None = None
-) -> dict:
-    """
-    Estimate whether a gene likely has uORFs based on transcript structure.
-    Genes with longer 5' UTRs and multiple transcripts are more likely to
-    contain functional uORFs.
+def _scan_uorfs(utr5: str) -> list[dict]:
+    """Scan a 5' UTR sequence (5'→3') for canonical upstream open reading frames.
 
-    total_transcripts may come from the main gene pipeline (which already
-    queried Ensembl) when the live transcript fetch here comes up empty.
+    A uORF is an ATG start codon followed by an in-frame stop codon
+    (TAA/TAG/TGA) that terminates before the main CDS — i.e. entirely inside
+    the 5' UTR. Coordinates are 1-based on the transcript sequence.
     """
-    if total_transcripts is None:
-        total_transcripts = len(transcripts)
+    uorfs = []
+    pos = utr5.find("ATG")
+    while pos != -1:
+        for stop in range(pos + 3, len(utr5) - 2, 3):
+            if utr5[stop : stop + 3] in ("TAA", "TAG", "TGA"):
+                uorfs.append({
+                    "start": pos + 1,
+                    "end": stop + 3,
+                    "length": stop + 3 - pos,
+                })
+                break
+        pos = utr5.find("ATG", pos + 1)
+    return uorfs
 
-    result = {
-        "hasUorfPotential": False,
-        "longestUtr5": 0,
-        "transcriptCount": total_transcripts,
+
+def _fetch_transcript_sequences(transcript_ids: list[str]) -> dict[str, str]:
+    """Batch-fetch spliced cDNA sequences for transcripts (id -> sequence).
+
+    Uses Ensembl's POST /sequence/id (up to 50 ids per call). A missing or
+    failed batch just yields fewer sequences; callers decide how to treat
+    partial data.
+    """
+    if not transcript_ids:
+        return {}
+    sequences: dict[str, str] = {}
+    for i in range(0, len(transcript_ids), 50):
+        chunk = transcript_ids[i : i + 50]
+        data = _ensembl_post("/sequence/id", {"ids": chunk, "type": "cdna"})
+        if isinstance(data, list):
+            for item in data:
+                if isinstance(item, dict) and item.get("id") and item.get("seq"):
+                    sequences[item["id"]] = item["seq"]
+    return sequences
+
+
+def _detect_uorfs(transcripts: list[dict]) -> dict:
+    """
+    Detect real upstream ORFs by scanning 5' UTR sequences from Ensembl.
+
+    For every transcript with a CDS annotation (Translation.start gives the
+    1-based position of the main start codon on the spliced cDNA), the 5' UTR
+    is the cDNA prefix before that codon. Each 5' UTR is scanned for ATG
+    start codons that close an in-frame stop codon before the CDS begins.
+
+    Returns:
+      hasUorfPotential: True when any protein-coding transcript has a uORF,
+        False when transcripts were examined and none had one, and None when
+        the 5' UTR sequences could not be fetched (unverifiable).
+    """
+    coding = [
+        t
+        for t in transcripts
+        if isinstance(t, dict)
+        and isinstance(t.get("Translation"), dict)
+        and t["Translation"].get("start")
+        and t.get("id")
+    ]
+
+    if not coding:
+        return {
+            "hasUorfPotential": None if not transcripts else False,
+            "uorfCount": 0,
+            "longestUtr5": 0,
+            "uorfs": [],
+            "transcriptCount": len(transcripts),
+        }
+
+    sequences = _fetch_transcript_sequences([t["id"] for t in coding])
+
+    # No 5' UTR sequence fetched at all — cannot verify.
+    if not sequences:
+        return {
+            "hasUorfPotential": None,
+            "uorfCount": 0,
+            "longestUtr5": 0,
+            "uorfs": [],
+            "transcriptCount": len(transcripts),
+        }
+
+    uorfs = []
+    longest_utr5 = 0
+    for t in coding:
+        seq = sequences.get(t["id"])
+        if not seq:
+            continue
+        cds_start = int(t["Translation"]["start"])
+        utr5 = seq[: cds_start - 1]
+        longest_utr5 = max(longest_utr5, len(utr5))
+        for u in _scan_uorfs(utr5):
+            u["transcript"] = t["id"]
+            uorfs.append(u)
+
+    return {
+        "hasUorfPotential": bool(uorfs),
+        "uorfCount": len(uorfs),
+        "longestUtr5": longest_utr5,
+        "uorfs": uorfs[:5],
+        "transcriptCount": len(transcripts),
     }
-
-    # Heuristic: genes with >1 transcript and complex 5' UTRs are more likely
-    # to have uORFs. We can't parse actual uORFs without sequence data, but
-    # we can flag genes with sufficient transcript complexity.
-    if total_transcripts >= 2:
-        result["hasUorfPotential"] = True
-
-    return result
 
 
 def _max_exon_count(transcripts: list[dict]) -> int | None:
@@ -225,6 +363,69 @@ def _check_splicing_complexity(
     }
 
 
+def _save_backup(organism: str, gene_symbol: str, ensembl_id: str | None, result: dict) -> None:
+    """Persist a last-known-good analysis so it survives an Ensembl outage."""
+    try:
+        db = SessionLocal()
+        try:
+            row = (
+                db.query(GeneFeatureBackup)
+                .filter(
+                    GeneFeatureBackup.organism == organism,
+                    GeneFeatureBackup.gene_symbol == gene_symbol,
+                )
+                .one_or_none()
+            )
+            now = time.time()
+            if row is None:
+                row = GeneFeatureBackup(
+                    organism=organism,
+                    gene_symbol=gene_symbol,
+                    ensembl_id=ensembl_id or "",
+                    result=json.dumps(result),
+                    created_at=now,
+                    updated_at=now,
+                )
+                db.add(row)
+            else:
+                row.ensembl_id = ensembl_id or row.ensembl_id
+                row.result = json.dumps(result)
+                row.updated_at = now
+            db.commit()
+        finally:
+            db.close()
+    except Exception as e:  # never let a backup write break the analysis
+        logger.warning("Failed to save gene feature backup for %s: %s", gene_symbol, e)
+
+
+def _load_backup(organism: str, gene_symbol: str) -> dict | None:
+    """Return the last-known-good analysis for a gene, or None."""
+    try:
+        db = SessionLocal()
+        try:
+            row = (
+                db.query(GeneFeatureBackup)
+                .filter(
+                    GeneFeatureBackup.organism == organism,
+                    GeneFeatureBackup.gene_symbol == gene_symbol,
+                )
+                .one_or_none()
+            )
+            if row is None:
+                return None
+            result = json.loads(row.result or "{}")
+            if not isinstance(result, dict):
+                return None
+            result["source"] = "backup"
+            result["backupTimestamp"] = row.updated_at
+            return result
+        finally:
+            db.close()
+    except Exception as e:
+        logger.warning("Failed to load gene feature backup for %s: %s", gene_symbol, e)
+        return None
+
+
 def analyze_gene_features(
     gene_symbol: str,
     organism: str = "homo_sapiens",
@@ -246,23 +447,34 @@ def analyze_gene_features(
         mechanisms are NOT hard-excluded. They are reported as available
         with an honest "could not verify" note, so the TG02 ranking still
         returns candidates for all genes instead of silently dropping them.
+      - Resilience backup: every live Ensembl analysis is persisted
+        (database.gene_feature_backups). When the Ensembl site is down or a
+        gene cannot be resolved, the last-known-good analysis is replayed
+        from backup so Gene Function keeps working for every gene.
 
     Returns a dict with:
     - features: per-mechanism availability flags
     - warnings: tissue expression / toxicity warnings
     - geneInfo: basic gene metadata used for the analysis
+    - source: "live" (Ensembl), "backup" (replayed from storage), or
+      "fallback" (permissive heuristics) — plus backupTimestamp for "backup".
     """
-    # Resolve Ensembl ID if not provided
-    if not ensembl_id:
-        lookup = _ensembl_get(
-            f"/lookup/symbol/{organism}/{gene_symbol}",
-            {"expand": "0"},
-        )
-        if isinstance(lookup, dict) and lookup.get("id"):
-            ensembl_id = lookup["id"]
+    # Resolve Ensembl ID if not provided — skipped entirely while the Ensembl
+    # site is known to be down, so every gene still gets an answer quickly.
+    if ensembl_id or _ensembl_available():
+        if not ensembl_id:
+            lookup = _ensembl_get(
+                f"/lookup/symbol/{organism}/{gene_symbol}",
+                {"expand": "0"},
+            )
+            if isinstance(lookup, dict) and lookup.get("id"):
+                ensembl_id = lookup["id"]
 
-    transcripts = _get_transcripts(ensembl_id) if ensembl_id else []
-    gene_data = _ensembl_get(f"/lookup/id/{ensembl_id}") if ensembl_id else None
+        transcripts = _get_transcripts(ensembl_id) if ensembl_id else []
+        gene_data = _ensembl_get(f"/lookup/id/{ensembl_id}") if ensembl_id else None
+    else:
+        transcripts = []
+        gene_data = None
 
     # Prefer pipeline-computed structural hints; fill gaps from Ensembl.
     if exon_count is None:
@@ -277,7 +489,7 @@ def analyze_gene_features(
 
     if can_verify_structure:
         splicing = _check_splicing_complexity(transcripts, exon_count, total_transcripts)
-        uorf = _estimate_uorf_potential(transcripts, total_transcripts)
+        uorf = _detect_uorfs(transcripts)
     else:
         splicing = {
             "hasPoisonExonPotential": None,
@@ -288,7 +500,9 @@ def analyze_gene_features(
         }
         uorf = {
             "hasUorfPotential": None,
+            "uorfCount": 0,
             "longestUtr5": 0,
+            "uorfs": [],
             "transcriptCount": 0,
         }
 
@@ -308,8 +522,15 @@ def analyze_gene_features(
         },
         "uORF": _feature_entry(
             uorf["hasUorfPotential"],
-            "Gene has multiple transcripts suggesting complex 5' UTR regulation",
-            "Gene has few transcripts; validated uORFs not confirmed (requires experimental evidence)",
+            (
+                f"Detected {uorf['uorfCount']} upstream open reading frame(s) in the 5' UTR"
+                + (
+                    f" (e.g. {uorf['uorfs'][0]['transcript']} at nt {uorf['uorfs'][0]['start']})"
+                    if uorf["uorfs"]
+                    else ""
+                )
+            ),
+            "No upstream open reading frames found in the 5' UTR of protein-coding transcripts",
             unverified_reason,
         ),
         "TANGO": _feature_entry(
@@ -371,7 +592,7 @@ def analyze_gene_features(
                 ),
             })
 
-    return {
+    result = {
         "features": features,
         "warnings": warnings,
         "geneInfo": {
@@ -381,10 +602,31 @@ def analyze_gene_features(
             "hasIntrons": splicing["hasIntrons"],
             "hasNmdTranscripts": splicing["hasNmdTranscripts"],
             "overlappingNats": nats["natCount"] or 0,
+            "uorfCount": uorf["uorfCount"],
             "verified": gene_verified,
             "geneType": gene_type,
         },
     }
+
+    # Resilience / backup: when live Ensembl data was obtained, persist it as
+    # the last-known-good analysis. When the site is down (or the gene cannot
+    # be resolved), replay the stored backup so Gene Function still works for
+    # every gene instead of silently dropping it. If no backup exists yet,
+    # return the permissive fallback with an honest note.
+    resolved_live = bool(gene_data) or bool(transcripts)
+    if resolved_live:
+        result["source"] = "live"
+        _save_backup(organism, gene_symbol, ensembl_id, result)
+    else:
+        backup = _load_backup(organism, gene_symbol)
+        if backup is not None:
+            # Keep the analysis but refresh warnings for this request's tissue.
+            backup["warnings"] = warnings
+            result = backup
+        else:
+            result["source"] = "fallback"
+
+    return result
 
 
 def _feature_entry(

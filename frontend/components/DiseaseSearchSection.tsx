@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Search, X } from "lucide-react";
+import { getOrganism } from "@/lib/organisms";
 
 export default function DiseaseSearchSection({
   organismId,
@@ -19,11 +20,14 @@ export default function DiseaseSearchSection({
 }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
-  const isHuman = organismId === "human";
+  const organism = getOrganism(organismId);
+  const organismName = organism?.commonName ?? organismId;
 
   function handleSearch() {
-    if (!query.trim() || !isHuman) return;
-    router.push(`/disease-search?query=${encodeURIComponent(query.trim())}`);
+    if (!query.trim()) return;
+    router.push(
+      `/disease-search?query=${encodeURIComponent(query.trim())}&organism=${encodeURIComponent(organismId)}`
+    );
   }
 
   function handleClear() {
@@ -46,8 +50,8 @@ export default function DiseaseSearchSection({
         )}
       </div>
       <p className="mt-0.5 text-[12px] text-slate-400">
-        Don&apos;t know the gene yet? Search by disease name (Human only) — opens a full results
-        page with associated genes, therapeutic areas, and known drugs.
+        Don&apos;t know the gene yet? Search by disease name — associations are human-based (Open Targets) and
+        {organismName.toLowerCase() === "human" ? " run directly on" : ` mapped to ${organismName} orthologs for`} your selected organism.
       </p>
 
       <div className="mt-3 flex gap-2">
@@ -61,14 +65,13 @@ export default function DiseaseSearchSection({
               else onDeactivate();
             }}
             onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-            disabled={!isHuman}
-            placeholder={isHuman ? "e.g. Duchenne Muscular Dystrophy" : "Switch organism to Human to use disease search"}
-            className="w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-[13.5px] text-slate-700 placeholder:text-slate-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20 disabled:bg-slate-50 disabled:text-slate-400"
+            placeholder="e.g. Duchenne Muscular Dystrophy"
+            className="w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-[13.5px] text-slate-700 placeholder:text-slate-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
           />
         </div>
         <button
           onClick={handleSearch}
-          disabled={!isHuman || !query.trim()}
+          disabled={!query.trim()}
           className="rounded-lg bg-brand px-5 py-2.5 text-[13.5px] font-medium text-white shadow-sm transition-colors hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-50"
         >
           Search
