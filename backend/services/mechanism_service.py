@@ -803,7 +803,9 @@ def rank_rna_editing_mechanisms(
                 eligible = False
                 rationale.append(_base_mismatch_reason(edit_type, sub))
 
-        if mechanism_id in ("A16", "A20") and single_exon:
+        # A20 is the SMaRT trans-splicing mechanism; only it needs intronic
+        # splice junctions. A16 (C-to-U editing) is not splice-dependent.
+        if mechanism_id == "A20" and single_exon:
             eligible = False
             rationale.append(
                 "Gene appears to be single-exon / intronless — trans-splicing relies on "
