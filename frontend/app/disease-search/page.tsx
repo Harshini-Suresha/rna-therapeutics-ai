@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Loader2,
@@ -21,6 +21,8 @@ import {
   Route,
   Gauge,
   Layers,
+  BarChart3,
+  Network,
 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import Topbar from "@/components/Topbar";
@@ -44,6 +46,20 @@ const DB_LABELS: Record<string, string> = {
   NORD: "NORD",
   GARD: "GARD",
   SCTID: "SNOMED CT",
+};
+
+const DB_ORDER = ["OMIM", "Orphanet", "MESH", "DOID", "NCIT", "UMLS", "SCTID", "ICD10CM", "ICD10WHO", "ICD9", "MedDRA", "NORD", "GARD"];
+
+const DB_LINKS: Record<string, (acc: string) => string> = {
+  OMIM: (a) => `https://omim.org/entry/${a}`,
+  Orphanet: (a) => `https://www.orpha.net/en/disease/detail/${a}`,
+  MESH: (a) => `https://meshb.nlm.nih.gov/record/ui?ui=${a}`,
+  DOID: (a) => `https://disease-ontology.org/?id=DOID:${a}`,
+  NCIT: (a) => `https://ncithesaurus.nci.nih.gov/ncitbrowser/ConceptReport.jsp?dictionary=NCI_Thesaurus&ns=ncit&code=${a}`,
+  UMLS: (a) => `https://uts.nlm.nih.gov/uts/umls/concept/${a}`,
+  ICD10CM: (a) => `https://icd.who.int/browse10/2019/en#/${a}`,
+  ICD10WHO: (a) => `https://icd.who.int/browse10/2019/en#/${a}`,
+  ICD9: (a) => `https://icd.codes/icd9/${a}`,
 };
 
 const EVIDENCE_LABELS: { key: string; label: string }[] = [
@@ -94,6 +110,15 @@ function SectionHeader({ icon: Icon, title }: { icon: React.ComponentType<{ clas
         </div>
       </td>
     </tr>
+  );
+}
+
+function SnapshotStat({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="rounded-xl border border-slate-100 bg-white px-3 py-2.5">
+      <p className="text-[15px] font-semibold tabular-nums text-slate-800">{value}</p>
+      <p className="text-[10.5px] leading-tight text-slate-500">{label}</p>
+    </div>
   );
 }
 
@@ -444,9 +469,58 @@ export default function DiseaseSearchResultsPage() {
     router.push("/");
   }
 
-  const omim = detail?.databaseRefs?.OMIM;
-  const orphanet = detail?.databaseRefs?.Orphanet;
   const formatCount = (n?: number | null) => (n != null ? n.toLocaleString() : "—");
+
+  const evidenceSummary = useMemo(() => {
+    const acc = EVIDENCE_LABELS.map((e) => ({ ...e, genes: 0, total: 0 }));
+    for (const g of detail?.genes ?? []) {
+      for (const item of acc) {
+        const v = g.evidence?.[item.key] ?? 0;
+        if (v > 0) {
+          item.genes += 1;
+          item.total += v;
+        }
+      }
+    }
+    return acc.filter((c) => c.genes > 0).sort((a, b) => b.total - a.total);
+  }, [detail]);
+
+  const pathwaySummary = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const g of detail?.genes ?? []) {
+      for (const p of g.pathways ?? []) {
+        counts[p.pathway] = (counts[p.pathway] ?? 0) + 1;
+      }
+    }
+    return Object.entries(counts)
+      .map(([pathway, count]) => ({ pathway, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 12);
+  }, [detail]);
+
+  const stageSummary = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const d of detail?.knownDrugs ?? []) {
+      const key =
+        d.phase === 4 || d.status?.toLowerCase().includes("approved")
+          ? "Approved"
+          : d.phase !== null
+            ? `Phase ${d.phase}`
+            : d.status || "Other";
+      counts[key] = (counts[key] ?? 0) + 1;
+    }
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  }, [detail]);
+
+  const biotypeSummary = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const g of detail?.genes ?? []) {
+      counts[g.biotype || "unknown"] = (counts[g.biotype || "unknown"] ?? 0) + 1;
+    }
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  }, [detail]);
+
+  const totalGenes = detail?.genes.length ?? 0;
 
   return (
     <div className="flex min-h-screen bg-[#F5F6FA]">
@@ -532,11 +606,12 @@ export default function DiseaseSearchResultsPage() {
                       <tbody>
                         <SectionHeader icon={BookOpen} title="Disease Information" />
                         <Td label="Description" value={detail.description} />
-                        <Td label="OMIM" value={omim} link={omim ? `https://omim.org/entry/${omim}` : undefined} />
-                        <Td label="Orphanet" value={orphanet} link={orphanet ? `https://www.orpha.net/en/disease/detail/${orphanet}` : undefined} />
-                        <Td label="MeSH" value={detail.databaseRefs?.MESH} link={detail.databaseRefs?.MESH ? `https://meshb.nlm.nih.gov/record/ui?ui=${detail.databaseRefs.MESH}` : undefined} />
-                        <Td label="UMLS" value={detail.databaseRefs?.UMLS} />
-                        <Td label="NCI Thesaurus" value={detail.databaseRefs?.NCIT} />
+                        {DB_ORDER.map((db) => {
+                          const acc = detail.databaseRefs?.[db];
+                          if (!acc) return null;
+                          const link = DB_LINKS[db] ? DB_LINKS[db](acc) : undefined;
+                          return <Td key={db} label={DB_LABELS[db] ?? db} value={acc} link={link} />;
+                        })}
 
                         {detail.synonyms.length > 0 && (
                           <>
@@ -616,6 +691,74 @@ export default function DiseaseSearchResultsPage() {
                   </div>
                 </Card>
 
+                {/* At-a-glance snapshot */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+                  <SnapshotStat label="Clinical features" value={detail.phenotypes.length} />
+                  <SnapshotStat label="Alternative names" value={detail.synonyms.length} />
+                  <SnapshotStat label="Subtypes" value={detail.childDiseases.length} />
+                  <SnapshotStat label="Related diseases" value={detail.relatedDiseases.length} />
+                  <SnapshotStat label="Genes w/ evidence" value={evidenceSummary.length > 0 ? evidenceSummary.reduce((s, e) => Math.max(s, e.genes), 0) : 0} />
+                  <SnapshotStat
+                    label="Avg. gene score"
+                    value={
+                      totalGenes > 0
+                        ? (detail.genes.reduce((s, g) => s + (g.score ?? 0), 0) / totalGenes).toFixed(2)
+                        : "—"
+                    }
+                  />
+                </div>
+
+                {/* Evidence landscape */}
+                {evidenceSummary.length > 0 && (
+                  <Card className="p-0 overflow-hidden">
+                    <div className="border-b border-slate-100 px-5 py-3">
+                      <div className="flex items-center gap-2">
+                        <BarChart3 className="h-4 w-4 text-blue-500" />
+                        <p className="text-[13px] font-semibold text-slate-800">Evidence Landscape</p>
+                      </div>
+                      <p className="mt-0.5 text-[11.5px] text-slate-400">
+                        Across {totalGenes} associated genes — share of genes with each type of supporting evidence.
+                      </p>
+                    </div>
+                    <div className="px-5 py-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-10 gap-y-2">
+                        {evidenceSummary.map((e) => (
+                          <div key={e.key} className="flex items-center gap-2">
+                            <span className="w-32 shrink-0 text-[11px] text-slate-500">{e.label}</span>
+                            <div className="h-2 flex-1 rounded-full bg-slate-100 overflow-hidden">
+                              <div className="h-full rounded-full bg-blue-500" style={{ width: `${(e.genes / totalGenes) * 100}%` }} />
+                            </div>
+                            <span className="w-14 text-right text-[10.5px] tabular-nums text-slate-500">{e.genes}/{totalGenes}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </Card>
+                )}
+
+                {/* Top pathways */}
+                {pathwaySummary.length > 0 && (
+                  <Card className="p-0 overflow-hidden">
+                    <div className="border-b border-slate-100 px-5 py-3">
+                      <div className="flex items-center gap-2">
+                        <Network className="h-4 w-4 text-violet-500" />
+                        <p className="text-[13px] font-semibold text-slate-800">Top Pathways</p>
+                      </div>
+                      <p className="mt-0.5 text-[11.5px] text-slate-400">Reactome pathways most frequent across the associated genes.</p>
+                    </div>
+                    <div className="px-5 py-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                        {pathwaySummary.map((p, i) => (
+                          <div key={i} className="flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2">
+                            <span className="flex-1 text-[11px] font-medium text-slate-700">{p.pathway}</span>
+                            <span className="rounded-full bg-violet-50 px-2 py-0.5 text-[10.5px] font-medium text-violet-700">{p.count} gene{p.count > 1 ? "s" : ""}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </Card>
+                )}
+
                 {/* Known drugs table */}
                 {detail.knownDrugs.length > 0 && (
                   <Card className="p-0 overflow-hidden">
@@ -625,6 +768,17 @@ export default function DiseaseSearchResultsPage() {
                         <p className="text-[13px] font-semibold text-slate-800">Known Drugs / Clinical Candidates ({detail.knownDrugs.length})</p>
                       </div>
                       <p className="mt-0.5 text-[11.5px] text-slate-400">Click a row to see mechanism of action and clinical reports.</p>
+                      {stageSummary.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {stageSummary.map(([stage, count]) => (
+                            <span key={stage} className={`rounded-full px-2.5 py-0.5 text-[10.5px] font-medium ${
+                              stage === "Approved" ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"
+                            }`}>
+                              {stage} · {count}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                     <div className="px-5 py-2">
                       <table className="w-full">
@@ -671,6 +825,15 @@ export default function DiseaseSearchResultsPage() {
                     <p className="mt-0.5 text-[11.5px] text-slate-400">
                       Ranked by evidence-based association score (0–1). Click a row to expand function, evidence breakdown, pathways, mouse models and genetic constraint. Higher score = stronger evidence linking the gene to this disease.
                     </p>
+                    {biotypeSummary.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {biotypeSummary.map(([biotype, count]) => (
+                          <span key={biotype} className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[10.5px] font-medium text-slate-600">
+                            {biotype} · {count}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <div className="overflow-x-auto">
                     <table className="w-full min-w-[760px]">

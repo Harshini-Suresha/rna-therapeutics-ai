@@ -1,14 +1,5 @@
 [
   {
-    "id": "n1785265443728",
-    "category": "analysis",
-    "title": "Gene lookup completed for il7",
-    "detail": "Retrieved data for il7 in homo sapiens.",
-    "timestamp": 1785265443.728485,
-    "read": false,
-    "meta": {}
-  },
-  {
     "id": "n1785266437732",
     "category": "analysis",
     "title": "Gene lookup completed for il7",
@@ -1796,6 +1787,15 @@
     "title": "Gene lookup completed for dmd",
     "detail": "Retrieved data for dmd in homo sapiens.",
     "timestamp": 1785808635.503086,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785809285517",
+    "category": "analysis",
+    "title": "Gene lookup completed for dmd",
+    "detail": "Retrieved data for dmd in homo sapiens.",
+    "timestamp": 1785809285.517471,
     "read": false,
     "meta": {}
   }
