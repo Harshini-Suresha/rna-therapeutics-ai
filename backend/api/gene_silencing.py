@@ -33,9 +33,17 @@ class CandidateRequest(BaseModel):
 
 
 @router.get("/api/gene-silencing/target/{ensembl_gene_id}")
-async def target_analysis(ensembl_gene_id: str):
-    """Fetch transcript / exon structure for the confirmed gene."""
-    result = get_target_analysis(ensembl_gene_id)
+async def target_analysis(
+    ensembl_gene_id: str,
+    gene_symbol: Optional[str] = None,
+    organism: Optional[str] = None,
+):
+    """Fetch transcript / exon structure for the confirmed gene.
+
+    Optional query params ``gene_symbol`` and ``organism`` enable a symbol-based
+    fallback when the Ensembl ID lookup returns no exon data.
+    """
+    result = get_target_analysis(ensembl_gene_id, gene_symbol=gene_symbol or "", organism=organism or "")
     if not result.get("exons"):
         raise HTTPException(status_code=404, detail="No exon data found for this gene.")
     return result
@@ -90,6 +98,7 @@ async def generate_aso_candidates(payload: CandidateRequest):
         "asoLength": candidates[0]["length"] if candidates else payload.aso_length,
         "totalExons": len(target.get("exons", [])),
         "cdsLength": target.get("cdsLength"),
+        "mechanismNotes": candidates[0].get("mechanismNotes", "") if candidates else "",
         "candidates": candidates,
     }
 

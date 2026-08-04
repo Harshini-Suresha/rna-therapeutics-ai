@@ -22,6 +22,26 @@ import { saveReport } from "@/lib/auth";
 
 const CONFIRMED_TARGET_KEY = "aso:confirmedTarget";
 const SELECTED_MECHANISM_KEY = "aso:selectedMechanism";
+const PROJECT_TARGET_TISSUE_KEY = "aso:projectTargetTissue";
+
+// Map free-text target tissue to deliveryContext dropdown values
+function mapTargetTissueToDeliveryContext(tissue: string): string {
+  const t = tissue.toLowerCase().trim();
+  if (t.includes("liver") || t.includes("hepatic")) return "liver";
+  if (t.includes("kidney") || t.includes("renal")) return "kidney";
+  if (t.includes("brain") || t.includes("cns") || t.includes("central nervous")) return "cns";
+  if (t.includes("muscle") || t.includes("skeletal") || t.includes("myocyte")) return "muscle";
+  if (t.includes("heart") || t.includes("cardiac") || t.includes("myocard")) return "heart";
+  if (t.includes("lung") || t.includes("pulmonary") || t.includes("respiratory")) return "lung";
+  if (t.includes("eye") || t.includes("retina") || t.includes("ocular") || t.includes("vitreous")) return "eye";
+  if (t.includes("tumor") || t.includes("cancer") || t.includes("neoplasm") || t.includes("malignan")) return "tumor";
+  if (t.includes("blood") || t.includes("bone marrow") || t.includes("hematopoietic") || t.includes("leukemia") || t.includes("lymphoma")) return "blood";
+  if (t.includes("skin") || t.includes("dermal") || t.includes("epidermal") || t.includes("cutaneous")) return "skin";
+  if (t.includes("pancreas") || t.includes("pancreatic")) return "pancreas";
+  if (t.includes("gut") || t.includes("intestine") || t.includes("intestinal") || t.includes("colon") || t.includes("bowel")) return "gut";
+  if (t.includes("spinal") || t.includes("cord")) return "spinal cord";
+  return "";
+}
 
 export default function GeneSilencingPage() {
   const router = useRouter();
@@ -73,6 +93,15 @@ export default function GeneSilencingPage() {
         }
       } catch { setMechanism(null); }
     }
+
+    // Load project target tissue and map to deliveryContext
+    const projectTissue = sessionStorage.getItem(PROJECT_TARGET_TISSUE_KEY);
+    if (projectTissue) {
+      const mapped = mapTargetTissueToDeliveryContext(projectTissue);
+      if (mapped) {
+        setDeliveryContext(mapped);
+      }
+    }
   }, []);
 
   // Fetch target analysis when gene loads
@@ -80,7 +109,7 @@ export default function GeneSilencingPage() {
     if (!gene?.geneId) return;
     setTargetLoading(true);
     setTargetError(null);
-    fetchTargetAnalysis(gene.geneId)
+    fetchTargetAnalysis(gene.geneId, gene.geneSymbol ?? undefined, gene.organism ?? undefined)
       .then(setTarget)
       .catch((e) => setTargetError(e instanceof Error ? e.message : "Failed to load target."))
       .finally(() => setTargetLoading(false));
@@ -150,7 +179,7 @@ export default function GeneSilencingPage() {
         title: `ASO Design: ${gene.geneSymbol} — ${mechanism.name}`,
         geneSymbol: gene.geneSymbol,
         disease: gene.disease || "",
-        summary: `Generated ${res.candidates.length} ASO candidates for ${mechanism.name}. Top candidate: ${res.candidates[0]?.asoLabel || "N/A"}.`,
+        summary: `Generated ${res.candidates.length} ASO candidates for ${mechanism.name}. Top candidate: ${res.candidates[0]?.targetRegion || "N/A"}.`,
         data: { mechanismId: mechanism.id, mechanismName: mechanism.name, candidateCount: res.candidates.length },
       });
     } catch (err) {
@@ -241,68 +270,84 @@ export default function GeneSilencingPage() {
             <TargetAnalysisCard
               target={target}
               selectedExons={selectedExons}
-              onToggleExon={handleToggleExon}
-              onSelectAll={handleSelectAllExons}
               isTotalKnockdown={isTotalKnockdown}
               onToggleTotalKnockdown={handleToggleTotalKnockdown}
             />
           ) : null}
+
+          {/* Step 1a: Target Selection — Exon picker */}
+          {target && !targetLoading && (
+            <Card className="p-5">
+              <SectionHeader step="1a" title="Target Selection" />
+              <div className="px-5 pb-5">
+                <p className="mb-3 text-[12px] text-slate-500">
+                  {isTotalKnockdown
+                    ? "Total Transcript Knockdown — all exons will be targeted."
+                    : `Select exon(s) to target. ${selectedExons.length > 0 ? `${selectedExons.length} exon(s) selected.` : "At least one exon required."}`}
+                </p>
+                {!isTotalKnockdown && target.exons.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {target.exons.map((exon) => {
+                      const idx = exon.index ?? 0;
+                      const isSelected = selectedExons.includes(idx);
+                      return (
+                        <button
+                          key={exon.id ?? idx}
+                          onClick={() => handleToggleExon(idx)}
+                          className={`rounded-md px-3 py-1.5 text-[12px] font-medium transition-colors ${
+                            isSelected
+                              ? "bg-brand text-white"
+                              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                          }`}
+                        >
+                          Exon {idx}{exon.length ? ` · ${exon.length}bp` : ""}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                {!isTotalKnockdown && selectedExons.length > 0 && (
+                  <p className="mt-2 text-[11px] text-slate-400">
+                    Targeting: {selectedExons.sort((a, b) => a - b).join(", ")}
+                  </p>
+                )}
+              </div>
+            </Card>
+          )}
 
           {/* Allele-specific variant selector */}
           {!isTotalKnockdown && !targetLoading && target && (
             <AlleleSelector
               variants={variants}
               selectedVariant={selectedVariant}
-              onSelectVariant={setSelectedVariant}
+              onSelectVariant={(v) => {
+                setSelectedVariant(v);
+                // Wire the selected ClinVar variant to knownVariant for generation
+                if (v) {
+                  const parts = [v.hgvsp || v.hgvsc || "", v.variantId, v.rsid].filter(Boolean);
+                  setKnownVariant(parts.join(" ") || v.variantId);
+                } else {
+                  // Revert to sessionStorage value if available, else clear
+                  const mechStored = sessionStorage.getItem(SELECTED_MECHANISM_KEY);
+                  if (mechStored) {
+                    try {
+                      const parsed = JSON.parse(mechStored);
+                      setKnownVariant(parsed.knownVariant ?? "");
+                    } catch { setKnownVariant(""); }
+                  } else {
+                    setKnownVariant("");
+                  }
+                }
+              }}
             />
           )}
 
           {/* Steps 2 + 3: Design Form + Results */}
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-5">
             <div className="lg:col-span-2 space-y-4">
-              {/* Exon Selection - mandatory, shown first */}
-              {target && !targetLoading && (
-                <Card className="p-5">
-                  <SectionHeader step="2" title="Target Selection" />
-                  <div className="px-5 pb-5">
-                    <p className="mb-3 text-[12px] text-slate-500">
-                      {isTotalKnockdown
-                        ? "Total Transcript Knockdown — all exons will be targeted."
-                        : `Select exon(s) to target. ${selectedExons.length > 0 ? `${selectedExons.length} exon(s) selected.` : "At least one exon required."}`}
-                    </p>
-                    {!isTotalKnockdown && target.exons.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5">
-                        {target.exons.map((exon) => {
-                          const idx = exon.index ?? 0;
-                          const isSelected = selectedExons.includes(idx);
-                          return (
-                            <button
-                              key={exon.id ?? idx}
-                              onClick={() => handleToggleExon(idx)}
-                              className={`rounded-md px-3 py-1.5 text-[12px] font-medium transition-colors ${
-                                isSelected
-                                  ? "bg-brand text-white"
-                                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                              }`}
-                            >
-                              Exon {idx}{exon.length ? ` · ${exon.length}bp` : ""}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                    {!isTotalKnockdown && selectedExons.length > 0 && (
-                      <p className="mt-2 text-[11px] text-slate-400">
-                        Targeting: {selectedExons.sort((a, b) => a - b).join(", ")}
-                      </p>
-                    )}
-                  </div>
-                </Card>
-              )}
-
               {/* ASO Design Parameters */}
               <Card className="p-5">
-                <SectionHeader step="3" title="ASO Design Parameters" />
+                <SectionHeader step="2" title="ASO Design Parameters" />
                 <div className="px-5 pb-5">
                   <AssoDesignForm
                     options={options}
@@ -332,7 +377,7 @@ export default function GeneSilencingPage() {
             </div>
 
             <div className="lg:col-span-3 space-y-3">
-              <SectionHeader step="4" title="Generated ASO Candidates" />
+              <SectionHeader step="3" title="Generated ASO Candidates" />
 
               {genError && (
                 <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-600">
@@ -369,8 +414,11 @@ export default function GeneSilencingPage() {
                     {results.targetExons && results.targetExons.length > 0
                       ? `Exons ${results.targetExons.join(", ")}`
                       : "all exons (total knockdown)"}{" "}
-                    &middot; {results.chemistry} &middot; {results.asoLength} nt
+                    &middot; {results.mechanismId} &middot; {results.chemistry} &middot; {results.asoLength} nt
                   </p>
+                  {results.mechanismNotes && (
+                    <p className="text-[11.5px] text-slate-400 italic mb-3">{results.mechanismNotes}</p>
+                  )}
                   {results.candidates.map((c, i) => (
                     <AssoCandidateCard key={c.sequence} candidate={c} rank={i + 1} />
                   ))}

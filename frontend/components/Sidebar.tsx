@@ -30,6 +30,7 @@ const PIPELINE_NAV: { section: string; items: NavItem[] }[] = [
       { label: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
       { label: "New Project", icon: FolderPlus, href: "/new-project" },
       { label: "Projects", icon: Folder, href: "/projects" },
+      { label: "Mechanism Docs", icon: BookOpen, href: "/documentation" },
     ],
   },
   {

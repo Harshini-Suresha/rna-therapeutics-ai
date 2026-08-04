@@ -1,6 +1,7 @@
 import {
   MechanismOptions,
   MechanismRankingResponse,
+  GeneFeaturesResponse,
   TherapeuticGoalId,
 } from "@/types/mechanism";
 
@@ -9,6 +10,24 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000"
 export async function fetchMechanismOptions(): Promise<MechanismOptions> {
   const res = await fetch(`${API_BASE}/api/mechanisms/options`, { cache: "no-store" });
   if (!res.ok) throw new Error("Could not load mechanism selection options.");
+  return res.json();
+}
+
+export async function fetchGeneFeatures(params: {
+  geneSymbol: string;
+  organism?: string;
+  ensemblId?: string | null;
+  tissueTpm?: number | null;
+}): Promise<GeneFeaturesResponse> {
+  const query = new URLSearchParams({ gene_symbol: params.geneSymbol });
+  if (params.organism) query.set("organism", params.organism);
+  if (params.ensemblId) query.set("ensembl_id", params.ensemblId);
+  if (params.tissueTpm != null) query.set("tissue_tpm", String(params.tissueTpm));
+
+  const res = await fetch(`${API_BASE}/api/mechanisms/gene-features?${query}`, {
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error("Could not analyze gene features.");
   return res.json();
 }
 
@@ -28,6 +47,31 @@ export async function rankGeneSilencingMechanisms(params: {
       silencing_scope: params.silencingScope,
       delivery_context: params.deliveryContext || null,
       known_variant: params.knownVariant || null,
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail || "Could not rank mechanisms.");
+  }
+  return res.json();
+}
+
+export async function rankGeneUpregulationMechanisms(params: {
+  geneSymbol: string;
+  defectType: string;
+  deliveryContext?: string | null;
+  knownRegulatoryElement?: string | null;
+  geneFeatures?: Record<string, unknown> | null;
+}): Promise<MechanismRankingResponse> {
+  const res = await fetch(`${API_BASE}/api/mechanisms/gene-upregulation`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      gene_symbol: params.geneSymbol,
+      defect_type: params.defectType,
+      delivery_context: params.deliveryContext || null,
+      known_regulatory_element: params.knownRegulatoryElement || null,
+      gene_features: params.geneFeatures || null,
     }),
   });
   if (!res.ok) {

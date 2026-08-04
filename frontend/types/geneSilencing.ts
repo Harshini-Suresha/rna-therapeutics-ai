@@ -37,6 +37,7 @@ export interface AssoCandidate {
   polygTracts: number;
   qualityScore: number;
   targetRegion: string;
+  mechanismId: string;
   chemistry: string;
   modifications: string[];
   exonNumber: number | null;
@@ -47,6 +48,8 @@ export interface AssoCandidate {
   polygPenalty: number;
   chemBonus: number;
   modBonus: number;
+  mechanismBonus: number;
+  mechanismNotes: string;
   cpgCount: number;
   cpgPenalty: number;
   longestHomopolymer: number;
@@ -92,6 +95,7 @@ export interface GenerateResponse {
   asoLength: number;
   totalExons: number;
   cdsLength: number | null;
+  mechanismNotes: string;
   candidates: AssoCandidate[];
 }
 

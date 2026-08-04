@@ -1,5 +1,4 @@
 import { GeneTargetObject } from "@/types/gene";
-import { lookupMockGene } from "@/lib/mockGene";
 
 // Use the backend running beside the local Next.js app by default. A deployed
 // environment can still override this with NEXT_PUBLIC_API_BASE_URL.
@@ -10,9 +9,8 @@ export async function fetchGene(
   geneSymbol: string
 ): Promise<GeneTargetObject> {
   const normalizedSymbol = geneSymbol.trim().toUpperCase();
-  const fallbackGene = normalizedSymbol ? lookupMockGene(normalizedSymbol) : undefined;
 
-  let data: Record<string, unknown> | null = null;
+  let data: Record<string, any> | null = null;
 
   try {
     const response = await fetch(`${API_BASE}/api/pipeline/initialize-target`, {
@@ -26,10 +24,6 @@ export async function fetchGene(
     });
 
     if (!response.ok) {
-      if (fallbackGene) {
-        return fallbackGene;
-      }
-
       const errorData = await response.json().catch(() => ({}));
       throw new Error(
         errorData.detail || `Target gene "${normalizedSymbol}" could not be resolved.`
@@ -38,24 +32,16 @@ export async function fetchGene(
 
     data = await response.json();
   } catch (error) {
-    if (fallbackGene) {
-      return fallbackGene;
-    }
-
     throw error instanceof Error
       ? error
       : new Error(`Target gene "${normalizedSymbol}" could not be resolved.`);
   }
 
   if (!data || typeof data !== "object") {
-    if (fallbackGene) {
-      return fallbackGene;
-    }
-
     throw new Error(`Target gene "${normalizedSymbol}" could not be resolved.`);
   }
 
-  const finalSymbol = data.geneSymbol ?? fallbackGene?.geneSymbol ?? normalizedSymbol;
+  const finalSymbol = data.geneSymbol ?? normalizedSymbol;
   const synonymValues = Array.isArray(data.synonyms) ? data.synonyms : [];
   const seenSynonyms = new Set<string>();
   const filteredSynonyms = synonymValues.filter((syn: unknown): syn is string => {
@@ -100,20 +86,16 @@ export async function fetchGene(
     otherTranscripts: data.otherTranscripts ?? [],
     totalTranscripts: data.totalTranscripts ?? null,
 
-    variantExamples: Array.isArray(data.variantExamples) && data.variantExamples.length > 0
-      ? data.variantExamples
-      : (fallbackGene?.variantExamples ?? []),
-    totalKnownVariantsClinvar: data.totalKnownVariantsClinvar ?? data.clinvarVariantCount ?? fallbackGene?.totalKnownVariantsClinvar ?? null,
+    variantExamples: Array.isArray(data.variantExamples) ? data.variantExamples : [],
+    totalKnownVariantsClinvar: data.totalKnownVariantsClinvar ?? data.clinvarVariantCount ?? null,
 
-    defaultTissue: data.defaultTissue ?? fallbackGene?.defaultTissue ?? null,
-    tissueExpressionLevel: data.tissueExpressionLevel ?? fallbackGene?.tissueExpressionLevel ?? null,
-    tissueTpm: data.tissueTpm ?? fallbackGene?.tissueTpm ?? null,
-    topTissues: Array.isArray(data.topTissues) && data.topTissues.length > 0
-      ? data.topTissues
-      : (fallbackGene?.topTissues ?? []),
-    defaultCellType: data.defaultCellType ?? fallbackGene?.defaultCellType ?? null,
-    cellExpressionLevel: data.cellExpressionLevel ?? fallbackGene?.cellExpressionLevel ?? null,
-    cellTpm: data.cellTpm ?? fallbackGene?.cellTpm ?? null,
+    defaultTissue: data.defaultTissue ?? null,
+    tissueExpressionLevel: data.tissueExpressionLevel ?? null,
+    tissueTpm: data.tissueTpm ?? null,
+    topTissues: Array.isArray(data.topTissues) ? data.topTissues : [],
+    defaultCellType: data.defaultCellType ?? null,
+    cellExpressionLevel: data.cellExpressionLevel ?? null,
+    cellTpm: data.cellTpm ?? null,
     cellTypeAll: data.cellTypeAll ?? {},
 
     expressionStabilityCV: data.expressionStabilityCV ?? null,
@@ -172,7 +154,7 @@ export async function fetchGene(
 
     dbSnpCount: data.dbSnpCount ?? null,
     gnomadAvailable: !!data.gnomadAvailable,
-    clinvarVariantCount: data.clinvarVariantCount ?? fallbackGene?.clinvarVariantCount ?? null,
+    clinvarVariantCount: data.clinvarVariantCount ?? null,
 
     topHgvsName: data.topHgvsName ?? null,
     topRsId: data.topRsId ?? null,
@@ -182,10 +164,9 @@ export async function fetchGene(
       data.gtexAvailable ||
       data.defaultTissue ||
       data.tissueTpm ||
-      (Array.isArray(data.topTissues) && data.topTissues.length > 0) ||
-      fallbackGene?.gtexAvailable
+      (Array.isArray(data.topTissues) && data.topTissues.length > 0)
     ),
-    humanProteinAtlasLevel: data.humanProteinAtlasLevel ?? fallbackGene?.humanProteinAtlasLevel ?? null,
+    humanProteinAtlasLevel: data.humanProteinAtlasLevel ?? null,
     gtexExpressionLevel: data.gtexExpressionLevel ?? null,
 
     intolerantToLossScore: data.intolerantToLossScore ?? null,
@@ -219,14 +200,14 @@ export async function fetchGene(
 
     deepLinks: data.deepLinks ?? {},
 
-    keggCount: data.keggCount ?? fallbackGene?.keggCount ?? null,
-    reactomeCount: data.reactomeCount ?? fallbackGene?.reactomeCount ?? null,
-    pathwayCommonsCount: data.pathwayCommonsCount ?? fallbackGene?.pathwayCommonsCount ?? null,
-    keggPathwayName: data.keggPathwayName ?? fallbackGene?.keggPathwayName ?? null,
-    reactomePathwayName: data.reactomePathwayName ?? fallbackGene?.reactomePathwayName ?? null,
-    keggPathwayId: data.keggPathwayId ?? fallbackGene?.keggPathwayId ?? null,
-    reactomePathwayId: data.reactomePathwayId ?? fallbackGene?.reactomePathwayId ?? null,
-    pathwayHighlight: data.pathwayHighlight ?? fallbackGene?.pathwayHighlight ?? null,
+    keggCount: data.keggCount ?? null,
+    reactomeCount: data.reactomeCount ?? null,
+    pathwayCommonsCount: data.pathwayCommonsCount ?? null,
+    keggPathwayName: data.keggPathwayName ?? null,
+    reactomePathwayName: data.reactomePathwayName ?? null,
+    keggPathwayId: data.keggPathwayId ?? null,
+    reactomePathwayId: data.reactomePathwayId ?? null,
+    pathwayHighlight: data.pathwayHighlight ?? null,
 
     goBiologicalProcess: data.goBiologicalProcess ?? null,
     goMolecularFunction: data.goMolecularFunction ?? null,

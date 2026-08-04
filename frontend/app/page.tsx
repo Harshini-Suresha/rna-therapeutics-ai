@@ -331,6 +331,7 @@ export default function NewProjectPage() {
         icd11Code: null,
         orphanetDiseaseNames: [],
         knownPathogenicVariants: null,
+        totalClinvarVariants: null,
         mutationBreakdown: {
           largeExonDeletions: null,
           largeExonDuplications: null,
@@ -535,6 +536,7 @@ export default function NewProjectPage() {
                   ))}
                 </div>
               </section>
+
             </>
           )}
           {gene && (

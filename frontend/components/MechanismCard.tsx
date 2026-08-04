@@ -74,10 +74,19 @@ export default function MechanismCard({
           ))}
         </ul>
 
-        {mechanism.fdaApprovedDrugs && (
+        {formatFdaDrugs(mechanism.fdaApprovedDrugs) && (
           <div className="rounded-lg bg-slate-50 px-3 py-2">
             <p className="text-[11px] font-medium text-slate-400">FDA-approved precedent</p>
-            <p className="mt-0.5 text-[12.5px] text-slate-700">{mechanism.fdaApprovedDrugs}</p>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {formatFdaDrugs(mechanism.fdaApprovedDrugs)!.map((drug) => (
+                <span
+                  key={drug}
+                  className="inline-flex items-center rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700"
+                >
+                  {drug}
+                </span>
+              ))}
+            </div>
           </div>
         )}
 
@@ -135,4 +144,29 @@ function Detail({ label, value }: { label: string; value: string | null }) {
       <p className="mt-0.5 text-[12.5px] text-slate-700 leading-snug">{value}</p>
     </div>
   );
+}
+
+// Parse FDA-approved drugs from the raw string, filtering out non-drug values
+function formatFdaDrugs(raw: string | null): string[] | null {
+  if (!raw) return null;
+
+  // Filter out "None" variants
+  const cleaned = raw.trim().replace(/\.$/, "");
+  const nonePatterns = [
+    /^none$/i,
+    /^none\s+\(/i,
+    /^none identified/i,
+    /^not applicable/i,
+    /^n\/a$/i,
+  ];
+  if (nonePatterns.some((p) => p.test(cleaned))) return null;
+
+  // Split semicolon-separated drug names
+  const drugs = raw
+    .split(/;/)
+    .map((d) => d.trim())
+    .filter((d) => d.length > 0);
+
+  if (drugs.length === 0) return null;
+  return drugs;
 }

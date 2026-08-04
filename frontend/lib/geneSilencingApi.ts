@@ -8,12 +8,16 @@ import {
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
 export async function fetchTargetAnalysis(
-  ensemblGeneId: string
+  ensemblGeneId: string,
+  geneSymbol?: string,
+  organism?: string
 ): Promise<TargetAnalysis> {
-  const res = await fetch(
-    `${API_BASE}/api/gene-silencing/target/${ensemblGeneId}`,
-    { cache: "no-store" }
-  );
+  const params = new URLSearchParams();
+  if (geneSymbol) params.set("gene_symbol", geneSymbol);
+  if (organism) params.set("organism", organism);
+  const qs = params.toString();
+  const url = `${API_BASE}/api/gene-silencing/target/${ensemblGeneId}${qs ? `?${qs}` : ""}`;
+  const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.detail || "Could not fetch target analysis.");

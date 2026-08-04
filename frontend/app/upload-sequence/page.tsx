@@ -766,8 +766,8 @@ export default function UploadSequencePage() {
         title: `Sequence Analysis: ${filename || "Uploaded Sequence"}`,
         geneSymbol: "",
         disease: "",
-        summary: `Analyzed sequence (${rawInput.length} bp). GC: ${((result.gcContent || 0) * 100).toFixed(1)}%. Tm: ${result.meltingTemperature?.toFixed(1) || "N/A"}°C.`,
-        data: { gcContent: result.gcContent, tm: result.meltingTemperature, length: rawInput.length },
+        summary: `Analyzed sequence (${rawInput.length} bp). GC: ${((result.gcContent || 0) * 100).toFixed(1)}%. Tm: ${result.meltingTemp?.tmNearestNeighbor?.toFixed(1) || "N/A"}°C.`,
+        data: { gcContent: result.gcContent, tm: result.meltingTemp?.tmNearestNeighbor ?? null, length: rawInput.length },
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Analysis failed.");

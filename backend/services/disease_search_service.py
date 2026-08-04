@@ -43,6 +43,10 @@ def get_disease_detail(query: str, gene_limit: int = 30) -> dict:
         "relatedDiseases": [],
         "childDiseases": [],
         "databaseRefs": {},
+        "literatureCount": None,
+        "associatedTargetCount": None,
+        "drugCandidateCount": None,
+        "ancestors": [],
     }
     query = (query or "").strip()
     if not query:
@@ -78,6 +82,8 @@ def get_disease_detail(query: str, gene_limit: int = 30) -> dict:
             id
             name
             description
+            literatureOcurrences { count }
+            ancestors
             therapeuticAreas { id name }
             synonyms { relation terms }
             phenotypes { count rows { phenotypeHPO { id name } } }
@@ -88,14 +94,44 @@ def get_disease_detail(query: str, gene_limit: int = 30) -> dict:
               count
               rows {
                 score
-                target { id approvedSymbol approvedName biotype }
+                datatypeScores { id score }
+                target {
+                  id
+                  approvedSymbol
+                  approvedName
+                  biotype
+                  functionDescriptions
+                  tractability { label modality value }
+                  geneticConstraint { constraintType exp obs oe }
+                  targetClass { label }
+                  mousePhenotypes { modelPhenotypeLabel }
+                  pathways { pathway pathwayId topLevelTerm }
+                }
               }
             }
             drugAndClinicalCandidates {
               count
               rows {
-                drug { id name }
+                drug {
+                  id
+                  name
+                  drugType
+                  mechanismsOfAction {
+                    uniqueActionTypes
+                    uniqueTargetTypes
+                    rows { mechanismOfAction actionType }
+                  }
+                }
                 maxClinicalStage
+                clinicalReports {
+                  id
+                  clinicalStage
+                  trialPhase
+                  trialOverallStatus
+                  url
+                  title
+                  year
+                }
               }
             }
           }
@@ -116,6 +152,23 @@ def get_disease_detail(query: str, gene_limit: int = 30) -> dict:
         disease_data = (resp2_data.get("data") or {}).get("disease") or {}
 
         result["description"] = disease_data.get("description")
+        result["literatureCount"] = (disease_data.get("literatureOcurrences") or {}).get("count")
+
+        # Resolve ancestor (disease hierarchy) names in a single aliased query.
+        ancestor_ids = [
+            a for a in (disease_data.get("ancestors") or [])
+            if isinstance(a, str) and (a.startswith("MONDO_") or a.startswith("EFO_"))
+        ]
+        # De-duplicate while preserving order
+        seen_ids = set()
+        unique_ancestors = []
+        for a in ancestor_ids:
+            if a not in seen_ids:
+                seen_ids.add(a)
+                unique_ancestors.append(a)
+        if unique_ancestors:
+            result["ancestors"] = _resolve_ancestor_names(unique_ancestors[:8])
+
         result["therapeuticAreas"] = [
             ta.get("name") for ta in (disease_data.get("therapeuticAreas") or []) if ta.get("name")
         ]
@@ -163,6 +216,7 @@ def get_disease_detail(query: str, gene_limit: int = 30) -> dict:
         result["relatedDiseases"] = similar_diseases[:10]
 
         rows = (disease_data.get("associatedTargets") or {}).get("rows") or []
+        result["associatedTargetCount"] = (disease_data.get("associatedTargets") or {}).get("count")
         genes = []
         for row in rows:
             target = row.get("target") or {}
@@ -176,10 +230,21 @@ def get_disease_detail(query: str, gene_limit: int = 30) -> dict:
                 "ensemblId": target.get("id"),
                 "biotype": target.get("biotype"),
                 "score": round(score, 3) if isinstance(score, (int, float)) else None,
+                "function": _first_nonempty(target.get("functionDescriptions")),
+                "evidence": _parse_evidence(row.get("datatypeScores") or []),
+                "targetClass": [tc.get("label") for tc in (target.get("targetClass") or []) if tc.get("label")],
+                "tractability": _parse_tractability(target.get("tractability") or []),
+                "constraint": _parse_constraint(target.get("geneticConstraint") or []),
+                "mousePhenotypes": [
+                    mp.get("modelPhenotypeLabel") for mp in (target.get("mousePhenotypes") or [])
+                    if mp.get("modelPhenotypeLabel")
+                ],
+                "pathways": _parse_pathways(target.get("pathways") or []),
             })
         result["genes"] = genes
 
         drug_rows = (disease_data.get("drugAndClinicalCandidates") or {}).get("rows") or []
+        result["drugCandidateCount"] = (disease_data.get("drugAndClinicalCandidates") or {}).get("count")
         seen_drugs = set()
         drugs = []
         for row in drug_rows:
@@ -194,6 +259,9 @@ def get_disease_detail(query: str, gene_limit: int = 30) -> dict:
                 "mechanismOfAction": None,
                 "phase": None,
                 "status": stage.replace("_", " ").title() if stage else None,
+                "drugType": drug.get("drugType"),
+                "mechanismsOfAction": _parse_moa(drug.get("mechanismsOfAction") or {}),
+                "clinicalReports": _parse_clinical_reports(row.get("clinicalReports") or []),
             })
         result["knownDrugs"] = drugs[:20]
 
@@ -201,6 +269,129 @@ def get_disease_detail(query: str, gene_limit: int = 30) -> dict:
 
     except requests.RequestException:
         return result
+
+
+def _resolve_ancestor_names(ancestor_ids):
+    """Resolve MONDO/EFO ancestor ids to display names in one aliased query."""
+    if not ancestor_ids:
+        return []
+    aliases = " ".join(
+        f'a{i}: search(queryString: "{a}", entityNames: ["disease"], page: {{index: 0, size: 1}}) {{ hits {{ id name }} }}'
+        for i, a in enumerate(ancestor_ids)
+    )
+    query = "query {" + aliases + "}"
+    try:
+        resp = requests.post(OPEN_TARGETS_URL, json={"query": query}, timeout=_TIMEOUT)
+        if resp.status_code != 200:
+            return [{"id": a, "name": a} for a in ancestor_ids]
+        data = resp.json().get("data") or {}
+        out = []
+        for key in sorted(data.keys(), key=lambda k: int(k[1:])):
+            hits = (data.get(key) or {}).get("hits") or []
+            if hits and hits[0].get("name"):
+                out.append({"id": hits[0].get("id") or ancestor_ids[int(key[1:])], "name": hits[0]["name"]})
+            else:
+                out.append({"id": ancestor_ids[int(key[1:])], "name": ancestor_ids[int(key[1:])]})
+        return out
+    except requests.RequestException:
+        return [{"id": a, "name": a} for a in ancestor_ids]
+
+
+def _first_nonempty(values):
+    if isinstance(values, str):
+        values = [values]
+    for v in values or []:
+        if v and isinstance(v, str):
+            return v
+    return None
+
+
+def _parse_evidence(datatype_scores):
+    """Map Open Targets datatype scores into an ordered, friendly dict."""
+    evidence = {}
+    for ds in datatype_scores or []:
+        if not ds:
+            continue
+        key = ds.get("id")
+        value = ds.get("score")
+        if key and isinstance(value, (int, float)):
+            evidence[key] = round(value, 3)
+    return evidence
+
+
+def _parse_tractability(tractability):
+    out = []
+    for t in tractability or []:
+        if not t:
+            continue
+        modality = t.get("modality")
+        label = t.get("label")
+        value = t.get("value")
+        if modality and label and value:
+            out.append({"modality": modality, "label": label})
+    return out
+
+
+def _parse_constraint(constraints):
+    out = {}
+    for c in constraints or []:
+        ctype = c.get("constraintType")
+        if not ctype:
+            continue
+        out[ctype] = {
+            "exp": round(c["exp"], 3) if isinstance(c.get("exp"), (int, float)) else c.get("exp"),
+            "obs": c.get("obs"),
+            "oe": round(c["oe"], 3) if isinstance(c.get("oe"), (int, float)) else c.get("oe"),
+        }
+    return out
+
+
+def _parse_pathways(pathways):
+    out = []
+    for p in pathways or []:
+        if not p:
+            continue
+        name = p.get("pathway")
+        pid = p.get("pathwayId")
+        if name and pid:
+            out.append({
+                "pathway": name,
+                "pathwayId": pid,
+                "topLevelTerm": p.get("topLevelTerm"),
+            })
+    return out
+
+
+def _parse_moa(moa):
+    out = {
+        "actionTypes": moa.get("uniqueActionTypes") or [],
+        "targetTypes": moa.get("uniqueTargetTypes") or [],
+        "rows": [],
+    }
+    for r in (moa.get("rows") or []):
+        if r and r.get("mechanismOfAction"):
+            out["rows"].append({
+                "mechanismOfAction": r.get("mechanismOfAction"),
+                "actionType": r.get("actionType"),
+            })
+    return out
+
+
+def _parse_clinical_reports(reports):
+    out = []
+    for r in reports or []:
+        if not r:
+            continue
+        out.append({
+            "id": r.get("id"),
+            "clinicalStage": r.get("clinicalStage"),
+            "trialPhase": r.get("trialPhase"),
+            "trialOverallStatus": r.get("trialOverallStatus"),
+            "url": r.get("url"),
+            "title": r.get("title"),
+            "year": r.get("year"),
+        })
+    return out
 
 
 def search_disease_genes(query: str, limit: int = 12) -> dict:

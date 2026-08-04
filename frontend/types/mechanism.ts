@@ -8,6 +8,9 @@ export interface MechanismOptions {
     defectTypes: MechanismOption[];
     silencingScopes: MechanismOption[];
   };
+  geneUpregulation: {
+    defectTypes: MechanismOption[];
+  };
   rnaProcessing: {
     spliceDefectTypes: MechanismOption[];
   };
@@ -50,7 +53,8 @@ export interface MechanismRankingResponse {
     spliceDefectType?: string;
     targetExon?: string | null;
     deliveryContext: string | null;
-    knownVariant: string | null;
+    knownVariant?: string | null;
+    knownRegulatoryElement?: string | null;
   };
   results: RankedMechanism[];
 }
@@ -65,6 +69,30 @@ export type TherapeuticGoalId =
   | "TG07"
   | "TG08"
   | "TG09";
+
+export interface MechanismFeature {
+  available: boolean;
+  reason: string;
+}
+
+export interface GeneFeatureWarning {
+  type: string;
+  severity: "high" | "medium" | "low";
+  message: string;
+}
+
+export interface GeneFeaturesResponse {
+  features: Record<string, MechanismFeature>;
+  warnings: GeneFeatureWarning[];
+  geneInfo: {
+    ensemblId: string | null;
+    transcriptCount: number;
+    exonCount: number | null;
+    hasIntrons: boolean;
+    hasNmdTranscripts: boolean;
+    overlappingNats: number;
+  };
+}
 
 export interface TherapeuticGoal {
   id: TherapeuticGoalId;

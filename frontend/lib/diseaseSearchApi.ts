@@ -22,6 +22,15 @@ export async function fetchDiseaseDetail(query: string): Promise<DiseaseDetailRe
       therapeuticAreas: [],
       genes: [],
       knownDrugs: [],
+      synonyms: [],
+      phenotypes: [],
+      relatedDiseases: [],
+      childDiseases: [],
+      databaseRefs: {},
+      literatureCount: null,
+      associatedTargetCount: null,
+      drugCandidateCount: null,
+      ancestors: [],
     };
   }
   return res.json();

@@ -5,22 +5,25 @@ Biological Information Retrieval Engine).
 
 Supports multiple therapeutic goals:
 - TG01: Gene Silencing (A1, A2, A12, A15, A21)
+- TG02: Gene Activation / Upregulation (A3, A4, A5, A6, A22, A23)
 - TG04: RNA Processing Modulation (A7, A8, A9, A10, A11)
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from typing import Optional
 
 from services.mechanism_service import (
     rank_gene_silencing_mechanisms,
+    rank_gene_upregulation_mechanisms,
     rank_rna_processing_mechanisms,
     DEFECT_TYPES,
     SILENCING_SCOPES,
+    GENE_UPREGULATION_DEFECT_TYPES,
     DELIVERY_CONTEXTS,
     SPLICE_DEFECT_TYPES,
 )
-from services.notification_service import add_notification
+from services.gene_feature_service import analyze_gene_features
 
 router = APIRouter()
 
@@ -31,6 +34,14 @@ class GeneSilencingRequest(BaseModel):
     silencing_scope: str
     delivery_context: Optional[str] = None
     known_variant: Optional[str] = None
+
+
+class GeneUpregulationRequest(BaseModel):
+    gene_symbol: str
+    defect_type: str
+    delivery_context: Optional[str] = None
+    known_regulatory_element: Optional[str] = None
+    gene_features: Optional[dict] = None
 
 
 class RnaProcessingRequest(BaseModel):
@@ -48,6 +59,9 @@ async def mechanism_options():
         "geneSilencing": {
             "defectTypes": [{"id": k, "label": v} for k, v in DEFECT_TYPES.items()],
             "silencingScopes": [{"id": k, "label": v} for k, v in SILENCING_SCOPES.items()],
+        },
+        "geneUpregulation": {
+            "defectTypes": [{"id": k, "label": v} for k, v in GENE_UPREGULATION_DEFECT_TYPES.items()],
         },
         "rnaProcessing": {
             "spliceDefectTypes": [{"id": k, "label": v} for k, v in SPLICE_DEFECT_TYPES.items()],
@@ -70,12 +84,6 @@ async def gene_silencing_mechanisms(payload: GeneSilencingRequest):
         known_variant=payload.known_variant,
     )
 
-    add_notification(
-        "analysis",
-        f"Ranked mechanisms for {payload.gene_symbol.upper()}",
-        f"{len(results)} mechanisms scored for gene silencing.",
-    )
-
     return {
         "geneSymbol": payload.gene_symbol.strip().upper(),
         "therapeuticGoal": "Gene Silencing",
@@ -84,6 +92,30 @@ async def gene_silencing_mechanisms(payload: GeneSilencingRequest):
             "silencingScope": payload.silencing_scope,
             "deliveryContext": payload.delivery_context,
             "knownVariant": payload.known_variant,
+        },
+        "results": results,
+    }
+
+
+@router.post("/api/mechanisms/gene-upregulation")
+async def gene_upregulation_mechanisms(payload: GeneUpregulationRequest):
+    if payload.defect_type not in GENE_UPREGULATION_DEFECT_TYPES:
+        raise HTTPException(status_code=400, detail=f"Unknown defect_type: {payload.defect_type}")
+
+    results = rank_gene_upregulation_mechanisms(
+        defect_type=payload.defect_type,
+        delivery_context=payload.delivery_context,
+        known_regulatory_element=payload.known_regulatory_element,
+        gene_features=payload.gene_features,
+    )
+
+    return {
+        "geneSymbol": payload.gene_symbol.strip().upper(),
+        "therapeuticGoal": "Gene Activation / Upregulation",
+        "inputs": {
+            "defectType": payload.defect_type,
+            "deliveryContext": payload.delivery_context,
+            "knownRegulatoryElement": payload.known_regulatory_element,
         },
         "results": results,
     }
@@ -104,12 +136,6 @@ async def rna_processing_mechanisms(payload: RnaProcessingRequest):
         known_variant=payload.known_variant,
     )
 
-    add_notification(
-        "analysis",
-        f"Ranked mechanisms for {payload.gene_symbol.upper()}",
-        f"{len(results)} mechanisms scored for RNA processing modulation.",
-    )
-
     return {
         "geneSymbol": payload.gene_symbol.strip().upper(),
         "therapeuticGoal": "RNA Processing Modulation",
@@ -121,3 +147,20 @@ async def rna_processing_mechanisms(payload: RnaProcessingRequest):
         },
         "results": results,
     }
+
+
+@router.get("/api/mechanisms/gene-features")
+async def gene_features(
+    gene_symbol: str = Query(..., description="Gene symbol to analyze"),
+    organism: str = Query("homo_sapiens", description="Species slug"),
+    ensembl_id: Optional[str] = Query(None, description="Ensembl gene ID (optional)"),
+    tissue_tpm: Optional[float] = Query(None, description="Baseline tissue TPM for overexpression warning"),
+):
+    """Analyze gene structural features to determine TG02 mechanism availability."""
+    result = analyze_gene_features(
+        gene_symbol=gene_symbol.strip(),
+        organism=organism.strip(),
+        ensembl_id=ensembl_id.strip() if ensembl_id else None,
+        tissue_tpm=tissue_tpm,
+    )
+    return result

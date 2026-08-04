@@ -1,374 +1,5 @@
 [
   {
-    "id": "n1785218205979",
-    "category": "analysis",
-    "title": "Ranked mechanisms for SPON2",
-    "detail": "5 mechanisms scored for gene silencing.",
-    "timestamp": 1785218205.979817,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785218316153",
-    "category": "analysis",
-    "title": "Generated 10 ASO candidates",
-    "detail": "Candidate design completed for ENSG00000159674.",
-    "timestamp": 1785218316.1530821,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785218365159",
-    "category": "analysis",
-    "title": "Generated 10 ASO candidates",
-    "detail": "Candidate design completed for ENSG00000159674.",
-    "timestamp": 1785218365.159756,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785218386061",
-    "category": "analysis",
-    "title": "Generated 10 ASO candidates",
-    "detail": "Candidate design completed for ENSG00000159674.",
-    "timestamp": 1785218386.061491,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785218433973",
-    "category": "analysis",
-    "title": "Generated 10 ASO candidates",
-    "detail": "Candidate design completed for ENSG00000159674.",
-    "timestamp": 1785218433.973512,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785218469208",
-    "category": "analysis",
-    "title": "Generated 10 ASO candidates",
-    "detail": "Candidate design completed for ENSG00000159674.",
-    "timestamp": 1785218469.208173,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785218481431",
-    "category": "analysis",
-    "title": "Generated 10 ASO candidates",
-    "detail": "Candidate design completed for ENSG00000159674.",
-    "timestamp": 1785218481.4317682,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785218492238",
-    "category": "analysis",
-    "title": "Generated 10 ASO candidates",
-    "detail": "Candidate design completed for ENSG00000159674.",
-    "timestamp": 1785218492.23865,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785218541189",
-    "category": "analysis",
-    "title": "Ranked mechanisms for SPON2",
-    "detail": "5 mechanisms scored for RNA processing modulation.",
-    "timestamp": 1785218541.189399,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785218597839",
-    "category": "analysis",
-    "title": "Generated 10 ASO candidates",
-    "detail": "Candidate design completed for ENSG00000159674.",
-    "timestamp": 1785218597.839374,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785218613924",
-    "category": "analysis",
-    "title": "Generated 10 ASO candidates",
-    "detail": "Candidate design completed for ENSG00000159674.",
-    "timestamp": 1785218613.924195,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785219212449",
-    "category": "analysis",
-    "title": "Sequence analysis completed",
-    "detail": "ASO analysis finished for a 31 nt sequence.",
-    "timestamp": 1785219212.4491441,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785219381794",
-    "category": "analysis",
-    "title": "Ranked mechanisms for SPON2",
-    "detail": "5 mechanisms scored for gene silencing.",
-    "timestamp": 1785219381.794785,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785219414064",
-    "category": "analysis",
-    "title": "Generated 10 ASO candidates",
-    "detail": "Candidate design completed for ENSG00000159674.",
-    "timestamp": 1785219414.0648499,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785219463460",
-    "category": "analysis",
-    "title": "Generated 10 ASO candidates",
-    "detail": "Candidate design completed for ENSG00000159674.",
-    "timestamp": 1785219463.460466,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785219803159",
-    "category": "analysis",
-    "title": "Ranked mechanisms for SPON2",
-    "detail": "5 mechanisms scored for gene silencing.",
-    "timestamp": 1785219803.159643,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785219881577",
-    "category": "analysis",
-    "title": "Generated 10 ASO candidates",
-    "detail": "Candidate design completed for ENSG00000159674.",
-    "timestamp": 1785219881.5775518,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785226508268",
-    "category": "analysis",
-    "title": "Ranked mechanisms for DMD",
-    "detail": "5 mechanisms scored for gene silencing.",
-    "timestamp": 1785226508.268065,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785226523021",
-    "category": "analysis",
-    "title": "Generated 10 ASO candidates",
-    "detail": "Candidate design completed for ENSG00000198947.",
-    "timestamp": 1785226523.021633,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785226538904",
-    "category": "analysis",
-    "title": "Generated 10 ASO candidates",
-    "detail": "Candidate design completed for ENSG00000198947.",
-    "timestamp": 1785226538.904526,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785226637544",
-    "category": "analysis",
-    "title": "Ranked mechanisms for FOXP3",
-    "detail": "5 mechanisms scored for gene silencing.",
-    "timestamp": 1785226637.544864,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785226645929",
-    "category": "analysis",
-    "title": "Ranked mechanisms for FOXP3",
-    "detail": "5 mechanisms scored for gene silencing.",
-    "timestamp": 1785226645.929087,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785226651895",
-    "category": "analysis",
-    "title": "Ranked mechanisms for FOXP3",
-    "detail": "5 mechanisms scored for gene silencing.",
-    "timestamp": 1785226651.895287,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785226656311",
-    "category": "analysis",
-    "title": "Ranked mechanisms for FOXP3",
-    "detail": "5 mechanisms scored for gene silencing.",
-    "timestamp": 1785226656.3113348,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785226661044",
-    "category": "analysis",
-    "title": "Ranked mechanisms for FOXP3",
-    "detail": "5 mechanisms scored for gene silencing.",
-    "timestamp": 1785226661.0441759,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785233217560",
-    "category": "analysis",
-    "title": "Gene lookup completed for il7",
-    "detail": "Retrieved data for il7 in homo sapiens.",
-    "timestamp": 1785233217.5608761,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785233282132",
-    "category": "analysis",
-    "title": "Gene lookup completed for il2ra",
-    "detail": "Retrieved data for il2ra in homo sapiens.",
-    "timestamp": 1785233282.132852,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785233513200",
-    "category": "analysis",
-    "title": "Gene lookup completed for il7",
-    "detail": "Retrieved data for il7 in homo sapiens.",
-    "timestamp": 1785233513.200187,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785233885208",
-    "category": "analysis",
-    "title": "Gene lookup completed for il7",
-    "detail": "Retrieved data for il7 in homo sapiens.",
-    "timestamp": 1785233885.208357,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785233911847",
-    "category": "analysis",
-    "title": "Gene lookup completed for il2ra",
-    "detail": "Retrieved data for il2ra in homo sapiens.",
-    "timestamp": 1785233911.847444,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785234001567",
-    "category": "analysis",
-    "title": "Gene lookup completed for col1a1",
-    "detail": "Retrieved data for col1a1 in homo sapiens.",
-    "timestamp": 1785234001.567992,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785234261882",
-    "category": "analysis",
-    "title": "Gene lookup completed for il2",
-    "detail": "Retrieved data for il2 in homo sapiens.",
-    "timestamp": 1785234261.882234,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785234309304",
-    "category": "analysis",
-    "title": "Gene lookup completed for gapdh",
-    "detail": "Retrieved data for gapdh in homo sapiens.",
-    "timestamp": 1785234309.304526,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785234804670",
-    "category": "analysis",
-    "title": "Gene lookup completed for foxp3",
-    "detail": "Retrieved data for foxp3 in homo sapiens.",
-    "timestamp": 1785234804.670061,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785234852244",
-    "category": "analysis",
-    "title": "Gene lookup completed for dmd",
-    "detail": "Retrieved data for dmd in homo sapiens.",
-    "timestamp": 1785234852.244192,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785239589368",
-    "category": "analysis",
-    "title": "Gene lookup completed for foxp3",
-    "detail": "Retrieved data for foxp3 in homo sapiens.",
-    "timestamp": 1785239589.368106,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785239662960",
-    "category": "analysis",
-    "title": "Ranked mechanisms for FOXP3",
-    "detail": "5 mechanisms scored for gene silencing.",
-    "timestamp": 1785239662.9600582,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785239677138",
-    "category": "analysis",
-    "title": "Ranked mechanisms for FOXP3",
-    "detail": "5 mechanisms scored for gene silencing.",
-    "timestamp": 1785239677.138528,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785239689736",
-    "category": "analysis",
-    "title": "Ranked mechanisms for FOXP3",
-    "detail": "5 mechanisms scored for gene silencing.",
-    "timestamp": 1785239689.7362292,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785239706665",
-    "category": "analysis",
-    "title": "Generated 10 ASO candidates",
-    "detail": "Candidate design completed for ENSG00000049768.",
-    "timestamp": 1785239706.665932,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785239708526",
-    "category": "analysis",
-    "title": "Generated 10 ASO candidates",
-    "detail": "Candidate design completed for ENSG00000049768.",
-    "timestamp": 1785239708.526099,
-    "read": false,
-    "meta": {}
-  },
-  {
     "id": "n1785265443728",
     "category": "analysis",
     "title": "Gene lookup completed for il7",
@@ -1427,6 +1058,744 @@
     "title": "Gene lookup completed for foxp3",
     "detail": "Retrieved data for foxp3 in homo sapiens.",
     "timestamp": 1785347211.803582,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785383309708",
+    "category": "analysis",
+    "title": "Gene lookup completed for dmd",
+    "detail": "Retrieved data for dmd in homo sapiens.",
+    "timestamp": 1785383309.708767,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785383370091",
+    "category": "analysis",
+    "title": "Gene lookup completed for DMD",
+    "detail": "Retrieved data for DMD in homo sapiens.",
+    "timestamp": 1785383370.091601,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785425411129",
+    "category": "analysis",
+    "title": "Gene lookup completed for ADAM10",
+    "detail": "Retrieved data for ADAM10 in homo sapiens.",
+    "timestamp": 1785425411.1298912,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785425528685",
+    "category": "analysis",
+    "title": "Gene lookup completed for adam10",
+    "detail": "Retrieved data for adam10 in homo sapiens.",
+    "timestamp": 1785425528.6858299,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785425552112",
+    "category": "analysis",
+    "title": "Ranked mechanisms for ADAM10",
+    "detail": "5 mechanisms scored for gene silencing.",
+    "timestamp": 1785425552.1129868,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785425577178",
+    "category": "analysis",
+    "title": "Ranked mechanisms for ADAM10",
+    "detail": "5 mechanisms scored for gene silencing.",
+    "timestamp": 1785425577.178472,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785425627119",
+    "category": "analysis",
+    "title": "Generated 10 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000137845.",
+    "timestamp": 1785425627.119765,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785425641779",
+    "category": "analysis",
+    "title": "Generated 10 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000137845.",
+    "timestamp": 1785425641.779644,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785425650888",
+    "category": "analysis",
+    "title": "Generated 10 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000137845.",
+    "timestamp": 1785425650.8882601,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785425699640",
+    "category": "analysis",
+    "title": "Generated 10 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000137845.",
+    "timestamp": 1785425699.6409311,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785425733675",
+    "category": "analysis",
+    "title": "Generated 7 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000137845.",
+    "timestamp": 1785425733.675606,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785425744278",
+    "category": "analysis",
+    "title": "Generated 10 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000137845.",
+    "timestamp": 1785425744.278174,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785427043729",
+    "category": "analysis",
+    "title": "Gene lookup completed for dmd",
+    "detail": "Retrieved data for dmd in homo sapiens.",
+    "timestamp": 1785427043.729779,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785427074203",
+    "category": "analysis",
+    "title": "Ranked mechanisms for DMD",
+    "detail": "5 mechanisms scored for gene silencing.",
+    "timestamp": 1785427074.203696,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785427098009",
+    "category": "analysis",
+    "title": "Generated 10 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000198947.",
+    "timestamp": 1785427098.00953,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785427424772",
+    "category": "analysis",
+    "title": "Generated 10 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000198947.",
+    "timestamp": 1785427424.772099,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785427618128",
+    "category": "analysis",
+    "title": "Generated 10 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000198947.",
+    "timestamp": 1785427618.1287732,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785427632546",
+    "category": "analysis",
+    "title": "Generated 10 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000198947.",
+    "timestamp": 1785427632.5466828,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785427641866",
+    "category": "analysis",
+    "title": "Generated 10 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000198947.",
+    "timestamp": 1785427641.866092,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785427665387",
+    "category": "analysis",
+    "title": "Generated 10 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000198947.",
+    "timestamp": 1785427665.387381,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785427686935",
+    "category": "analysis",
+    "title": "Generated 10 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000198947.",
+    "timestamp": 1785427686.935165,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785427709575",
+    "category": "analysis",
+    "title": "Generated 10 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000198947.",
+    "timestamp": 1785427709.575982,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785427724372",
+    "category": "analysis",
+    "title": "Generated 10 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000198947.",
+    "timestamp": 1785427724.372351,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785428854162",
+    "category": "analysis",
+    "title": "Gene lookup completed for dmd",
+    "detail": "Retrieved data for dmd in homo sapiens.",
+    "timestamp": 1785428854.1623309,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785428977755",
+    "category": "analysis",
+    "title": "Gene lookup completed for DMD",
+    "detail": "Retrieved data for DMD in homo sapiens.",
+    "timestamp": 1785428977.755358,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785429047342",
+    "category": "analysis",
+    "title": "Ranked mechanisms for DMD",
+    "detail": "5 mechanisms scored for gene silencing.",
+    "timestamp": 1785429047.342674,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785429121037",
+    "category": "analysis",
+    "title": "Generated 10 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000198947.",
+    "timestamp": 1785429121.037187,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785430174343",
+    "category": "analysis",
+    "title": "Gene lookup completed for dmd",
+    "detail": "Retrieved data for dmd in homo sapiens.",
+    "timestamp": 1785430174.3439171,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785430210998",
+    "category": "analysis",
+    "title": "Ranked mechanisms for DMD",
+    "detail": "5 mechanisms scored for gene silencing.",
+    "timestamp": 1785430210.998146,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785431428773",
+    "category": "analysis",
+    "title": "Gene lookup completed for dmd",
+    "detail": "Retrieved data for dmd in homo sapiens.",
+    "timestamp": 1785431428.773501,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785431624873",
+    "category": "analysis",
+    "title": "Gene lookup completed for gapdh",
+    "detail": "Retrieved data for gapdh in homo sapiens.",
+    "timestamp": 1785431624.873325,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785729054144",
+    "category": "analysis",
+    "title": "Gene lookup completed for dmd",
+    "detail": "Retrieved data for dmd in homo sapiens.",
+    "timestamp": 1785729054.144746,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785736216846",
+    "category": "analysis",
+    "title": "Gene lookup completed for dmd",
+    "detail": "Retrieved data for dmd in homo sapiens.",
+    "timestamp": 1785736216.846307,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785736241899",
+    "category": "analysis",
+    "title": "Gene lookup completed for foxp3",
+    "detail": "Retrieved data for foxp3 in homo sapiens.",
+    "timestamp": 1785736241.89901,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785736826291",
+    "category": "analysis",
+    "title": "Gene lookup completed for dmd",
+    "detail": "Retrieved data for dmd in homo sapiens.",
+    "timestamp": 1785736826.291314,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785736830130",
+    "category": "analysis",
+    "title": "Gene lookup completed for spon2",
+    "detail": "Retrieved data for spon2 in homo sapiens.",
+    "timestamp": 1785736830.1304278,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785737089412",
+    "category": "analysis",
+    "title": "Gene lookup completed for SPON2",
+    "detail": "Retrieved data for SPON2 in homo sapiens.",
+    "timestamp": 1785737089.412553,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785737368763",
+    "category": "analysis",
+    "title": "Gene lookup completed for dmd",
+    "detail": "Retrieved data for dmd in homo sapiens.",
+    "timestamp": 1785737368.7636201,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785737374329",
+    "category": "analysis",
+    "title": "Gene lookup completed for spon2",
+    "detail": "Retrieved data for spon2 in homo sapiens.",
+    "timestamp": 1785737374.329333,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785737423108",
+    "category": "analysis",
+    "title": "Gene lookup completed for DMD",
+    "detail": "Retrieved data for DMD in homo sapiens.",
+    "timestamp": 1785737423.1080031,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785737494080",
+    "category": "analysis",
+    "title": "Gene lookup completed for spon2",
+    "detail": "Retrieved data for spon2 in homo sapiens.",
+    "timestamp": 1785737494.0802612,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785737909712",
+    "category": "analysis",
+    "title": "Gene lookup completed for dmd",
+    "detail": "Retrieved data for dmd in homo sapiens.",
+    "timestamp": 1785737909.712184,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785738144311",
+    "category": "analysis",
+    "title": "Gene lookup completed for dmd",
+    "detail": "Retrieved data for dmd in homo sapiens.",
+    "timestamp": 1785738144.311296,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785738598798",
+    "category": "analysis",
+    "title": "Gene lookup completed for DMD",
+    "detail": "Retrieved data for DMD in homo sapiens.",
+    "timestamp": 1785738598.798013,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785739275893",
+    "category": "analysis",
+    "title": "Gene lookup completed for EDNRA",
+    "detail": "Retrieved data for EDNRA in homo sapiens.",
+    "timestamp": 1785739275.893844,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785739873438",
+    "category": "analysis",
+    "title": "Gene lookup completed for EDNRA",
+    "detail": "Retrieved data for EDNRA in homo sapiens.",
+    "timestamp": 1785739873.4381719,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785743796238",
+    "category": "analysis",
+    "title": "Gene lookup completed for EDNRA",
+    "detail": "Retrieved data for EDNRA in homo sapiens.",
+    "timestamp": 1785743796.238785,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785744130508",
+    "category": "analysis",
+    "title": "Gene lookup completed for dmd",
+    "detail": "Retrieved data for dmd in homo sapiens.",
+    "timestamp": 1785744130.508024,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785744181825",
+    "category": "analysis",
+    "title": "Gene lookup completed for EDNRA",
+    "detail": "Retrieved data for EDNRA in homo sapiens.",
+    "timestamp": 1785744181.8253329,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785745869665",
+    "category": "analysis",
+    "title": "Gene lookup completed for dmd",
+    "detail": "Retrieved data for dmd in homo sapiens.",
+    "timestamp": 1785745869.665183,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785745876467",
+    "category": "analysis",
+    "title": "Gene lookup completed for EDNRA",
+    "detail": "Retrieved data for EDNRA in homo sapiens.",
+    "timestamp": 1785745876.467188,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785745908930",
+    "category": "analysis",
+    "title": "Generated 7 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000151617.",
+    "timestamp": 1785745908.93088,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785745919271",
+    "category": "analysis",
+    "title": "Generated 7 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000151617.",
+    "timestamp": 1785745919.271542,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785745930498",
+    "category": "analysis",
+    "title": "Generated 7 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000151617.",
+    "timestamp": 1785745930.498084,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785745939477",
+    "category": "analysis",
+    "title": "Generated 7 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000151617.",
+    "timestamp": 1785745939.477487,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785745945923",
+    "category": "analysis",
+    "title": "Generated 7 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000151617.",
+    "timestamp": 1785745945.923765,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785745954868",
+    "category": "analysis",
+    "title": "Generated 7 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000151617.",
+    "timestamp": 1785745954.868924,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785746066982",
+    "category": "analysis",
+    "title": "Generated 7 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000151617.",
+    "timestamp": 1785746066.982583,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785746120805",
+    "category": "analysis",
+    "title": "Gene lookup completed for dmd",
+    "detail": "Retrieved data for dmd in homo sapiens.",
+    "timestamp": 1785746120.805591,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785746388649",
+    "category": "analysis",
+    "title": "Generated 10 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000198947.",
+    "timestamp": 1785746388.64963,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785746395700",
+    "category": "analysis",
+    "title": "Generated 10 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000198947.",
+    "timestamp": 1785746395.700487,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785746578907",
+    "category": "analysis",
+    "title": "Gene lookup completed for dmd",
+    "detail": "Retrieved data for dmd in homo sapiens.",
+    "timestamp": 1785746578.9073348,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785747184917",
+    "category": "analysis",
+    "title": "Gene lookup completed for dmd",
+    "detail": "Retrieved data for dmd in homo sapiens.",
+    "timestamp": 1785747184.917207,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785747348164",
+    "category": "analysis",
+    "title": "Generated 10 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000198947.",
+    "timestamp": 1785747348.1640792,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785747371348",
+    "category": "analysis",
+    "title": "Generated 10 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000198947.",
+    "timestamp": 1785747371.3481321,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785747383194",
+    "category": "analysis",
+    "title": "Generated 10 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000198947.",
+    "timestamp": 1785747383.1941812,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785747392644",
+    "category": "analysis",
+    "title": "Generated 10 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000198947.",
+    "timestamp": 1785747392.644567,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785747418661",
+    "category": "analysis",
+    "title": "Generated 10 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000198947.",
+    "timestamp": 1785747418.661854,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785747430917",
+    "category": "analysis",
+    "title": "Generated 10 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000198947.",
+    "timestamp": 1785747430.9179652,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785747473848",
+    "category": "analysis",
+    "title": "Generated 10 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000198947.",
+    "timestamp": 1785747473.848086,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785747483383",
+    "category": "analysis",
+    "title": "Generated 10 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000198947.",
+    "timestamp": 1785747483.383113,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785747504558",
+    "category": "analysis",
+    "title": "Generated 10 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000198947.",
+    "timestamp": 1785747504.558896,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785747563436",
+    "category": "analysis",
+    "title": "Gene lookup completed for dmd",
+    "detail": "Retrieved data for dmd in homo sapiens.",
+    "timestamp": 1785747563.436416,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785747621370",
+    "category": "analysis",
+    "title": "Gene lookup completed for snai1",
+    "detail": "Retrieved data for snai1 in homo sapiens.",
+    "timestamp": 1785747621.370687,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785747638303",
+    "category": "analysis",
+    "title": "Gene lookup completed for snai1",
+    "detail": "Retrieved data for snai1 in mus musculus.",
+    "timestamp": 1785747638.303689,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785747741260",
+    "category": "analysis",
+    "title": "Generated 10 ASO candidates",
+    "detail": "Candidate design completed for ENSMUSG00000042821.",
+    "timestamp": 1785747741.260183,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785747771403",
+    "category": "analysis",
+    "title": "Generated 10 ASO candidates",
+    "detail": "Candidate design completed for ENSMUSG00000042821.",
+    "timestamp": 1785747771.403035,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785747978350",
+    "category": "analysis",
+    "title": "Gene lookup completed for dmd",
+    "detail": "Retrieved data for dmd in homo sapiens.",
+    "timestamp": 1785747978.350923,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785749203061",
+    "category": "analysis",
+    "title": "Gene lookup completed for smn1",
+    "detail": "Retrieved data for smn1 in homo sapiens.",
+    "timestamp": 1785749203.061806,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785749355878",
+    "category": "analysis",
+    "title": "Gene lookup completed for HTT",
+    "detail": "Retrieved data for HTT in homo sapiens.",
+    "timestamp": 1785749355.878338,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785749935906",
+    "category": "analysis",
+    "title": "Generated 10 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000172062.",
+    "timestamp": 1785749935.9065201,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1785808635503",
+    "category": "analysis",
+    "title": "Gene lookup completed for dmd",
+    "detail": "Retrieved data for dmd in homo sapiens.",
+    "timestamp": 1785808635.503086,
     "read": false,
     "meta": {}
   }

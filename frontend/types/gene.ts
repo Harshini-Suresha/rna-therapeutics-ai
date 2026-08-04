@@ -266,4 +266,20 @@ export interface GeneTargetObject {
     frameshiftMutations: number | null;
     spliceSiteMutations: number | null;
   };
+
+  // Therapeutic mechanism documentation (TG02 gene silencing / upregulation)
+  documentation?: {
+    title: string;
+    subtitle: string;
+    mechanisms: {
+      code: string;
+      name: string;
+      description: string;
+      biologicalLogic: string;
+      mechanismDetail: string;
+      clinicalExample?: string;
+      primaryTargetRegion: string;
+      modalityType: string;
+    }[];
+  } | null;
 }

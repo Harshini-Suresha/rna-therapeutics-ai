@@ -110,6 +110,8 @@ export default function AssoCandidateCard({
                 <span className="text-[13px] font-semibold text-slate-800">{candidate.chemistry.toUpperCase()}</span>
                 <span className="text-[11px] text-slate-400">·</span>
                 <span className="text-[11px] text-slate-500">{candidate.length} nt</span>
+                <span className="text-[11px] text-slate-400">·</span>
+                <span className="rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-600">{candidate.mechanismId}</span>
                 <ConfidenceBadge score={candidate.qualityScore} />
               </div>
               <p className="text-[10.5px] text-slate-400 mt-0.5">{candidate.targetRegion}</p>
@@ -243,6 +245,13 @@ export default function AssoCandidateCard({
               <Td label="Poly-G Penalty" value={`-${candidate.polygPenalty}`} warn={candidate.polygPenalty > 0} />
               {candidate.chemBonus !== 0 && <Td label="Chemistry Bonus" value={`+${candidate.chemBonus}`} />}
               {candidate.modBonus !== 0 && <Td label="Modification Bonus" value={`+${candidate.modBonus}`} />}
+              {candidate.mechanismBonus !== 0 && <Td label="Mechanism Bonus" value={`${candidate.mechanismBonus > 0 ? "+" : ""}${candidate.mechanismBonus}`} />}
+              {candidate.mechanismNotes && (
+                <tr className="border-b border-slate-100">
+                  <td className="py-1.5 pr-4 text-[11px] text-slate-500">Mechanism Notes</td>
+                  <td className="py-1.5 text-right text-[10.5px] text-slate-500 italic max-w-[250px]">{candidate.mechanismNotes}</td>
+                </tr>
+              )}
               {candidate.cpgPenalty > 0 && <Td label="CpG Immune Penalty" value={`-${candidate.cpgPenalty}`} warn />}
 
               {/* ALLELE-SPECIFIC */}
@@ -276,15 +285,16 @@ export default function AssoCandidateCard({
               <div>
                 <p className="font-bold text-slate-700 mb-1">Composite Quality Score</p>
                 <code className="block rounded bg-slate-100 px-3 py-2 text-[10px] font-mono text-slate-600">
-                  Score = GC×0.30 + Tm×0.40 − SelfDimer×200 − PolyG×15 + ChemBonus + ModBonus − CpG + TissueAdjustments + DefectAdjustments + AlleleBonus
+                  Score = GC×0.30 + Tm×0.40 − SelfDimer×200 − PolyG×15 + ChemBonus + ModBonus − CpG + TissueAdjustments + DefectAdjustments + MechBonus + AlleleBonus
                 </code>
                 <ul className="mt-1.5 space-y-0.5 text-[10px]">
                   <li><strong>GC Content (×0.30):</strong> max(0, 100 − |GC% − 50%| × 400). Peaks at 50%.</li>
                   <li><strong>Melting Temp (×0.40):</strong> max(0, 100 − |Tm − 52°C| × 3). Peaks at 52°C.</li>
                   <li><strong>Self-dimer:</strong> Fraction of palindromic 4-mers × 200.</li>
                   <li><strong>Poly-G:</strong> Count of G-tracts (≥3 consecutive G) × 15.</li>
-                  <li><strong>Chemistry:</strong> LNA +5, 2'-OMe +3, siRNA +2, PMO −3.</li>
-                  <li><strong>Modifications:</strong> PS +4, LNA wings +5, 2'-OMe +3, PMO core +2, PNA +3.</li>
+                  <li><strong>Chemistry:</strong> LNA +15, Gapmer +10, siRNA +8, 2'-OMe +5, PMO −5.</li>
+                  <li><strong>Modifications:</strong> PS +10, LNA wings +12, PNA +8, 2'-OMe +7, PMO core +6.</li>
+                  <li><strong>Mechanism:</strong> A1 (RNase H): gapmer/LNA +12, PMO/2'-OMe −8. A2 (Translation): PMO/2'-OMe +10, gapmer −5. A21 (siRNA): siRNA +15, wrong chem −15.</li>
                   <li><strong>CpG:</strong> (count − 2) × 5 if {'>'}2 CpGs (TLR9 immune stimulation).</li>
                   <li><strong>Allele-Specific:</strong> +5 to +20 for SNPs, +10 for indels, +5 bonus for gapmer+PS chemistry.</li>
                 </ul>

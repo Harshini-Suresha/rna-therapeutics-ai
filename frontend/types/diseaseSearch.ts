@@ -4,6 +4,13 @@ export interface DiseaseGeneMatch {
   ensemblId: string | null;
   score: number | null;
   biotype?: string | null;
+  function?: string | null;
+  evidence?: Record<string, number>;
+  targetClass?: string[];
+  tractability?: { modality: string; label: string }[];
+  constraint?: Record<string, { exp: number | null; obs: number | null; oe: number | null }>;
+  mousePhenotypes?: string[];
+  pathways?: { pathway: string; pathwayId: string; topLevelTerm?: string | null }[];
 }
 
 export interface DiseaseSearchResponse {
@@ -12,11 +19,28 @@ export interface DiseaseSearchResponse {
   genes: DiseaseGeneMatch[];
 }
 
+export interface ClinicalReport {
+  id?: string | null;
+  clinicalStage?: string | null;
+  trialPhase?: string | null;
+  trialOverallStatus?: string | null;
+  url?: string | null;
+  title?: string | null;
+  year?: number | null;
+}
+
 export interface KnownDrug {
   name: string;
   mechanismOfAction: string | null;
   phase: number | null;
   status: string | null;
+  drugType?: string | null;
+  mechanismsOfAction?: {
+    actionTypes?: string[];
+    targetTypes?: string[];
+    rows?: { mechanismOfAction: string; actionType?: string | null }[];
+  };
+  clinicalReports?: ClinicalReport[];
 }
 
 export interface DiseaseDetailResponse {
@@ -31,4 +55,8 @@ export interface DiseaseDetailResponse {
   relatedDiseases: { id: string; score: number }[];
   childDiseases: { id: string; name: string }[];
   databaseRefs: Record<string, string>;
+  literatureCount?: number | null;
+  associatedTargetCount?: number | null;
+  drugCandidateCount?: number | null;
+  ancestors?: { id: string; name: string }[];
 }

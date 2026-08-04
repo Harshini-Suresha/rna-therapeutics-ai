@@ -7,22 +7,81 @@ for a target exon, and computes biophysical metrics (GC%, Tm, self-dimer risk).
 
 from __future__ import annotations
 
+import logging
 import re
+import time
 import requests
 
 ENSEMBL_REST = "https://rest.ensembl.org"
+MAX_RETRIES = 3
+RETRY_BACKOFF = 1.5  # seconds
+
+logger = logging.getLogger(__name__)
 
 
-def _ensembl_get(url: str, timeout: int = 15) -> requests.Response:
-    return requests.get(url, headers={"Content-Type": "application/json"}, timeout=timeout)
+def _ensembl_get(url: str, timeout: int = 20, retries: int = MAX_RETRIES) -> requests.Response:
+    """GET with retries and exponential backoff for transient Ensembl failures."""
+    last_exc = None
+    for attempt in range(1, retries + 1):
+        try:
+            resp = requests.get(url, headers={"Accept": "application/json"}, timeout=timeout)
+            if resp.ok or resp.status_code == 404:
+                return resp
+            if resp.status_code == 429:
+                # Rate-limited — honour Retry-After or back off
+                retry_after = resp.headers.get("Retry-After")
+                wait = float(retry_after) if retry_after else RETRY_BACKOFF * (2 ** (attempt - 1))
+                logger.warning("Ensembl rate-limited (attempt %d/%d), waiting %.1fs", attempt, retries, wait)
+                time.sleep(wait)
+                continue
+            if resp.status_code >= 500:
+                last_exc = RuntimeError(f"HTTP {resp.status_code}")
+                wait = RETRY_BACKOFF * (2 ** (attempt - 1))
+                logger.warning("Ensembl returned %d (attempt %d/%d), retrying in %.1fs",
+                               resp.status_code, attempt, retries, wait)
+                time.sleep(wait)
+                continue
+            # Client errors other than 404/429 — return as-is
+            return resp
+        except requests.RequestException as exc:
+            last_exc = exc
+            if attempt < retries:
+                wait = RETRY_BACKOFF * (2 ** (attempt - 1))
+                logger.warning("Ensembl request failed (attempt %d/%d), retrying in %.1fs: %s",
+                               attempt, retries, wait, exc)
+                time.sleep(wait)
+    raise RuntimeError(f"Ensembl request failed after {retries} attempts: {last_exc}")
+
+
+def _parse_exons_from_transcript(transcript: dict) -> list[dict]:
+    """Extract and sort exon list from an Ensembl transcript object."""
+    exons = transcript.get("Exon", [])
+    strand = transcript.get("strand", 1)
+    sorted_exons = sorted(exons, key=lambda e: e.get("start", 0), reverse=(strand == -1))
+    return [
+        {
+            "id": e.get("id"),
+            "index": idx + 1,
+            "start": e.get("start"),
+            "end": e.get("end"),
+            "length": (e.get("end", 0) - e.get("start", 0) + 1),
+        }
+        for idx, e in enumerate(sorted_exons)
+        if e.get("start") and e.get("end")
+    ]
 
 
 # ---------------------------------------------------------------------------
 # 1. Target Analysis — transcript / exon structure for the confirmed gene
 # ---------------------------------------------------------------------------
 
-def get_target_analysis(ensembl_gene_id: str) -> dict:
-    """Return transcript and exon structure for the gene."""
+def get_target_analysis(ensembl_gene_id: str, gene_symbol: str = "", organism: str = "") -> dict:
+    """Return transcript and exon structure for the gene.
+
+    Uses the Ensembl /lookup/id endpoint with ``expand=1`` to retrieve exon
+    coordinates for the canonical (or first coding) transcript.  Falls back to
+    a symbol-based lookup when the ID lookup returns no exon data.
+    """
     result = {
         "geneId": ensembl_gene_id,
         "canonicalTranscript": None,
@@ -32,55 +91,85 @@ def get_target_analysis(ensembl_gene_id: str) -> dict:
         "mrnaSequence": None,
     }
 
+    # --- Primary: lookup by Ensembl gene ID ---
     try:
         resp = _ensembl_get(f"{ENSEMBL_REST}/lookup/id/{ensembl_gene_id}?expand=1")
-        if not resp.ok:
-            return result
-        data = resp.json()
+        if resp.ok:
+            data = resp.json()
+            transcripts = data.get("Transcript", [])
+            coding = [t for t in transcripts if t.get("biotype") == "protein_coding"]
+            result["totalCodingTranscripts"] = len(coding)
 
-        transcripts = data.get("Transcript", [])
-        coding = [t for t in transcripts if t.get("biotype") == "protein_coding"]
-        result["totalCodingTranscripts"] = len(coding)
+            canonical_id = data.get("canonical_transcript", "")
+            canonical = None
+            for t in coding:
+                if t.get("id", "").split(".")[0] == canonical_id.split(".")[0]:
+                    canonical = t
+                    break
+            if not canonical and coding:
+                canonical = coding[0]
 
-        canonical_id = data.get("canonical_transcript", "")
-        canonical = None
-        for t in coding:
-            if t.get("id", "").split(".")[0] == canonical_id.split(".")[0]:
-                canonical = t
-                break
-        if not canonical and coding:
-            canonical = coding[0]
-
-        if canonical:
-            result["canonicalTranscript"] = {
-                "id": canonical.get("id"),
-                "biotype": canonical.get("biotype"),
-            }
-            exons = canonical.get("Exon", [])
-            # Sort by genomic start position — exons don't come pre-ranked
-            strand = canonical.get("strand", 1)
-            sorted_exons = sorted(exons, key=lambda e: e.get("start", 0), reverse=(strand == -1))
-            result["exons"] = [
-                {
-                    "id": e.get("id"),
-                    "index": idx + 1,
-                    "start": e.get("start"),
-                    "end": e.get("end"),
-                    "length": (e.get("end", 0) - e.get("start", 0) + 1),
+            if canonical:
+                result["canonicalTranscript"] = {
+                    "id": canonical.get("id"),
+                    "biotype": canonical.get("biotype"),
                 }
-                for idx, e in enumerate(sorted_exons)
-                if e.get("start") and e.get("end")
-            ]
+                result["exons"] = _parse_exons_from_transcript(canonical)
 
-            # Fetch CDS length from the sequence endpoint
-            tid = canonical.get("id", "").split(".")[0]
-            seq_resp = _ensembl_get(f"{ENSEMBL_REST}/sequence/id/{tid}?type=cds")
-            if seq_resp.ok:
-                seq = seq_resp.json().get("seq", "")
-                result["cdsLength"] = len(seq)
-                result["mrnaSequence"] = seq
-    except Exception:
-        pass
+                # Fetch CDS length from the sequence endpoint
+                tid = canonical.get("id", "").split(".")[0]
+                try:
+                    seq_resp = _ensembl_get(f"{ENSEMBL_REST}/sequence/id/{tid}?type=cds")
+                    if seq_resp.ok:
+                        seq = seq_resp.json().get("seq", "")
+                        result["cdsLength"] = len(seq)
+                        result["mrnaSequence"] = seq
+                except Exception as exc:
+                    logger.warning("CDS sequence fetch failed for %s: %s", tid, exc)
+        else:
+            logger.warning("Ensembl ID lookup returned HTTP %d for %s", resp.status_code, ensembl_gene_id)
+    except Exception as exc:
+        logger.warning("Ensembl ID lookup failed for %s: %s", ensembl_gene_id, exc)
+
+    # --- Fallback: if no exons retrieved, try symbol-based lookup ---
+    if not result["exons"] and gene_symbol:
+        logger.info("No exons from ID lookup, trying symbol fallback for %s", gene_symbol)
+        species = (organism or "homo_sapiens").lower().replace(" ", "_")
+        try:
+            sym_resp = _ensembl_get(
+                f"{ENSEMBL_REST}/lookup/symbol/{species}/{gene_symbol}?expand=1"
+            )
+            if sym_resp.ok:
+                sym_data = sym_resp.json()
+                transcripts = sym_data.get("Transcript", [])
+                coding = [t for t in transcripts if t.get("biotype") == "protein_coding"]
+                result["totalCodingTranscripts"] = len(coding)
+
+                canonical = next((t for t in coding if t.get("is_canonical")), coding[0] if coding else None)
+                if canonical:
+                    result["canonicalTranscript"] = {
+                        "id": canonical.get("id"),
+                        "biotype": canonical.get("biotype"),
+                    }
+                    result["exons"] = _parse_exons_from_transcript(canonical)
+
+                    if not result["cdsLength"]:
+                        tid = canonical.get("id", "").split(".")[0]
+                        try:
+                            seq_resp = _ensembl_get(f"{ENSEMBL_REST}/sequence/id/{tid}?type=cds")
+                            if seq_resp.ok:
+                                seq = seq_resp.json().get("seq", "")
+                                result["cdsLength"] = len(seq)
+                                result["mrnaSequence"] = seq
+                        except Exception as exc:
+                            logger.warning("CDS sequence fetch failed (symbol fallback) for %s: %s", tid, exc)
+            else:
+                logger.warning("Ensembl symbol lookup returned HTTP %d for %s", sym_resp.status_code, gene_symbol)
+        except Exception as exc:
+            logger.warning("Ensembl symbol lookup failed for %s: %s", gene_symbol, exc)
+
+    if not result["exons"]:
+        logger.error("No exon data retrieved for gene %s (ID: %s)", gene_symbol or "?", ensembl_gene_id)
 
     return result
 
@@ -373,26 +462,26 @@ def _tissue_scores(delivery_context: str | None, chemistry: str, length: int) ->
     """
     ctx = (delivery_context or "").lower().strip()
 
-    # Default tissue profiles: uptake, bbb, immune
+    # Default tissue profiles: uptake, bbb, immune — amplified for meaningful scoring
     tissue_profiles = {
-        "liver":        {"uptake": 15, "bbb": 0,  "immune": -5, "notes": "High hepatic uptake; PNPLA3 and ASGR-mediated endocytosis favor liver ASOs."},
-        "kidney":       {"uptake": 10, "bbb": 0,  "immune": 0,  "notes": "Good renal tubular uptake but rapid glomerular filtration clearance."},
-        "cns":          {"uptake": -10, "bbb": 20, "immune": -10, "notes": "Requires BBB crossing; intrathecal delivery common. PMO+CPP or LNA preferred."},
-        "brain":        {"uptake": -10, "bbb": 20, "immune": -10, "notes": "Requires BBB crossing; intrathecal delivery common. PMO+CPP or LNA preferred."},
-        "muscle":       {"uptake": 5, "bbb": 0,  "immune": 0,  "notes": "Moderate uptake; large tissue mass dilutes dose. DMD exon-skipping validated."},
-        "skeletal muscle": {"uptake": 5, "bbb": 0, "immune": 0, "notes": "Moderate uptake; large tissue mass dilutes dose. DMD exon-skipping validated."},
-        "heart":        {"uptake": 3, "bbb": 0,  "immune": -3, "notes": "Limited cardiac uptake; systemic delivery reaches myocardium at high doses."},
-        "lung":         {"uptake": 8, "bbb": 0,  "immune": 5,  "notes": "Accessible via inhalation; mucus barrier for systemic delivery. Good for local."},
-        "eye":          {"uptake": 12, "bbb": 0,  "immune": 15, "notes": "Immune-privileged site; intravitreal delivery. Local exposure with minimal systemic."},
-        "retina":       {"uptake": 12, "bbb": 0,  "immune": 15, "notes": "Immune-privileged site; intravitreal delivery. Local exposure with minimal systemic."},
-        "spinal cord":  {"uptake": -5, "bbb": 15, "immune": -5, "notes": "Intrathecal delivery required; limited diffusion from CSF."},
-        "tumor":        {"uptake": 5, "bbb": 0,  "immune": 10, "notes": "Tumor microenvironment may enhance uptake; immune stimulation can be beneficial."},
-        "blood":        {"uptake": 8, "bbb": 0,  "immune": 8,  "notes": "Hematopoietic cells readily take up ASOs; immune stimulation risk."},
-        "bone marrow":  {"uptake": 8, "bbb": 0,  "immune": 8,  "notes": "Hematopoietic cells readily take up ASOs; immune stimulation risk."},
+        "liver":        {"uptake": 20, "bbb": 0,  "immune": -8, "notes": "High hepatic uptake; PNPLA3 and ASGR-mediated endocytosis favor liver ASOs."},
+        "kidney":       {"uptake": 15, "bbb": 0,  "immune": 0,  "notes": "Good renal tubular uptake but rapid glomerular filtration clearance."},
+        "cns":          {"uptake": -15, "bbb": 25, "immune": -12, "notes": "Requires BBB crossing; intrathecal delivery common. PMO+CPP or LNA preferred."},
+        "brain":        {"uptake": -15, "bbb": 25, "immune": -12, "notes": "Requires BBB crossing; intrathecal delivery common. PMO+CPP or LNA preferred."},
+        "muscle":       {"uptake": 8, "bbb": 0,  "immune": 0,  "notes": "Moderate uptake; large tissue mass dilutes dose. DMD exon-skipping validated."},
+        "skeletal muscle": {"uptake": 8, "bbb": 0, "immune": 0, "notes": "Moderate uptake; large tissue mass dilutes dose. DMD exon-skipping validated."},
+        "heart":        {"uptake": 5, "bbb": 0,  "immune": -5, "notes": "Limited cardiac uptake; systemic delivery reaches myocardium at high doses."},
+        "lung":         {"uptake": 12, "bbb": 0,  "immune": 8,  "notes": "Accessible via inhalation; mucus barrier for systemic delivery. Good for local."},
+        "eye":          {"uptake": 18, "bbb": 0,  "immune": 10, "notes": "Immune-privileged site; intravitreal delivery. Local exposure with minimal systemic."},
+        "retina":       {"uptake": 18, "bbb": 0,  "immune": 10, "notes": "Immune-privileged site; intravitreal delivery. Local exposure with minimal systemic."},
+        "spinal cord":  {"uptake": -8, "bbb": 20, "immune": -8, "notes": "Intrathecal delivery required; limited diffusion from CSF."},
+        "tumor":        {"uptake": 8, "bbb": 0,  "immune": 15, "notes": "Tumor microenvironment may enhance uptake; immune stimulation can be beneficial."},
+        "blood":        {"uptake": 12, "bbb": 0,  "immune": 12, "notes": "Hematopoietic cells readily take up ASOs; immune stimulation risk."},
+        "bone marrow":  {"uptake": 12, "bbb": 0,  "immune": 12, "notes": "Hematopoietic cells readily take up ASOs; immune stimulation risk."},
         "pancreas":     {"uptake": 5, "bbb": 0,  "immune": 0,  "notes": "Limited pancreatic uptake; systemic delivery required."},
-        "skin":         {"uptake": 10, "bbb": 0,  "immune": 5,  "notes": "Topical or intradermal delivery; good local exposure."},
-        "gut":          {"uptake": 8, "bbb": 0,  "immune": 10, "notes": "Oral delivery challenging; enema or local delivery preferred."},
-        "intestine":    {"uptake": 8, "bbb": 0,  "immune": 10, "notes": "Oral delivery challenging; enema or local delivery preferred."},
+        "skin":         {"uptake": 15, "bbb": 0,  "immune": 8,  "notes": "Topical or intradermal delivery; good local exposure."},
+        "gut":          {"uptake": 10, "bbb": 0,  "immune": 12, "notes": "Oral delivery challenging; enema or local delivery preferred."},
+        "intestine":    {"uptake": 10, "bbb": 0,  "immune": 12, "notes": "Oral delivery challenging; enema or local delivery preferred."},
     }
 
     # Find best matching tissue
@@ -406,24 +495,48 @@ def _tissue_scores(delivery_context: str | None, chemistry: str, length: int) ->
         # Default profile for unknown tissue
         profile = {"uptake": 0, "bbb": 0, "immune": 0, "notes": "No tissue-specific adjustments applied."}
 
-    # Chemistry-tissue interactions
+    # Chemistry-tissue interactions — large bonuses for validated pairings
     chem_bonus = 0
     if ctx in ("cns", "brain", "spinal cord"):
         if chemistry in ("pmo", "lna_gapmer"):
-            chem_bonus = 8  # LNA/PMO better for CNS
+            chem_bonus = 15  # LNA/PMO strongly preferred for CNS
         elif chemistry == "gapmer":
-            chem_bonus = -3  # Standard gapmer less ideal for CNS
+            chem_bonus = -8  # Standard gapmer poor for CNS
+        elif chemistry == "sirna":
+            chem_bonus = 5   # siRNA can work with conjugation
     elif ctx in ("liver",):
         if chemistry == "gapmer":
-            chem_bonus = 5  # Gapmers well-validated for liver
+            chem_bonus = 12  # Gapmers well-validated for liver (e.g., inclisiran)
+        elif chemistry == "lna_gapmer":
+            chem_bonus = 8   # LNA also works well for liver
+        elif chemistry == "sirna":
+            chem_bonus = 10  # siRNA liver-targeted (e.g., patisiran)
     elif ctx in ("eye", "retina"):
         if chemistry == "pmo":
-            chem_bonus = 5  # PMOs used in retinal diseases
+            chem_bonus = 10  # PMOs used in retinal diseases (e.g., eteplirsen)
+        elif chemistry == "2ome":
+            chem_bonus = 8   # 2'-OMe used in intravitreal ASOs
+    elif ctx in ("muscle", "skeletal muscle"):
+        if chemistry in ("pmo",):
+            chem_bonus = 10  # PMO exon-skipping for DMD
+        elif chemistry == "gapmer":
+            chem_bonus = 5
+    elif ctx in ("blood", "bone marrow"):
+        if chemistry == "gapmer":
+            chem_bonus = 8   # Gapmers for hematologic targets
+    elif ctx in ("lung",):
+        if chemistry == "2ome":
+            chem_bonus = 8   # 2'-OMe for inhaled ASOs
+    elif ctx in ("tumor",):
+        if chemistry in ("gapmer", "lna_gapmer"):
+            chem_bonus = 8   # RNase H preferred for tumor knockdown
 
     # Length-tissue interaction
     length_modifier = 0
     if ctx in ("cns", "brain", "spinal cord") and length > 20:
-        length_modifier = -5  # Longer ASOs cross BBB worse
+        length_modifier = -10  # Longer ASOs cross BBB significantly worse
+    elif ctx in ("cns", "brain", "spinal cord") and length <= 16:
+        length_modifier = 5   # Shorter ASOs cross BBB better
 
     return {
         "uptake_modifier": profile["uptake"],
@@ -458,57 +571,57 @@ def _defect_scores(defect_type: str | None, silencing_scope: str | None, chemist
 
     if "loss-of-function" in defect or "lof" in defect:
         # LoF: aggressive knockdown preferred; high nuclease resistance important
-        scores["defect_bonus"] = 3
-        scores["nuclease_preference"] = 5 if nuclease_score >= 70 else -3
+        scores["defect_bonus"] = 8
+        scores["nuclease_preference"] = 10 if nuclease_score >= 70 else -5
         scores["defect_notes"] = "Loss-of-function: aggressive knockdown preferred. High nuclease resistance favors efficacy."
 
     elif "gain-of-function" in defect or "gof" in defect:
         # GoF: need substantial reduction; gapmer preferred
-        scores["defect_bonus"] = 2
+        scores["defect_bonus"] = 6
         if chemistry == "gapmer" or chemistry == "lna_gapmer":
-            scores["chemistry_preference"] = 5
+            scores["chemistry_preference"] = 10
         scores["defect_notes"] = "Gain-of-function: substantial protein reduction needed. Gapmer/LNA chemistry preferred for potent knockdown."
 
     elif "haploinsufficiency" in defect:
         # Haploinsufficiency: silencing ASOs are contraindicated; warn
-        scores["defect_bonus"] = -10
+        scores["defect_bonus"] = -15
         scores["defect_notes"] = "Haploinsufficiency: gene silencing may worsen the phenotype. Consider upregulation mechanisms instead."
 
     elif "dominant-negative" in defect or "dominant negative" in defect:
         # Dominant-negative: allele-specific silencing preferred
-        scores["defect_bonus"] = 2
+        scores["defect_bonus"] = 6
         scores["defect_notes"] = "Dominant-negative: allele-specific silencing of the mutant allele preferred. Consider variant-specific ASO design."
 
     elif "toxic rna" in defect or "toxic gain" in defect or "rna toxicity" in defect:
         # Toxic RNA: degrade the toxic transcript; RNAse H preferred
-        scores["defect_bonus"] = 4
+        scores["defect_bonus"] = 10
         if chemistry in ("gapmer", "lna_gapmer"):
-            scores["chemistry_preference"] = 6
+            scores["chemistry_preference"] = 12
         scores["defect_notes"] = "Toxic RNA: transcript degradation preferred. RNase H-recruiting gapmers are most effective."
 
     elif "splice" in defect or "splicing" in defect:
         # Splice defect: steric blocking preferred, not cleavage
-        scores["defect_bonus"] = 3
+        scores["defect_bonus"] = 8
         if chemistry in ("pmo", "2ome"):
-            scores["chemistry_preference"] = 8
+            scores["chemistry_preference"] = 15
         elif chemistry in ("gapmer", "lna_gapmer"):
-            scores["chemistry_preference"] = -5  # Gapmers cleave, not ideal for splice correction
+            scores["chemistry_preference"] = -10  # Gapmers cleave, not ideal for splice correction
         scores["defect_notes"] = "Splice defect: steric blocking (PMO/2'-OMe) preferred for splice correction. RNase H gapmers may be counterproductive."
 
     elif "nonsense" in defect or "premature stop" in defect:
         # Nonsense mutations: read-through or exon skipping
-        scores["defect_bonus"] = 2
+        scores["defect_bonus"] = 6
         scores["defect_notes"] = "Nonsense mutation: exon-skipping ASOs may bypass the premature stop codon."
 
     elif "frameshift" in defect:
         # Frameshift: similar to nonsense
-        scores["defect_bonus"] = 2
+        scores["defect_bonus"] = 6
         scores["defect_notes"] = "Frameshift mutation: exon-skipping or transcript degradation strategies applicable."
 
     # Silencing scope adjustments
     if scope == "total_knockdown":
         # Total knockdown: higher nuclease resistance needed for widespread degradation
-        scores["nuclease_preference"] += 3
+        scores["nuclease_preference"] += 8
         scores["defect_notes"] += " Total transcript knockdown selected — broad targeting across all exons."
 
     return scores
@@ -546,14 +659,113 @@ def _mechanism_design_constraints(mechanism_id: str, aso_length: int, chemistry:
     if mechanism_id == "A21":
         return 21, "sirna", "mrna"
     if mechanism_id == "A12":
-        raise ValueError(
-            "Anti-miR design requires the mature pathogenic miRNA sequence; a target gene CDS cannot be used as its substitute."
-        )
+        # Anti-miR: cannot design from CDS — return gracefully
+        return aso_length, chemistry, "mrna"
     if mechanism_id == "A15":
-        raise ValueError(
-            "Promoter-targeting ASO design requires a validated promoter-associated RNA sequence; a coding mRNA sequence cannot be used as its substitute."
-        )
+        # Promoter-targeting: cannot design from CDS — return gracefully
+        return aso_length, chemistry, "mrna"
     raise ValueError(f"Unsupported gene-silencing mechanism: {mechanism_id}")
+
+
+def _mechanism_scoring_adjustments(
+    mechanism_id: str,
+    chemistry: str,
+    modifications: list[str],
+    candidate_seq: str,
+    gc: float,
+    tm: float,
+) -> dict:
+    """Compute mechanism-specific scoring bonuses/penalties.
+
+    Each mechanism has different biological requirements that affect what
+    makes a good ASO candidate:
+
+    - A1 (RNase H1 mRNA degradation): Potent cleavage preferred.
+      Gapmer/LNA chemistry strongly favored. Longer ASOs ok.
+    - A2 (Translation blocking): Steric hindrance at AUG.
+      Shorter, high-affinity ASOs preferred. PMO/2'-OMe ok.
+      RNase H gapmers are counterproductive.
+    - A21 (siRNA/RISC): Duplex RNA guide/passenger.
+      21-nt forced. RISC loading efficiency matters.
+    - A12 (Anti-miR): miRNA sponge / complement.
+      Needs mature miRNA sequence (not from CDS).
+    - A15 (Promoter ASO): Transcriptional gene silencing.
+      Needs promoter-associated RNA (not from CDS).
+    """
+    mech_bonus = 0
+    mech_notes = ""
+
+    if mechanism_id == "A1":
+        # RNase H1: gapmer is gold standard, LNA boosts potency
+        if chemistry in ("gapmer", "lna_gapmer"):
+            mech_bonus = 12  # Strong bonus for RNase H-recruiting chemistries
+            mech_notes = "A1 (RNase H1): Gapmer chemistry recruits RNase H1 for mRNA cleavage."
+        elif chemistry == "sirna":
+            mech_bonus = 5
+            mech_notes = "A1 (RNase H1): siRNA can recruit RNase H via RISC, but gapmer preferred."
+        elif chemistry in ("pmo", "2ome"):
+            mech_bonus = -8  # Steric blockers don't recruit RNase H
+            mech_notes = "A1 (RNase H1): PMO/2'-OMe are steric blockers — poor RNase H recruitment for mRNA degradation."
+        # Length: 18-22 nt optimal for RNase H
+        if 18 <= len(candidate_seq) <= 22:
+            mech_bonus += 3
+        elif len(candidate_seq) > 25:
+            mech_bonus -= 3
+
+    elif mechanism_id == "A2":
+        # Translation blocking: high-affinity steric blocker at AUG
+        if chemistry in ("pmo", "2ome"):
+            mech_bonus = 10  # Steric blockers ideal for translation arrest
+            mech_notes = "A2 (Translation block): PMO/2'-OMe sterically block ribosome at AUG."
+        elif chemistry in ("gapmer", "lna_gapmer"):
+            mech_bonus = -5  # Gapmers cleave mRNA — not ideal for translation blocking
+            mech_notes = "A2 (Translation block): Gapmers recruit RNase H — may degrade mRNA instead of blocking translation."
+        elif chemistry == "sirna":
+            mech_bonus = -10  # siRNA cleaves, doesn't block translation
+            mech_notes = "A2 (Translation block): siRNA degrades mRNA via RISC — not translation blocking."
+        # Higher Tm = tighter binding = better steric block
+        if tm >= 55:
+            mech_bonus += 5
+        elif tm >= 50:
+            mech_bonus += 2
+        # LNA wings boost affinity for steric blocking
+        if "lna_wings" in modifications:
+            mech_bonus += 5
+        if "phosphorothioate" in modifications:
+            mech_bonus += 3  # PS improves cellular retention
+
+    elif mechanism_id == "A21":
+        # siRNA: duplex RNA, RISC-loaded, guide strand cleaves target
+        if chemistry == "sirna":
+            mech_bonus = 15  # siRNA chemistry is required
+            mech_notes = "A21 (siRNA): Duplex guide/passenger loaded into RISC for AGO2-mediated cleavage."
+        else:
+            mech_bonus = -15  # Wrong chemistry for siRNA mechanism
+            mech_notes = "A21 (siRNA): Requires siRNA duplex chemistry — other ASO chemistries incompatible."
+        # GC 30-50% optimal for RISC loading (not too stable, not too weak)
+        if 0.30 <= gc <= 0.50:
+            mech_bonus += 5
+        elif gc > 0.60:
+            mech_bonus -= 5  # Too GC-rich = guide strand may not unwind
+        # Thermodynamic asymmetry: guide strand should have lower 5' stability
+        if tm < 50:
+            mech_bonus += 3  # Moderate Tm preferred for RISC loading
+
+    elif mechanism_id == "A12":
+        # Anti-miR: miRNA inhibitor — needs mature miRNA sequence
+        # This shouldn't normally be reached from CDS, but handle gracefully
+        mech_bonus = -5
+        mech_notes = "A12 (Anti-miR): Requires mature miRNA sequence. CDS-derived design is approximate."
+
+    elif mechanism_id == "A15":
+        # Promoter ASO: transcriptional gene silencing via promoter RNA
+        mech_bonus = -5
+        mech_notes = "A15 (Promoter): Requires promoter-associated RNA. CDS-derived design is approximate."
+
+    return {
+        "mechBonus": mech_bonus,
+        "mechNotes": mech_notes,
+    }
 
 
 def _allele_specific_scoring(
@@ -779,29 +991,31 @@ def generate_candidates(
             sc_penalty = sc * 200
             pg_penalty = pg * 15
 
-            # Chemistry-specific bonuses
+            # Chemistry-specific bonuses — large enough to meaningfully shift rankings
             chem_bonus = 0
             if chemistry == "lna_gapmer":
-                chem_bonus += 5  # LNA boosts binding affinity
+                chem_bonus = 15  # LNA: highest affinity + nuclease resistance
+            elif chemistry == "gapmer":
+                chem_bonus = 10  # Gapmer: most validated, strong RNase H
             elif chemistry == "2ome":
-                chem_bonus += 3  # 2'-OMe moderate affinity boost
-            elif chemistry == "pmo":
-                chem_bonus -= 3  # PMO lower uptake without CPP
+                chem_bonus = 5   # 2'-OMe: moderate affinity, good safety
             elif chemistry == "sirna":
-                chem_bonus += 2  # siRNA RISC amplification
+                chem_bonus = 8   # siRNA: RISC amplification bonus
+            elif chemistry == "pmo":
+                chem_bonus = -5  # PMO: lower uptake without CPP, but splice-safe
 
-            # Modification bonuses
+            # Modification bonuses — each mod adds real differentiation
             mod_bonus = 0
             if "phosphorothioate" in modifications:
-                mod_bonus += 4  # PS increases nuclease resistance
+                mod_bonus += 10  # PS: major nuclease resistance + protein binding
             if "lna_wings" in modifications:
-                mod_bonus += 5  # LNA wings boost Tm significantly
+                mod_bonus += 12  # LNA wings: strongest Tm boost per substitution
             if "2omemod" in modifications:
-                mod_bonus += 3  # 2'-OMe wings moderate boost
+                mod_bonus += 7   # 2'-OMe wings: moderate boost, low toxicity
             if "pmo_core" in modifications:
-                mod_bonus += 2  # PMO core for splice-switching
+                mod_bonus += 6   # PMO core: splice-switching without cleavage
             if "pna_clamp" in modifications:
-                mod_bonus += 3  # PNA clamp protects from exonucleases
+                mod_bonus += 8   # PNA clamp: excellent exonuclease shield
 
             # CpG penalty (immune stimulation risk)
             cpg_penalty = max(0, (cpg - 2)) * 5
@@ -820,7 +1034,11 @@ def generate_candidates(
             defect_nuclease = defect["nuclease_preference"]
             defect_chem = defect["chemistry_preference"]
 
-            quality = max(0, min(100, gc_score * 0.30 + tm_score * 0.40 - sc_penalty - pg_penalty + chem_bonus + mod_bonus - cpg_penalty + tissue_uptake + tissue_bbb + tissue_immune + tissue_chem + tissue_len + defect_bonus + defect_nuclease + defect_chem))
+            # Mechanism-specific scoring adjustments
+            mech_adj = _mechanism_scoring_adjustments(mechanism_id, chemistry, modifications, candidate_seq, gc, tm)
+            mech_bonus = mech_adj["mechBonus"]
+
+            quality = max(0, min(100, gc_score * 0.30 + tm_score * 0.40 - sc_penalty - pg_penalty + chem_bonus + mod_bonus - cpg_penalty + tissue_uptake + tissue_bbb + tissue_immune + tissue_chem + tissue_len + defect_bonus + defect_nuclease + defect_chem + mech_bonus))
 
             if is_total_knockdown:
                 region_label = f"Full Transcript offset +{offset}"
@@ -856,7 +1074,7 @@ def generate_candidates(
 
             # Allele-specific scoring
             allele = _allele_specific_scoring(
-                candidate_seq, known_variant, exon_seq, chemistry, modifications
+                candidate_seq, known_variant, candidate_seq, chemistry, modifications
             )
 
             # Apply allele-specific bonus to quality score
@@ -871,6 +1089,7 @@ def generate_candidates(
                 "polygTracts": pg,
                 "qualityScore": round(adjusted_quality, 1),
                 "targetRegion": region_label,
+                "mechanismId": mechanism_id,
                 "chemistry": chemistry,
                 "modifications": modifications,
                 "exonNumber": exon_num,
@@ -881,6 +1100,8 @@ def generate_candidates(
                 "polygPenalty": round(pg_penalty, 1),
                 "chemBonus": chem_bonus,
                 "modBonus": mod_bonus,
+                "mechanismBonus": mech_bonus,
+                "mechanismNotes": mech_adj["mechNotes"],
                 "cpgCount": cpg,
                 "cpgPenalty": cpg_penalty,
                 "longestHomopolymer": _longest_homopolymer(candidate_seq),

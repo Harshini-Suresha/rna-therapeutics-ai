@@ -42,7 +42,6 @@ export default function NewProjectPage() {
   const [disease, setDisease] = useState("");
   const [geneSymbol, setGeneSymbol] = useState("");
   const [therapeuticGoal, setTherapeuticGoal] = useState("");
-  const [targetTissue, setTargetTissue] = useState("");
   const [cellLine, setCellLine] = useState("");
   const [notes, setNotes] = useState("");
 
@@ -67,7 +66,6 @@ export default function NewProjectPage() {
         disease,
         geneSymbol,
         therapeuticGoal,
-        targetTissue,
         cellLine,
         notes,
       });
@@ -231,17 +229,6 @@ export default function NewProjectPage() {
           <div className="px-5 pb-5 space-y-4">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
-                <FieldLabel hint="Target tissue or organ system">
-                  Target Tissue
-                </FieldLabel>
-                <input
-                  value={targetTissue}
-                  onChange={(e) => setTargetTissue(e.target.value)}
-                  placeholder="e.g. Skeletal Muscle"
-                  className="w-full rounded border border-slate-300 bg-white py-2 px-3 text-[12.5px] text-slate-700 placeholder:text-slate-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
-                />
-              </div>
-              <div>
                 <FieldLabel hint="Primary cell line for validation">
                   Cell Line
                 </FieldLabel>
@@ -285,7 +272,6 @@ export default function NewProjectPage() {
               <ReviewRow label="Disease" value={disease || "—"} />
               <ReviewRow label="Gene" value={geneSymbol || "—"} />
               <ReviewRow label="Therapeutic Goal" value={therapeuticGoal || "—"} />
-              <ReviewRow label="Target Tissue" value={targetTissue || "—"} />
               <ReviewRow label="Cell Line" value={cellLine || "—"} />
               {notes && (
                 <div>

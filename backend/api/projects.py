@@ -27,7 +27,6 @@ class ProjectCreate(BaseModel):
     geneSymbol: str = ""
     ensemblId: str = ""
     therapeuticGoal: str = ""
-    targetTissue: str = ""
     cellLine: str = ""
     notes: str = ""
 
@@ -40,7 +39,6 @@ class ProjectUpdate(BaseModel):
     geneSymbol: Optional[str] = None
     ensemblId: Optional[str] = None
     therapeuticGoal: Optional[str] = None
-    targetTissue: Optional[str] = None
     cellLine: Optional[str] = None
     notes: Optional[str] = None
     status: Optional[str] = None
@@ -109,7 +107,6 @@ def create_project(req: ProjectCreate, user: User = Depends(get_current_user), d
         gene_symbol=req.geneSymbol.strip(),
         ensembl_id=req.ensemblId.strip(),
         therapeutic_goal=req.therapeuticGoal.strip(),
-        target_tissue=req.targetTissue.strip(),
         cell_line=req.cellLine.strip(),
         notes=req.notes.strip(),
         status="active",
@@ -147,8 +144,6 @@ def update_project(
         p.ensembl_id = req.ensemblId.strip()
     if req.therapeuticGoal is not None:
         p.therapeutic_goal = req.therapeuticGoal.strip()
-    if req.targetTissue is not None:
-        p.target_tissue = req.targetTissue.strip()
     if req.cellLine is not None:
         p.cell_line = req.cellLine.strip()
     if req.notes is not None:

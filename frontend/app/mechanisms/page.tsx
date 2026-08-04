@@ -11,20 +11,182 @@ import { GeneTargetObject } from "@/types/gene";
 import {
   MechanismOptions,
   MechanismRankingResponse,
+  GeneFeaturesResponse,
   TherapeuticGoalId,
   THERAPEUTIC_GOALS,
 } from "@/types/mechanism";
 import {
   fetchMechanismOptions,
+  fetchGeneFeatures,
   rankGeneSilencingMechanisms,
+  rankGeneUpregulationMechanisms,
   rankRnaProcessingMechanisms,
   getGoalLabel,
 } from "@/lib/mechanismApi";
 import { saveReport } from "@/lib/auth";
+import { MechanismFeature } from "@/types/mechanism";
 
 const CONFIRMED_TARGET_KEY = "aso:confirmedTarget";
 const SELECTED_MECHANISM_KEY = "aso:selectedMechanism";
 const SELECTED_GOAL_KEY = "aso:therapeuticGoal";
+const PROJECT_TARGET_TISSUE_KEY = "aso:projectTargetTissue";
+
+// Map free-text target tissue to deliveryContext dropdown values
+function mapTargetTissueToDeliveryContext(tissue: string): string {
+  const t = tissue.toLowerCase().trim();
+  if (t.includes("liver") || t.includes("hepatic")) return "liver";
+  if (t.includes("kidney") || t.includes("renal")) return "kidney";
+  if (t.includes("brain") || t.includes("cns") || t.includes("central nervous")) return "cns";
+  if (t.includes("muscle") || t.includes("skeletal") || t.includes("myocyte")) return "muscle";
+  if (t.includes("heart") || t.includes("cardiac") || t.includes("myocard")) return "heart";
+  if (t.includes("lung") || t.includes("pulmonary") || t.includes("respiratory")) return "lung";
+  if (t.includes("eye") || t.includes("retina") || t.includes("ocular") || t.includes("vitreous")) return "eye";
+  if (t.includes("tumor") || t.includes("cancer") || t.includes("neoplasm") || t.includes("malignan")) return "tumor";
+  if (t.includes("blood") || t.includes("bone marrow") || t.includes("hematopoietic") || t.includes("leukemia") || t.includes("lymphoma")) return "blood";
+  if (t.includes("skin") || t.includes("dermal") || t.includes("epidermal") || t.includes("cutaneous")) return "skin";
+  if (t.includes("pancreas") || t.includes("pancreatic")) return "pancreas";
+  if (t.includes("gut") || t.includes("intestine") || t.includes("intestinal") || t.includes("colon") || t.includes("bowel")) return "gut";
+  if (t.includes("spinal") || t.includes("cord")) return "spinal cord";
+  return "";
+}
+
+// Defect type → compatible mechanism IDs (mirrors UPREGULATION_DEFECT_COMPATIBILITY in backend)
+const DEFECT_TO_MECHANISMS: Record<string, string[]> = {
+  haploinsufficiency: ["A3", "A4", "A6", "A23"],
+  poison_exon_inclusion: ["A3"],
+  nat_mediated_repression: ["A4"],
+  uorf_mediated_repression: ["A5"],
+  mirna_mediated_repression: ["A6"],
+  deficient_mirna: ["A22"],
+  epigenetic_promoter_silencing: ["A23"],
+};
+
+// Mechanism ID → feature key in gene features response
+const MECHANISM_TO_FEATURE: Record<string, string> = {
+  A3: "TANGO",
+  A4: "NAT",
+  A5: "uORF",
+  A6: "miRNA_block",
+  A22: "miRNA_replacement",
+  A23: "saRNA",
+};
+
+interface MechanismCard {
+  key: string;
+  label: string;
+  mechanism: string;
+  description: string;
+}
+
+const MECHANISM_CARDS: MechanismCard[] = [
+  { key: "saRNA", label: "saRNA (Promoter)", mechanism: "A23", description: "Recruits RNA Pol II & AGO2 to boost transcription" },
+  { key: "uORF", label: "uORF Blocking", mechanism: "A5", description: "Blocks inhibitory upstream ORFs to enhance translation" },
+  { key: "TANGO", label: "Poison Exon (TANGO)", mechanism: "A3", description: "Prevents poison exon inclusion to restore functional mRNA" },
+  { key: "NAT", label: "NAT / lncRNA Silencing", mechanism: "A4", description: "Degrades antisense lncRNAs that repress the gene" },
+  { key: "miRNA_block", label: "miRNA Site Blocking", mechanism: "A6", description: "Blocks miRNA binding sites on the target mRNA" },
+  { key: "miRNA_replacement", label: "miRNA Replacement", mechanism: "A22", description: "Replaces a deficient regulatory miRNA" },
+];
+
+function MechanismAvailabilityCards({
+  features,
+  selectedDefectType,
+  geneSymbol,
+}: {
+  features: Record<string, MechanismFeature>;
+  selectedDefectType: string;
+  geneSymbol: string;
+}) {
+  // Which mechanisms are compatible with the selected defect type?
+  const compatibleMechanisms = selectedDefectType
+    ? new Set(DEFECT_TO_MECHANISMS[selectedDefectType] || [])
+    : null;
+
+  return (
+    <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+          Mechanism Availability for {geneSymbol}
+        </p>
+        {compatibleMechanisms && (
+          <p className="text-[10.5px] text-brand font-medium">
+            {compatibleMechanisms.size} mechanism{compatibleMechanisms.size !== 1 ? "s" : ""} match this defect
+          </p>
+        )}
+      </div>
+      <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+        {MECHANISM_CARDS.map(({ key, label, mechanism, description }) => {
+          const feat = features[key];
+          const structurallyAvailable = feat?.available ?? true;
+          const isCompatible = compatibleMechanisms ? compatibleMechanisms.has(mechanism) : null;
+
+          // Card state: eligible (green), compatible but structurally unavailable (yellow),
+          // incompatible with selected defect (grey), or no defect selected (default)
+          let borderColor = "border-slate-200 bg-white";
+          let dotColor = "bg-slate-300";
+          let labelColor = "text-slate-700";
+          let badge = null;
+
+          if (!selectedDefectType) {
+            // No defect selected — show structural availability only
+            if (structurallyAvailable) {
+              borderColor = "border-emerald-200 bg-emerald-50/50";
+              dotColor = "bg-emerald-500";
+              labelColor = "text-emerald-800";
+            } else {
+              borderColor = "border-slate-200 bg-white opacity-60";
+            }
+          } else if (isCompatible && structurallyAvailable) {
+            // Compatible AND structurally available — highlight as eligible
+            borderColor = "border-brand bg-brand/5 ring-1 ring-brand/30";
+            dotColor = "bg-brand";
+            labelColor = "text-brand";
+            badge = (
+              <span className="ml-1.5 inline-flex items-center rounded-full bg-brand/10 px-1.5 py-0.5 text-[9px] font-bold text-brand">
+                ELIGIBLE
+              </span>
+            );
+          } else if (isCompatible && !structurallyAvailable) {
+            // Compatible but gene lacks the feature — show warning
+            borderColor = "border-amber-200 bg-amber-50/50";
+            dotColor = "bg-amber-400";
+            labelColor = "text-amber-700";
+            badge = (
+              <span className="ml-1.5 inline-flex items-center rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-600">
+                GENE LACKS FEATURE
+              </span>
+            );
+          } else {
+            // Not compatible with this defect type
+            borderColor = "border-slate-200 bg-white opacity-50";
+            dotColor = "bg-slate-300";
+            labelColor = "text-slate-500";
+          }
+
+          return (
+            <div
+              key={key}
+              className={`flex items-start gap-2 rounded-md border p-2.5 text-[11.5px] transition-all ${borderColor}`}
+            >
+              <span className={`mt-0.5 h-2 w-2 shrink-0 rounded-full ${dotColor}`} />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center flex-wrap gap-0.5">
+                  <p className={`font-semibold ${labelColor}`}>
+                    {label}
+                    <span className="ml-1 font-mono text-[10px] opacity-60">({mechanism})</span>
+                  </p>
+                  {badge}
+                </div>
+                <p className="text-[10.5px] text-slate-500 mt-0.5 leading-snug">
+                  {feat?.reason || description}
+                </p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 export default function MechanismSelectionPage() {
   const router = useRouter();
@@ -38,6 +200,12 @@ export default function MechanismSelectionPage() {
   // TG01 fields
   const [defectType, setDefectType] = useState("");
   const [silencingScope, setSilencingScope] = useState("");
+
+  // TG02 fields
+  const [upregDefectType, setUpregDefectType] = useState("");
+  const [knownRegulatoryElement, setKnownRegulatoryElement] = useState("");
+  const [geneFeatures, setGeneFeatures] = useState<GeneFeaturesResponse | null>(null);
+  const [geneFeaturesLoading, setGeneFeaturesLoading] = useState(false);
 
   // TG04 fields
   const [spliceDefectType, setSpliceDefectType] = useState("");
@@ -67,10 +235,38 @@ export default function MechanismSelectionPage() {
       setSelectedGoal(savedGoal);
     }
 
+    // Load project target tissue and map to deliveryContext
+    const projectTissue = sessionStorage.getItem(PROJECT_TARGET_TISSUE_KEY);
+    if (projectTissue) {
+      const mapped = mapTargetTissueToDeliveryContext(projectTissue);
+      if (mapped) {
+        setDeliveryContext(mapped);
+      }
+    }
+
     fetchMechanismOptions()
       .then(setOptions)
       .catch((e) => setOptionsError(e instanceof Error ? e.message : "Failed to load options."));
   }, []);
+
+  // Fetch gene structural features when TG02 is selected
+  useEffect(() => {
+    if (selectedGoal !== "TG02" || !gene) {
+      setGeneFeatures(null);
+      return;
+    }
+
+    setGeneFeaturesLoading(true);
+    fetchGeneFeatures({
+      geneSymbol: gene.geneSymbol,
+      organism: gene.organism || "homo_sapiens",
+      ensemblId: gene.geneId,
+      tissueTpm: gene.tissueTpm,
+    })
+      .then(setGeneFeatures)
+      .catch(() => setGeneFeatures(null))
+      .finally(() => setGeneFeaturesLoading(false));
+  }, [selectedGoal, gene]);
 
   function handleSelectGoal(goalId: TherapeuticGoalId) {
     setSelectedGoal(goalId);
@@ -79,6 +275,8 @@ export default function MechanismSelectionPage() {
     setSelectedId(null);
     setDefectType("");
     setSilencingScope("");
+    setUpregDefectType("");
+    setKnownRegulatoryElement("");
     setSpliceDefectType("");
     setTargetExon("");
     setDeliveryContext("");
@@ -107,6 +305,15 @@ export default function MechanismSelectionPage() {
           silencingScope,
           deliveryContext,
           knownVariant,
+        });
+      } else if (selectedGoal === "TG02") {
+        if (!upregDefectType) return;
+        result = await rankGeneUpregulationMechanisms({
+          geneSymbol: gene.geneSymbol,
+          defectType: upregDefectType,
+          deliveryContext,
+          knownRegulatoryElement,
+          geneFeatures: geneFeatures as unknown as Record<string, unknown> | null,
         });
       } else if (selectedGoal === "TG04") {
         if (!spliceDefectType) return;
@@ -158,6 +365,7 @@ export default function MechanismSelectionPage() {
   function isRankDisabled(): boolean {
     if (!gene || !selectedGoal || loading) return true;
     if (selectedGoal === "TG01") return !defectType || !silencingScope;
+    if (selectedGoal === "TG02") return !upregDefectType;
     if (selectedGoal === "TG04") return !spliceDefectType;
     return true;
   }
@@ -331,6 +539,108 @@ export default function MechanismSelectionPage() {
                 </div>
               )}
 
+              {selectedGoal === "TG02" && (
+                <div className="space-y-4 px-6 pb-4">
+                  {/* Gene feature analysis loading */}
+                  {geneFeaturesLoading && (
+                    <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-[12.5px] text-blue-700">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Analyzing gene structural features...
+                    </div>
+                  )}
+
+                  {/* Defect type selection — this drives which mechanisms are eligible */}
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                    <div>
+                      <FieldLabel hint="Select the molecular defect to see which upregulation mechanisms apply">
+                        Molecular Defect Type <span className="text-red-500">*</span>
+                      </FieldLabel>
+                      <select
+                        value={upregDefectType}
+                        onChange={(e) => {
+                          setUpregDefectType(e.target.value);
+                          clearRanking();
+                        }}
+                        className="w-full rounded-lg border border-slate-300 bg-white py-2.5 px-3 text-[13.5px] text-slate-700 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+                      >
+                        <option value="">Select defect type</option>
+                        {options?.geneUpregulation.defectTypes.map((o) => (
+                          <option key={o.id} value={o.id}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <FieldLabel hint="General delivery/chemistry precedent — a soft tie-breaker, not a hard filter">
+                        Delivery / Tissue Context
+                      </FieldLabel>
+                      <select
+                        value={deliveryContext}
+                        onChange={(e) => {
+                          setDeliveryContext(e.target.value);
+                          clearRanking();
+                        }}
+                        className="w-full rounded-lg border border-slate-300 bg-white py-2.5 px-3 text-[13.5px] text-slate-700 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+                      >
+                        <option value="">Not specified</option>
+                        {options?.deliveryContexts.map((o) => (
+                          <option key={o.id} value={o.id}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="md:col-span-3">
+                      <FieldLabel hint="Optional — known poison exon, NAT, uORF, or miRNA binding site for this gene">
+                        Known Regulatory Element (optional)
+                      </FieldLabel>
+                      <input
+                        value={knownRegulatoryElement}
+                        onChange={(e) => {
+                          setKnownRegulatoryElement(e.target.value);
+                          clearRanking();
+                        }}
+                        placeholder="e.g. BDNF-AS antisense transcript / chr11:53886643 poison exon"
+                        className="w-full rounded-lg border border-slate-300 bg-white py-2.5 px-3 text-[13.5px] text-slate-700 placeholder:text-slate-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Mechanism availability — filtered by selected defect type */}
+                  {geneFeatures && !geneFeaturesLoading && (
+                    <MechanismAvailabilityCards
+                      features={geneFeatures.features}
+                      selectedDefectType={upregDefectType}
+                      geneSymbol={gene?.geneSymbol || ""}
+                    />
+                  )}
+
+                  {/* Overexpression warnings */}
+                  {geneFeatures?.warnings.map((w, i) => (
+                    <div
+                      key={i}
+                      className={`rounded-lg border px-4 py-3 text-[12.5px] ${
+                        w.severity === "high"
+                          ? "border-amber-300 bg-amber-50 text-amber-800"
+                          : "border-yellow-200 bg-yellow-50 text-yellow-700"
+                      }`}
+                    >
+                      {w.message}
+                    </div>
+                  ))}
+
+                  {/* Hint when no defect type selected */}
+                  {!upregDefectType && (
+                    <p className="text-[12px] text-slate-500 italic">
+                      Select a Molecular Defect Type above to see which mechanisms are eligible for this gene.
+                    </p>
+                  )}
+                </div>
+              )}
+
               {selectedGoal === "TG04" && (
                 <div className="grid grid-cols-1 gap-4 px-6 pb-4 md:grid-cols-3">
                   <div>
@@ -407,7 +717,7 @@ export default function MechanismSelectionPage() {
                 </div>
               )}
 
-              {selectedGoal !== "TG01" && selectedGoal !== "TG04" && (
+              {selectedGoal !== "TG01" && selectedGoal !== "TG02" && selectedGoal !== "TG04" && (
                 <div className="px-6 pb-4">
                   <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
                     <p className="text-[13px] font-medium text-slate-600">
@@ -489,12 +799,23 @@ export default function MechanismSelectionPage() {
 
           {selectedId && (
             <div className="flex justify-end pt-2">
-              <button
-                onClick={() => router.push("/gene-silencing")}
-                className="flex items-center gap-2 rounded-lg bg-brand px-6 py-3 text-[14px] font-medium text-white shadow-sm transition-colors hover:bg-brand-dark"
-              >
-                Proceed to Gene Silencing
-              </button>
+              {selectedGoal === "TG02" ? (
+                <div className="flex items-center gap-3">
+                  <p className="text-[12px] text-slate-500">
+                    The ASO design pipeline for gene upregulation mechanisms is under development.
+                  </p>
+                  <span className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-5 py-3 text-[13px] font-medium text-slate-400">
+                    Design pipeline coming soon
+                  </span>
+                </div>
+              ) : (
+                <button
+                  onClick={() => router.push("/gene-silencing")}
+                  className="flex items-center gap-2 rounded-lg bg-brand px-6 py-3 text-[14px] font-medium text-white shadow-sm transition-colors hover:bg-brand-dark"
+                >
+                  Proceed to Gene Silencing
+                </button>
+              )}
             </div>
           )}
         </main>
