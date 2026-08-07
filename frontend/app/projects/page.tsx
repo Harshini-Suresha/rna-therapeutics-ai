@@ -19,7 +19,7 @@ import { listProjects, deleteProject, ProjectSummary } from "@/lib/auth";
 const STATUS_STYLES: Record<string, string> = {
   active: "bg-emerald-50 text-emerald-700 border-emerald-200",
   completed: "bg-blue-50 text-blue-700 border-blue-200",
-  archived: "bg-slate-100 text-slate-500 border-slate-200",
+  archived: "bg-slate-100 text-slate-500 border-[#E5E7EB]",
 };
 
 function formatDate(ts: number): string {
@@ -102,7 +102,7 @@ export default function ProjectsPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search projects by name, disease, or gene..."
-          className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-[12.5px] text-slate-700 placeholder:text-slate-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+          className="w-full rounded-lg border border-[#E5E7EB] bg-white py-2.5 pl-10 pr-4 text-[12.5px] text-slate-700 placeholder:text-slate-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
         />
       </div>
 
@@ -186,7 +186,7 @@ export default function ProjectsPage() {
                           className="fixed inset-0 z-10"
                           onClick={() => setActiveMenu(null)}
                         />
-                        <div className="absolute right-0 top-8 z-20 w-40 rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
+                        <div className="absolute right-0 top-8 z-20 w-40 rounded-lg border border-[#E5E7EB] bg-white py-1 shadow-lg">
                           <button
                             onClick={() => handleDelete(p.id)}
                             className="flex w-full items-center gap-2 px-3 py-2 text-[12px] text-red-600 hover:bg-red-50"

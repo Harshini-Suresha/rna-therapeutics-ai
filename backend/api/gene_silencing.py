@@ -5,6 +5,10 @@ Gene Silencing API — target analysis + ASO candidate generation.
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional
+from fastapi import Depends
+from database.models import User
+from services.auth_service import get_current_user
+from services.email_service import send_report_email
 
 from services.gene_silencing_service import (
     get_target_analysis,
@@ -30,6 +34,11 @@ class CandidateRequest(BaseModel):
     defect_type: Optional[str] = None
     silencing_scope: Optional[str] = None
     known_variant: Optional[str] = None
+
+
+class ReportEmailRequest(BaseModel):
+    report_content: str
+    filename: str
 
 
 @router.get("/api/gene-silencing/target/{ensembl_gene_id}")
@@ -101,6 +110,25 @@ async def generate_aso_candidates(payload: CandidateRequest):
         "mechanismNotes": candidates[0].get("mechanismNotes", "") if candidates else "",
         "candidates": candidates,
     }
+
+
+@router.post("/api/gene-silencing/email-report")
+async def email_aso_report(
+    payload: ReportEmailRequest,
+    user: User = Depends(get_current_user),
+):
+    """Email a generated report to the authenticated user's account email."""
+    if not payload.report_content.strip():
+        raise HTTPException(status_code=422, detail="Report content is required.")
+    sent, message = send_report_email(
+        user.email,
+        user.name,
+        payload.report_content,
+        payload.filename or "aso-candidate-report.txt",
+    )
+    if not sent:
+        raise HTTPException(status_code=503, detail=message)
+    return {"ok": True, "message": message}
 
 
 @router.get("/api/gene-silencing/variants/{ensembl_gene_id}")

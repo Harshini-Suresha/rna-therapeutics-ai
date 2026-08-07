@@ -16,6 +16,7 @@
   "asoChemistry": null,
   "typicalLength": "~21–23 bp duplex.",
   "designRules": "Select unique target sequence; optimize guide/passenger strand asymmetry; minimize seed-region off-targets; validate AGO2-mediated cleavage.",
+  "scoring": "Candidates are ranked by predicted target duplex free energy (ΔG, kcal/mol) computed using ViennaRNA duplexfold — more negative values indicate stronger predicted ASO-target binding. Biophysical metrics reported: GC content, nearest-neighbor Tm (primer3), self-structure MFE (ViennaRNA fold), poly-G tracts, CpG count, homopolymer runs, purine content, GC skew, sequence complexity, molecular weight, extinction coefficient. Drug-like estimates: nuclease resistance, cellular uptake, BBB crossing, off-target risk, immune stimulation, synthesis difficulty.",
   "secondaryStructureRequirement": "Accessible target region improves silencing efficiency.",
   "offTargetConsiderations": "Seed-mediated off-target effects; saturation of endogenous RNAi pathways; immune stimulation.",
   "advantages": "Highly potent; catalytic mechanism; several FDA-approved therapeutics; efficient liver delivery using GalNAc conjugation.",

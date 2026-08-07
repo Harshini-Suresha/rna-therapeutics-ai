@@ -12,6 +12,9 @@ import re
 import time
 import requests
 
+import RNA
+import primer3
+
 ENSEMBL_REST = "https://rest.ensembl.org"
 MAX_RETRIES = 3
 RETRY_BACKOFF = 1.5  # seconds
@@ -210,10 +213,6 @@ LENGTH_RANGE = {"min": 12, "max": 30, "default": 18, "step": 1}
 MIN_GC = 0.30
 MAX_GC = 0.70
 
-# Melting temperature approximation (nearest-neighbor simplified)
-_nn_params = {"A": 2.0, "T": 2.0, "G": 4.0, "C": 4.0}
-
-
 def _calc_gc(seq: str) -> float:
     if not seq:
         return 0.0
@@ -222,34 +221,28 @@ def _calc_gc(seq: str) -> float:
 
 
 def _calc_tm(seq: str) -> float:
-    """Simplified Tm (°C) using Wallace rule adjusted for oligos ≤ 20-mer."""
-    seq = seq.upper()
-    a = sum(1 for b in seq if b == "A")
-    t = sum(1 for b in seq if b == "T")
-    g = sum(1 for b in seq if b == "G")
-    c = sum(1 for b in seq if b == "C")
-    n = a + t + g + c
-    if n == 0:
+    """Real Tm (°C) using nearest-neighbor thermodynamics (SantaLucia 1998).
+
+    Uses primer3's calc_tm which implements the unified nearest-neighbor model
+    with salt corrections — the same method used by IDT OligoAnalyzer, Primer3,
+    and other professional oligo design tools.
+    """
+    if not seq:
         return 0.0
-    # Wallace rule for short oligos: Tm = 2*(A+T) + 4*(G+C)
-    tm = 2 * (a + t) + 4 * (g + c)
-    return round(tm, 1)
+    return round(primer3.calc_tm(seq.upper()), 1)
 
 
-def _self_complement_score(seq: str) -> float:
-    """Fraction of sequence that can form hairpins (palindromic 4-mers)."""
-    seq = seq.upper()
-    comp = {"A": "T", "T": "A", "G": "C", "C": "G"}
-    n = len(seq)
-    if n < 4:
+def _self_complement_mfe(seq: str) -> float:
+    """Real MFE (minimum free energy) for self-structure prediction.
+
+    Uses ViennaRNA's RNA.fold() which implements the Zuker algorithm for
+    thermodynamic secondary structure prediction. More negative MFE indicates
+    stronger tendency to form hairpins or other intramolecular structures.
+    """
+    if not seq or len(seq) < 4:
         return 0.0
-    count = 0
-    for i in range(n - 3):
-        sub = seq[i : i + 4]
-        rc = "".join(comp.get(b, "N") for b in reversed(sub))
-        if sub == rc:
-            count += 1
-    return round(count / (n - 3), 4) if n > 3 else 0.0
+    _, mfe = RNA.fold(seq.upper())
+    return round(mfe, 2)
 
 
 def _polyg_score(seq: str) -> int:
@@ -425,18 +418,6 @@ def _immune_stimulation_risk(seq: str, chemistry: str) -> float:
     elif chemistry == "pmo":
         risk -= 3  # PMOs are less immunostimulatory
     return min(100, max(0, round(risk, 1)))
-
-
-def _drug_likeness_score(quality: float, nuclease: float, uptake: float, off_target: float) -> float:
-    """Overall drug-likeness score combining multiple factors."""
-    # Weighted combination
-    score = (
-        quality * 0.35 +
-        nuclease * 0.25 +
-        uptake * 0.20 +
-        (100 - off_target) * 0.20
-    )
-    return round(min(100, max(0, score)), 1)
 
 
 def _duplex_stability(gc: float, tm: float, length: int) -> str:
@@ -659,6 +640,19 @@ def _estimated_binding_energy(gc_content: float, tm: float) -> float:
     return round(dG * 21, 1)  # scale to ~21-mer length
 
 
+def _target_duplex_energy(candidate_seq: str, target_seq: str) -> float:
+    """Real predicted binding free energy between ASO candidate and target.
+
+    Uses ViennaRNA's duplexfold() which computes the minimum free energy
+    of the duplex formed between the ASO candidate and its target mRNA region.
+    More negative ΔG indicates stronger predicted target engagement.
+    """
+    if not candidate_seq or not target_seq:
+        return 0.0
+    duplex = RNA.duplexfold(candidate_seq.upper(), target_seq.upper())
+    return round(duplex.energy, 2)
+
+
 def _reverse_complement(seq: str) -> str:
     """Return the antisense oligonucleotide sequence for an RNA target site."""
     return seq.upper().translate(str.maketrans("ATGC", "TACG"))[::-1]
@@ -787,25 +781,92 @@ def _mechanism_scoring_adjustments(
     }
 
 
+def _parse_variant_position(known_variant: str) -> dict | None:
+    """Extract a CDS coordinate from a simple HGVS variant string.
+
+    Handles substitutions (c.1521C>T), deletions (c.1521_1523del,
+    c.1521delC), insertions (c.1521insT), and delins (c.10594_10595delins...),
+    with optional g./n. prefixes. Returns ``{"position", "ref", "alt", "kind", "coordinate"}``
+    where position is the 0-based CDS offset of the variant, or None.
+    """
+    variant = known_variant.strip().upper()
+
+    m = re.search(r"[cgn]\.(\d+)([ATGC]+)>([ATGC]+)", variant, re.IGNORECASE)
+    if m:
+        coord = m.group(0)
+        return {
+            "position": int(m.group(1)) - 1,
+            "ref": m.group(2),
+            "alt": m.group(3),
+            "kind": "snp",
+            "coordinate": coord[0].lower() + coord[1:],
+        }
+
+    m = re.search(r"[cgn]\.(\d+)(?:_(\d+))?DEL([ATGC]+)?", variant, re.IGNORECASE)
+    if m:
+        coord = (m.group(0)[0].lower() + m.group(0)[1:]).replace("DEL", "del")
+        return {
+            "position": int(m.group(1)) - 1,
+            "ref": m.group(3) or None,
+            "alt": None,
+            "kind": "del",
+            "coordinate": coord,
+        }
+
+    m = re.search(r"[cgn]\.(\d+)(?:_(\d+))?INS([ATGC]+)?", variant, re.IGNORECASE)
+    if m:
+        coord = (m.group(0)[0].lower() + m.group(0)[1:]).replace("INS", "ins")
+        return {
+            "position": int(m.group(1)),
+            "ref": None,
+            "alt": m.group(3) or None,
+            "kind": "ins",
+            "coordinate": coord,
+        }
+
+    m = re.search(r"[cgn]\.(\d+)(?:_(\d+))?DELINS([ATGC]+)?", variant, re.IGNORECASE)
+    if m:
+        coord = (m.group(0)[0].lower() + m.group(0)[1:]).replace("DELINS", "delins")
+        return {
+            "position": int(m.group(1)) - 1,
+            "ref": None,
+            "alt": m.group(3) or None,
+            "kind": "delins",
+            "coordinate": coord,
+        }
+
+    return None
+
+
 def _allele_specific_scoring(
     candidate_seq: str,
     known_variant: str | None,
     exon_seq: str,
     chemistry: str,
     modifications: list[str],
+    spans_variant: bool = False,
 ) -> dict:
     """Score allele-specific targeting based on the known variant.
 
-    If a known_variant is provided, the ASO should ideally discriminate
-    between the mutant and wild-type allele. This is most effective for:
-    - SNPs within the target region
-    - Deletions/insertions that shift the binding site
+    An ASO can only discriminate the mutant from the wild-type allele when
+    its binding window actually spans the variant's CDS coordinate. Only
+    candidates overlapping the variant position are rewarded and flagged
+    allele-specific; all others score 0 so that results reflect real
+    positional discrimination rather than a uniform bonus for every
+    candidate.
 
     Returns allele_bonus (score adjustment) and notes about the design.
     """
     result = {"alleleBonus": 0, "alleleSpecific": False, "alleleNotes": ""}
 
     if not known_variant:
+        return result
+
+    if not spans_variant:
+        result["alleleNotes"] = (
+            f"Does not span {known_variant} at the candidate binding window; "
+            "reposition the ASO over the variant for allele discrimination."
+        )
         return result
 
     variant = known_variant.strip().upper()
@@ -928,20 +989,25 @@ def generate_candidates(
     # Build cumulative CDS offset map: exon_index -> (cds_start, cds_end)
     exon_cds_map: list[tuple[int, int]] = []
     cursor = 0
-    for exon in exons:
+    remaining_seq = seq_len
+    for i, exon in enumerate(exons):
         exon_genomic_len = exon.get("length", 0)
+        remaining_exons = len(exons) - i
         # Proportional CDS contribution for this exon
-        cds_contribution = round(seq_len * exon_genomic_len / total_genomic)
+        if i == len(exons) - 1:
+            # Last exon gets all remaining sequence
+            cds_contribution = remaining_seq
+        else:
+            cds_contribution = round(seq_len * exon_genomic_len / total_genomic)
+            # Ensure each exon gets enough room for at least one ASO binding site
+            min_contribution = min(aso_length * 2, remaining_seq // remaining_exons)
+            cds_contribution = max(min_contribution, cds_contribution)
+            cds_contribution = min(cds_contribution, remaining_seq - (remaining_exons - 1))
         cds_start = cursor
         cds_end = cursor + cds_contribution
         exon_cds_map.append((cds_start, cds_end))
         cursor = cds_end
-
-    # Clamp the last exon's end to the actual sequence length to avoid
-    # floating-point rounding drift
-    if exon_cds_map:
-        last_start, _ = exon_cds_map[-1]
-        exon_cds_map[-1] = (last_start, seq_len)
+        remaining_seq -= cds_contribution
 
     exon_count = len(exons)
 
@@ -956,28 +1022,57 @@ def generate_candidates(
 
     # A missing list means total-transcript knockdown. Invalid exon numbers
     # are ignored rather than silently using an unrelated default region.
+    # A selected exon must always remain a hard targeting constraint, including
+    # for allele-specific designs.
     is_total_knockdown = target_exon_indices is None
     requested_exons = (
         list(range(1, exon_count + 1))
         if is_total_knockdown
-        else target_exon_indices
+        else (target_exon_indices or [])
     )
     target_indices = sorted({index for index in requested_exons if 0 < index <= exon_count})
     if not target_indices and targeting_mode != "translation_start":
         return candidates
 
+    # Parse the known variant's CDS coordinate once so allele-specific
+    # candidates are always generated around it, even when the chosen exons
+    # do not contain the variant.
+    variant_pos = None
+    variant_coordinate = ""
+    if known_variant and targeting_mode != "translation_start":
+        parsed_variant = _parse_variant_position(known_variant)
+        if parsed_variant and parsed_variant["position"] < seq_len - aso_length + 1:
+            variant_pos = parsed_variant["position"]
+            variant_coordinate = parsed_variant["coordinate"]
+
     seen = set()
-    # Generate candidates with a small flanking window. Each selected exon is
-    # scanned independently for mRNA-targeting mechanisms.
-    flank = min(10, aso_length // 2)
+    # Search only windows fully contained within each selected exon. Do not
+    # borrow flanking sequence from a neighbouring exon: that can make two
+    # different exon choices yield overlapping candidate sets.
     step = max(1, aso_length // 3)
     if targeting_mode != "translation_start":
         for target_exon_index in target_indices:
             exon_start, exon_end = exon_cds_map[target_exon_index - 1]
             search_ranges.append((
-                max(0, exon_start - flank),
-                min(seq_len - aso_length, exon_end + flank),
+                exon_start,
+                min(seq_len - aso_length, exon_end - aso_length),
                 f"Exon {target_exon_index}",
+            ))
+
+    # Keep a variant-centered window inside the requested exon. Previously it
+    # was appended for every exon selection, which caused every choice to show
+    # the same top-ranked, variant-centered candidates.
+    if variant_pos is not None:
+        variant_exon_index = next(
+            (index for index, (start, end) in enumerate(exon_cds_map, 1) if start <= variant_pos < end),
+            None,
+        )
+        if is_total_knockdown or variant_exon_index in target_indices:
+            variant_exon_start, variant_exon_end = exon_cds_map[variant_exon_index - 1] if variant_exon_index else (0, seq_len)
+            search_ranges.append((
+                max(variant_exon_start, variant_pos - aso_length + 1),
+                min(variant_pos, variant_exon_end - aso_length),
+                f"Variant {variant_coordinate}",
             ))
 
     for search_start, search_end, target_label in search_ranges:
@@ -995,69 +1090,37 @@ def generate_candidates(
                 continue
             seen.add(candidate_seq)
 
+            spans_variant = (
+                variant_pos is not None
+                and offset <= variant_pos < offset + aso_length
+            )
+
             gc = _calc_gc(candidate_seq)
-            if gc < MIN_GC or gc > MAX_GC:
+            if (gc < MIN_GC or gc > MAX_GC) and not spans_variant:
                 continue
 
             tm = _calc_tm(candidate_seq)
-            sc = _self_complement_score(candidate_seq)
+            self_mfe = _self_complement_mfe(candidate_seq)
             pg = _polyg_score(candidate_seq)
             cpg = _cpg_count(candidate_seq)
 
-            # Composite quality score (0-100)
-            gc_score = max(0, 100 - abs(gc - 0.50) * 400)
-            tm_score = max(0, 100 - abs(tm - 52) * 3)
-            sc_penalty = sc * 200
-            pg_penalty = pg * 15
+            # Target duplex energy — most biologically relevant real metric
+            target_region_seq = seq[offset : offset + aso_length]
+            duplex_energy = _target_duplex_energy(candidate_seq, target_region_seq)
 
-            # Chemistry-specific bonuses — large enough to meaningfully shift rankings
-            chem_bonus = 0
-            if chemistry == "lna_gapmer":
-                chem_bonus = 15  # LNA: highest affinity + nuclease resistance
-            elif chemistry == "gapmer":
-                chem_bonus = 10  # Gapmer: most validated, strong RNase H
-            elif chemistry == "2ome":
-                chem_bonus = 5   # 2'-OMe: moderate affinity, good safety
-            elif chemistry == "sirna":
-                chem_bonus = 8   # siRNA: RISC amplification bonus
-            elif chemistry == "pmo":
-                chem_bonus = -5  # PMO: lower uptake without CPP, but splice-safe
+            # Mechanism-specific notes — informs chemistry choice without
+            # blending into an opaque composite score
+            mech_adj = _mechanism_scoring_adjustments(
+                mechanism_id, chemistry, modifications, candidate_seq, gc, tm
+            )
+            mech_notes = mech_adj["mechNotes"]
 
-            # Modification bonuses — each mod adds real differentiation
-            mod_bonus = 0
-            if "phosphorothioate" in modifications:
-                mod_bonus += 10  # PS: major nuclease resistance + protein binding
-            if "lna_wings" in modifications:
-                mod_bonus += 12  # LNA wings: strongest Tm boost per substitution
-            if "2omemod" in modifications:
-                mod_bonus += 7   # 2'-OMe wings: moderate boost, low toxicity
-            if "pmo_core" in modifications:
-                mod_bonus += 6   # PMO core: splice-switching without cleavage
-            if "pna_clamp" in modifications:
-                mod_bonus += 8   # PNA clamp: excellent exonuclease shield
-
-            # CpG penalty (immune stimulation risk)
-            cpg_penalty = max(0, (cpg - 2)) * 5
-
-            # Tissue-specific scoring adjustments
-            tissue = _tissue_scores(delivery_context, chemistry, aso_length)
-            tissue_uptake = tissue["uptake_modifier"]
-            tissue_bbb = tissue["bbb_modifier"]
-            tissue_immune = tissue["immune_modifier"]
-            tissue_chem = tissue["chem_tissue_bonus"]
-            tissue_len = tissue["length_modifier"]
-
-            # Defect-type-specific adjustments
-            defect = _defect_scores(defect_type, silencing_scope, chemistry, _nuclease_resistance_score(chemistry, modifications))
-            defect_bonus = defect["defect_bonus"]
-            defect_nuclease = defect["nuclease_preference"]
-            defect_chem = defect["chemistry_preference"]
-
-            # Mechanism-specific scoring adjustments
-            mech_adj = _mechanism_scoring_adjustments(mechanism_id, chemistry, modifications, candidate_seq, gc, tm)
-            mech_bonus = mech_adj["mechBonus"]
-
-            quality = max(0, min(100, gc_score * 0.30 + tm_score * 0.40 - sc_penalty - pg_penalty + chem_bonus + mod_bonus - cpg_penalty + tissue_uptake + tissue_bbb + tissue_immune + tissue_chem + tissue_len + defect_bonus + defect_nuclease + defect_chem + mech_bonus))
+            # Defect-type-specific notes
+            defect = _defect_scores(
+                defect_type, silencing_scope, chemistry,
+                _nuclease_resistance_score(chemistry, modifications),
+            )
+            defect_notes = defect["defect_notes"]
 
             if is_total_knockdown:
                 region_label = f"Full Transcript offset +{offset}"
@@ -1068,14 +1131,29 @@ def generate_candidates(
                 exon_num = None
                 exon_len = None
             else:
-                relative_pos = offset - exon_start
-                if relative_pos < 0:
-                    region_label = f"{target_label} 5' flank {relative_pos}"
-                elif offset + aso_length > exon_end:
-                    region_label = f"{target_label} 3' flank +{relative_pos}"
+                # Determine exon number for this candidate
+                if target_label.startswith("Exon "):
+                    exon_num = int(target_label.removeprefix("Exon "))
                 else:
-                    region_label = f"{target_label} offset +{relative_pos}"
-                exon_num = int(target_label.removeprefix("Exon ")) if target_label.startswith("Exon ") else None
+                    exon_num = next(
+                        (ei for ei, (es, ee) in enumerate(exon_cds_map, 1) if es <= offset < ee),
+                        None,
+                    )
+                # If the candidate falls within an exon but exon_start is not set
+                # (e.g. variant-based ranges), look up the exon coordinates.
+                if exon_num is not None and exon_start is None:
+                    exon_start, exon_end = exon_cds_map[exon_num - 1]
+                # Compute region label
+                if exon_start is None:
+                    region_label = f"{target_label} offset +{offset}"
+                else:
+                    relative_pos = offset - exon_start
+                    if relative_pos < 0:
+                        region_label = f"{target_label} 5' flank {relative_pos}"
+                    elif offset + aso_length > exon_end:
+                        region_label = f"{target_label} 3' flank +{relative_pos}"
+                    else:
+                        region_label = f"{target_label} offset +{relative_pos}"
                 exon_len = (exon_end - exon_start) if (exon_start is not None and exon_end is not None) else None
 
             # Compute additional drug-like properties
@@ -1086,48 +1164,50 @@ def generate_candidates(
             complexity_val = _sequence_complexity(candidate_seq)
             off_target = _off_target_risk(candidate_seq, complexity_val)
             immune_risk = _immune_stimulation_risk(candidate_seq, chemistry)
-            drug_like = _drug_likeness_score(quality, nuclease_score, uptake_score, off_target)
             stability = _duplex_stability(gc, tm, aso_length)
             mw = _molecular_weight(candidate_seq)
             ext_coeff = _extinction_coefficient(candidate_seq)
 
-            # Allele-specific scoring
+            # Allele-specific scoring — only candidates whose binding window
+            # actually spans the variant's CDS coordinate are flagged
             allele = _allele_specific_scoring(
-                candidate_seq, known_variant, candidate_seq, chemistry, modifications
+                candidate_seq, known_variant, seq, chemistry, modifications,
+                spans_variant=spans_variant,
             )
 
-            # Apply allele-specific bonus to quality score
-            adjusted_quality = min(100, quality + allele["alleleBonus"])
+            # Tissue context modifiers (separate from the removed composite score)
+            tissue = _tissue_scores(delivery_context, chemistry, aso_length)
+            tissue_uptake = tissue["uptake_modifier"]
+            tissue_bbb = tissue["bbb_modifier"]
+            tissue_immune = tissue["immune_modifier"]
+            tissue_chem = tissue["chem_tissue_bonus"]
+            tissue_len = tissue["length_modifier"]
 
             candidates.append({
                 "sequence": _reverse_complement(candidate_seq),
                 "length": aso_length,
                 "gcContent": round(gc * 100, 1),
-                "meltingTemp": tm,
-                "selfComplementScore": round(sc, 4),
-                "polygTracts": pg,
-                "qualityScore": round(adjusted_quality, 1),
+                "polyGPass": pg == 0,
+                "meltingTempC": tm,  # Real nearest-neighbor Tm (°C) via primer3
+                "selfStructureMfe": self_mfe,  # Real ViennaRNA MFE (kcal/mol)
+                "targetDuplexEnergy": duplex_energy,  # Real ViennaRNA duplex ΔG (kcal/mol)
+                "learnedEfficacy": {
+                    "available": False,
+                    "value": None,
+                    "modelInfo": "Not yet trained",
+                    "scopeCaveat": None,
+                },
                 "targetRegion": region_label,
                 "mechanismId": mechanism_id,
                 "chemistry": chemistry,
                 "modifications": modifications,
                 "exonNumber": exon_num,
                 "exonLength": exon_len,
-                "gcScore": round(gc_score, 1),
-                "tmScore": round(tm_score, 1),
-                "selfComplementPenalty": round(sc_penalty, 1),
-                "polygPenalty": round(pg_penalty, 1),
-                "chemBonus": chem_bonus,
-                "modBonus": mod_bonus,
-                "mechanismBonus": mech_bonus,
-                "mechanismNotes": mech_adj["mechNotes"],
                 "cpgCount": cpg,
-                "cpgPenalty": cpg_penalty,
                 "longestHomopolymer": _longest_homopolymer(candidate_seq),
                 "purineContent": _purine_content(candidate_seq),
                 "sequenceComplexity": complexity_val,
                 "gcSkew": _gc_skew(candidate_seq),
-                "bindingEnergy": _estimated_binding_energy(gc, tm),
                 "molecularWeight": mw,
                 "extinctionCoefficient": ext_coeff,
                 "nucleaseResistance": nuclease_score,
@@ -1136,7 +1216,6 @@ def generate_candidates(
                 "synthesisDifficulty": synthesis_score,
                 "offTargetRisk": off_target,
                 "immuneStimulation": immune_risk,
-                "drugLikeness": drug_like,
                 "duplexStability": stability,
                 "deliveryContext": delivery_context or "",
                 "tissueUptakeModifier": tissue_uptake,
@@ -1147,16 +1226,24 @@ def generate_candidates(
                 "tissueNotes": tissue["tissue_notes"],
                 "defectType": defect_type or "",
                 "silencingScope": silencing_scope or "",
-                "defectBonus": defect_bonus,
-                "defectNucleasePreference": defect_nuclease,
-                "defectChemPreference": defect_chem,
-                "defectNotes": defect["defect_notes"],
+                "defectNotes": defect_notes,
+                "mechanismNotes": mech_notes,
                 "knownVariant": known_variant or "",
                 "alleleSpecific": allele["alleleSpecific"],
-                "alleleBonus": allele["alleleBonus"],
                 "alleleNotes": allele["alleleNotes"],
             })
 
-    # Sort by quality descending, return top 10
-    candidates.sort(key=lambda c: c["qualityScore"], reverse=True)
+    # Rank by target duplex energy (most negative = strongest predicted
+    # target engagement) as the primary real metric. When a known variant
+    # is supplied, candidates whose binding window spans the variant position
+    # are ranked first, with target duplex energy as the tiebreaker.
+    if variant_pos is not None:
+        candidates.sort(
+            key=lambda c: (
+                not c["alleleSpecific"],
+                c["targetDuplexEnergy"],
+            )
+        )
+    else:
+        candidates.sort(key=lambda c: c["targetDuplexEnergy"])
     return candidates[:10]

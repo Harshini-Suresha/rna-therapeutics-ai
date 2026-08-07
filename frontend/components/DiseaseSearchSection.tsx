@@ -36,7 +36,7 @@ export default function DiseaseSearchSection({
   }
 
   return (
-    <div className={`rounded-xl border p-4 transition-colors ${active ? "border-brand bg-brand/5" : "border-slate-200 bg-white"}`}>
+    <div className={`rounded-xl border p-4 transition-colors ${active ? "border-brand bg-brand/5" : "border-[#E5E7EB] bg-white"}`}>
       <div className="flex items-center justify-between">
         <p className="text-[13px] font-semibold text-slate-700">Or search by disease</p>
         {active && (

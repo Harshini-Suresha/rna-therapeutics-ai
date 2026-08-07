@@ -206,7 +206,7 @@ export default function NewProjectPage() {
                   className={`text-left rounded-lg border p-3 transition-colors ${
                     therapeuticGoal === g.name
                       ? "border-brand bg-brand/5 ring-2 ring-brand/20"
-                      : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                      : "border-[#E5E7EB] hover:border-slate-300 hover:bg-slate-50"
                   }`}
                 >
                   <p className="text-[12.5px] font-semibold text-slate-800">
@@ -262,7 +262,7 @@ export default function NewProjectPage() {
         <Card>
           <SectionHeader step="4" title="Review & Launch" />
           <div className="px-5 pb-5">
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 space-y-3">
+            <div className="rounded-lg border border-[#E5E7EB] bg-slate-50 p-4 space-y-3">
               <ReviewRow label="Project" value={name || "(unnamed)"} />
               <ReviewRow label="Description" value={description || "—"} />
               <ReviewRow
@@ -306,7 +306,7 @@ export default function NewProjectPage() {
           <button
             onClick={() => setStep((s) => s + 1)}
             disabled={!canNext()}
-            className="flex items-center gap-1.5 rounded bg-[#061b49] px-4 py-2 text-[12.5px] font-medium text-white transition-colors hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded bg-brand px-4 py-2 text-[12.5px] font-medium text-white transition-colors hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-50"
           >
             Next
             <ArrowRight className="h-3.5 w-3.5" />

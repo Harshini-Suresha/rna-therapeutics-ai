@@ -21,6 +21,7 @@ interface NavItem {
   icon: React.ElementType;
   href: string;
   badge?: string;
+  color?: string;
 }
 
 const PIPELINE_NAV: { section: string; items: NavItem[] }[] = [
@@ -36,16 +37,17 @@ const PIPELINE_NAV: { section: string; items: NavItem[] }[] = [
   {
     section: "pipeline",
     items: [
-      { label: "Target Discovery", icon: Crosshair, href: "/targets" },
-      { label: "ASO Design", icon: PenSquare, href: "/designs" },
-      { label: "Computational Analysis", icon: BarChart3, href: "/analysis" },
-      { label: "Experimental Validation", icon: FlaskConical, href: "/validation" },
+      { label: "Target Discovery", icon: Crosshair, href: "/targets", color: "text-pipeline-discovery" },
+      { label: "ASO Design", icon: PenSquare, href: "/designs", color: "text-pipeline-design" },
+      { label: "RNA Engineering", icon: Dna, href: "/rna-engineering" },
+      { label: "Computational Analysis", icon: BarChart3, href: "/analysis", color: "text-pipeline-analysis" },
+      { label: "Experimental Validation", icon: FlaskConical, href: "/validation", color: "text-pipeline-validation" },
     ],
   },
   {
     section: "output",
     items: [
-      { label: "Reports", icon: FileText, href: "/reports" },
+      { label: "Reports", icon: FileText, href: "/reports", color: "text-pipeline-reports" },
       { label: "Knowledge Base", icon: BookOpen, href: "/knowledge" },
       { label: "Upload Sequence", icon: UploadCloud, href: "/upload-sequence" },
     ],
@@ -67,11 +69,10 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className="hidden lg:flex lg:w-56 shrink-0 flex-col bg-gradient-to-b from-navy-950 to-navy-900 text-white h-screen sticky top-0">
-      {/* Logo */}
-      <div className="px-3 py-3 border-b border-white/[0.06]">
-        <a href="/dashboard" className="flex items-center gap-2.5 px-2.5 py-2 hover:bg-white/[0.04] transition-colors">
-          <Dna className="h-4 w-4 text-indigo-400 shrink-0" strokeWidth={2} />
+    <aside className="hidden lg:flex lg:w-56 shrink-0 flex-col bg-sidebar text-white h-screen sticky top-0">
+      <div className="px-3 py-3 border-b border-white/[0.08]">
+        <a href="/dashboard" className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-sidebar-hover transition-colors">
+          <Dna className="h-4 w-4 text-accent-biology shrink-0" strokeWidth={2} />
           <div className="leading-tight">
             <p className="text-[12px] font-semibold tracking-wide text-white">
               RNA THERAPEUTICS
@@ -81,12 +82,11 @@ export default function Sidebar() {
         </a>
       </div>
 
-      {/* Nav */}
       <nav className="sidebar-scroll flex-1 overflow-y-auto px-2.5 py-3">
         {PIPELINE_NAV.map((group, gi) => (
           <div key={group.section} className={gi > 0 ? "mt-3" : ""}>
             {gi > 0 && (
-              <div className="mx-2 mb-1.5 border-t border-white/[0.06]" />
+              <div className="mx-2 mb-1.5 border-t border-white/[0.08]" />
             )}
             <p className="px-2 mb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
               {group.section === "overview"
@@ -105,15 +105,17 @@ export default function Sidebar() {
                   <li key={item.label}>
                     <a
                       href={item.href}
-                      className={`group flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] font-semibold transition-colors ${
+                      className={`group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium transition-colors ${
                         active
-                          ? "bg-brand text-white"
-                          : "text-slate-300 hover:bg-white/[0.06] hover:text-white"
+                          ? "bg-sidebar-active text-white"
+                          : "text-slate-300 hover:bg-sidebar-hover hover:text-white"
                       }`}
                     >
                       <Icon
                         className={`h-4 w-4 shrink-0 ${
-                          active ? "text-white" : "text-slate-400 group-hover:text-slate-200"
+                          active
+                            ? item.color ?? "text-accent-biology"
+                            : "text-slate-400 group-hover:text-slate-200"
                         }`}
                         strokeWidth={active ? 2.2 : 2}
                       />
@@ -132,7 +134,7 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      <div className="px-4 py-3 text-[11px] font-medium leading-relaxed border-t border-white/[0.06]">
+      <div className="px-4 py-3 text-[11px] font-medium leading-relaxed border-t border-white/[0.08]">
         <span className="text-slate-300">&copy; 2026, KoshKey Sciences Pvt Ltd</span>
         <br />
         <a href="mailto:mail@koshkey.com" className="text-slate-300 hover:text-white transition-colors">

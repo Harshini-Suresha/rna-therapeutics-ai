@@ -12,7 +12,7 @@ export function Card({
 }) {
   return (
     <div
-      className={`border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-xl ${className}`}
+      className={`border border-[#E5E7EB] dark:border-slate-700 bg-white dark:bg-slate-800 rounded-xl ${className}`}
     >
       {children}
     </div>
@@ -60,7 +60,7 @@ export function FieldLabel({
             ?
           </button>
           {open && (
-            <span className="absolute left-5 top-0 z-20 mt-0 w-56 rounded border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] leading-relaxed text-slate-600 shadow-md">
+            <span className="absolute left-5 top-0 z-20 mt-0 w-56 rounded border border-[#E5E7EB] bg-white px-2.5 py-1.5 text-[11px] leading-relaxed text-slate-600 shadow-md">
               {hint}
             </span>
           )}

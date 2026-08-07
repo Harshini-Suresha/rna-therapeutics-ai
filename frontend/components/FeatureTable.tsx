@@ -240,7 +240,7 @@ export default function FeatureTable({
           </span>
           <button
             onClick={() => downloadCsv(filteredRows)}
-            className="flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-[10px] font-medium text-slate-500 hover:bg-slate-50"
+            className="flex items-center gap-1 rounded-md border border-[#E5E7EB] px-2 py-1 text-[10px] font-medium text-slate-500 hover:bg-slate-50"
           >
             <Download className="h-3 w-3" /> CSV
           </button>
@@ -279,13 +279,13 @@ export default function FeatureTable({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search..."
-            className="rounded-md border border-slate-200 bg-white pl-6 pr-2 py-1 text-[11px] text-slate-600 placeholder:text-slate-400 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/20 w-40"
+            className="rounded-md border border-[#E5E7EB] bg-white pl-6 pr-2 py-1 text-[11px] text-slate-600 placeholder:text-slate-400 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/20 w-40"
           />
         </div>
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto rounded-lg border border-slate-200">
+      <div className="overflow-x-auto rounded-lg border border-[#E5E7EB]">
         <table className="w-full text-[11px]">
           <thead>
             <tr className="bg-slate-50 text-left text-slate-500">

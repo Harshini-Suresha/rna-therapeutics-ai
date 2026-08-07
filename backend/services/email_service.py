@@ -89,3 +89,45 @@ If you did not create an account, you can safely ignore this email.
     except Exception as e:
         logger.error(f"Failed to send verification email to {email}: {e}")
         return False
+
+
+def send_report_email(email: str, name: str, report_content: str, filename: str) -> tuple[bool, str]:
+    """Email a user-requested report to the account's registered address.
+
+    Returns an explicit delivery status so development environments without
+    SMTP never claim that an email was sent.
+    """
+    if not SMTP_HOST:
+        logger.warning("Report email requested for %s, but SMTP is not configured.", email)
+        return False, "SMTP is not configured, so the report could not be emailed."
+
+    try:
+        msg = EmailMessage()
+        msg["Subject"] = "Your ASO candidate report"
+        msg["From"] = SMTP_FROM
+        msg["To"] = email
+        msg.set_content(
+            f"Hi {name or 'there'},\n\n"
+            "Your requested ASO candidate report is attached.\n\n"
+            "— RNA Therapeutics Platform"
+        )
+        msg.add_attachment(
+            report_content.encode("utf-8"),
+            maintype="text",
+            subtype="plain",
+            filename=filename,
+        )
+
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+            server.ehlo()
+            if SMTP_PORT != 25:
+                server.starttls()
+            if SMTP_USER:
+                server.login(SMTP_USER, SMTP_PASS)
+            server.send_message(msg)
+
+        logger.info("ASO report email sent to %s", email)
+        return True, f"Report emailed to {email}."
+    except Exception as exc:
+        logger.error("Failed to send ASO report email to %s: %s", email, exc)
+        return False, "The report could not be emailed. Please try again later."

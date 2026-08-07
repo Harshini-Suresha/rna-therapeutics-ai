@@ -17,6 +17,7 @@
   "asoChemistry": "Fully modified RNase H-inactive ASOs including PMO, PNA, 2′-OMe, 2′-MOE and some LNA-based steric-blocking designs.",
   "typicalLength": "Approximately 15–25 nucleotides, depending on chemistry and target.",
   "designRules": "Literature synthesis: target accessible initiation regions; maintain high binding affinity; use RNase H-inactive chemistries; minimize off-target complementarity.",
+  "scoring": "Candidates are ranked by predicted target duplex free energy (ΔG, kcal/mol) computed using ViennaRNA duplexfold — more negative values indicate stronger predicted ASO-target binding. Biophysical metrics reported: GC content, nearest-neighbor Tm (primer3), self-structure MFE (ViennaRNA fold), poly-G tracts, CpG count, homopolymer runs, purine content, GC skew, sequence complexity, molecular weight, extinction coefficient. Drug-like estimates: nuclease resistance, cellular uptake, BBB crossing, off-target risk, immune stimulation, synthesis difficulty.",
   "secondaryStructureRequirement": "Target accessible, unstructured regions surrounding the translation initiation site whenever possible.",
   "offTargetConsiderations": "Unintended binding to homologous transcripts may inhibit translation of non-target genes; evaluate transcriptome-wide complementarity.",
   "advantages": "Preserves RNA integrity; reversible mechanism; suitable when transcript degradation is undesirable.",

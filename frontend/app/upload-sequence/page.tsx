@@ -792,7 +792,7 @@ export default function UploadSequencePage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-[#F5F6FA]">
+    <div className="flex min-h-screen bg-[#F8FAFC]">
       <Sidebar />
       <div className="flex min-h-screen flex-1 flex-col">
         <Topbar />
@@ -1072,7 +1072,7 @@ export default function UploadSequencePage() {
                         className={`flex items-start gap-3 rounded-xl border p-4 text-left transition-colors ${
                           isSelected
                             ? "border-brand bg-brand/5 ring-1 ring-brand"
-                            : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                            : "border-[#E5E7EB] bg-white hover:border-slate-300 hover:bg-slate-50"
                         }`}
                       >
                         <span
@@ -1181,19 +1181,19 @@ export default function UploadSequencePage() {
 
               {/* Summary bar */}
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-card">
+                <div className="rounded-xl border border-[#E5E7EB] bg-white p-3 shadow-card">
                   <p className="text-[10px] uppercase tracking-wider text-slate-400">Sequence Type</p>
                   <p className="text-[15px] font-bold text-slate-800 mt-0.5 uppercase">{analysis.sequenceType}</p>
                 </div>
-                <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-card">
+                <div className="rounded-xl border border-[#E5E7EB] bg-white p-3 shadow-card">
                   <p className="text-[10px] uppercase tracking-wider text-slate-400">Length</p>
                   <p className="text-[15px] font-bold text-slate-800 mt-0.5">{analysis.length.toLocaleString()} nt</p>
                 </div>
-                <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-card">
+                <div className="rounded-xl border border-[#E5E7EB] bg-white p-3 shadow-card">
                   <p className="text-[10px] uppercase tracking-wider text-slate-400">GC Content</p>
                   <p className="text-[15px] font-bold text-slate-800 mt-0.5">{analysis.gcContent}%</p>
                 </div>
-                <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-card">
+                <div className="rounded-xl border border-[#E5E7EB] bg-white p-3 shadow-card">
                   <p className="text-[10px] uppercase tracking-wider text-slate-400">Modality</p>
                   <p className="text-[15px] font-bold text-slate-800 mt-0.5 uppercase">{MODALITIES.find((m) => m.id === selectedModality)?.name ?? selectedModality}</p>
                 </div>

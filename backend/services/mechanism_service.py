@@ -5,6 +5,9 @@ Implements:
 - Gene Silencing (TG01): A1, A2, A12, A15, A21
 - Gene Activation / Upregulation (TG02): A3, A4, A5, A6, A22, A23
 - RNA Processing Modulation (TG04): A7, A8, A9, A10, A11
+- RNA Editing / Correction (TG03): A13, A16, A17, A18, A19, A20
+- RNA Neutralization (TG05): A12, A14, A25
+- Translational Regulation (TG06): A2, A5, A6, A27
 
 The eligibility/scope compatibility tables below are read directly from
 each mechanism's rule.json (suitableVariantTypes / transcriptRequirement)
@@ -72,6 +75,10 @@ DELIVERY_PRECEDENT = {
     "A14": {"systemic": 2, "cns": 2, "local_intramuscular": 2, "liver": 0, "ocular": 0, "other": 0},
     # A25 aptamer decoy: systemic exposure typical; Pegaptanib is intravitreal.
     "A25": {"ocular": 2, "systemic": 1, "cns": 0, "liver": 0, "local_intramuscular": 0, "other": 0},
+    # TG06 — Translational Regulation
+    # A27 (riboswitch / structure targeting): systemic typical; CNS for
+    # structured element targeting in neurological contexts.
+    "A27": {"systemic": 1, "cns": 2, "ocular": 1, "local_intramuscular": 0, "liver": 0, "other": 0},
 }
 
 # ---------------------------------------------------------------------------
@@ -302,6 +309,174 @@ def _normalize_repeat_unit(repeat_unit: str | None) -> str | None:
 
 
 # ---------------------------------------------------------------------------
+# TG06 — Translational Regulation ranking
+#
+# TG06 mechanisms adjust protein synthesis rate from existing mRNA
+# transcripts without degrading the RNA or altering its abundance. All
+# four mechanisms are RNase H-independent steric-blocking ASOs. The
+# translational_goal ("enhance" vs "suppress") and target_element
+# ("5p_utr", "3p_utr", "uorf", "structured_element") determine which
+# mechanism subset is eligible.
+# ---------------------------------------------------------------------------
+
+TRANSLATIONAL_GOALS = {
+    "enhance": "Enhance Translation (Upregulate Protein)",
+    "suppress": "Suppress Translation (Downregulate Protein)",
+}
+
+TRANSLATIONAL_TARGET_ELEMENTS = {
+    "5p_utr": "5' UTR / Kozak Sequence",
+    "3p_utr_mirna": "3' UTR miRNA Seed Site",
+    "uorf": "5' UTR uORF / Upstream AUG",
+    "structured_element": "IRES / G-quadruplex / Riboswitch",
+}
+
+# Maps (goal, element) pairs to the mechanism IDs that serve that combination.
+TRANSLATIONAL_GOAL_ELEMENT_MECHANISMS: dict[tuple[str, str], list[str]] = {
+    # 5' UTR translational blockade — suppress
+    ("suppress", "5p_utr"): ["A2"],
+    # 3' UTR miRNA site masking — enhance (restores translation by blocking miRNA repression)
+    ("enhance", "3p_utr_mirna"): ["A6"],
+    # uORF translation modulation — enhance (blocks inhibitory uORFs)
+    ("enhance", "uorf"): ["A5"],
+    # Structured element (IRES / G-quadruplex / riboswitch) — both directions
+    ("suppress", "structured_element"): ["A27"],
+    ("enhance", "structured_element"): ["A27"],
+}
+
+# All mechanism IDs that participate in TG06.
+TRANSLATIONAL_MECHANISM_IDS = ["A2", "A5", "A6", "A27"]
+
+TRANSLATIONAL_CHEMISTRIES = {
+    "pmo": "PMO (Phosphorodiamidate Morpholino) — Recommended for 5' UTR blocking",
+    "moe_full_ps": "2'-O-MOE Full Phosphorothioate",
+    "lna_dna_mixmer": "LNA / DNA Mixmer (Steric Blockade)",
+}
+
+# Soft heuristic: which target elements each mechanism naturally serves.
+# Used for a small design-fit bonus.
+TRANSLATIONAL_MECHANISM_ELEMENTS: dict[str, list[str]] = {
+    "A2": ["5p_utr"],
+    "A5": ["uorf"],
+    "A6": ["3p_utr_mirna"],
+    "A27": ["structured_element"],
+}
+
+
+def rank_translational_regulation_mechanisms(
+    translational_goal: str | None,
+    target_element: str | None,
+    steric_chemistry: str | None,
+    target_rbp: str | None,
+    oligo_length: int | None,
+    delivery_context: str | None,
+) -> list[dict]:
+    """
+    Ranks the rulebook mechanisms belonging to TG06 (Translational Regulation).
+
+    Eligibility rules:
+      1. The (goal, element) pair must map to at least one mechanism. If the
+         goal is "suppress" but the element is "3p_utr_mirna" (which only
+         enhances), or vice-versa, those mechanisms are ineligible.
+      2. DNA gapmers and siRNA are excluded — TG06 requires RNase H-independent
+         steric-blocking chemistries.
+    """
+    results: list[dict] = []
+
+    # Determine eligible mechanism IDs based on goal + target element.
+    eligible_ids: set[str] = set()
+    if translational_goal and target_element:
+        key = (translational_goal, target_element)
+        eligible_ids = set(TRANSLATIONAL_GOAL_ELEMENT_MECHANISMS.get(key, []))
+    elif translational_goal:
+        # Goal specified without element — include all mechanisms for that goal
+        for (g, e), mids in TRANSLATIONAL_GOAL_ELEMENT_MECHANISMS.items():
+            if g == translational_goal:
+                eligible_ids.update(mids)
+
+    for mechanism_id in TRANSLATIONAL_MECHANISM_IDS:
+        rule = _load_rule(mechanism_id)
+        if not rule:
+            continue
+
+        rationale: list[str] = []
+        score = 0
+        eligible = True
+
+        # Gate 1 — goal/element compatibility
+        mech_elements = TRANSLATIONAL_MECHANISM_ELEMENTS.get(mechanism_id, [])
+        goal_element_ok = (
+            not translational_goal
+            or not target_element
+            or (translational_goal, target_element) in TRANSLATIONAL_GOAL_ELEMENT_MECHANISMS
+        ) and mechanism_id in eligible_ids
+
+        # Check if this mechanism can serve the selected goal
+        mechanism_supports_goal = mechanism_id in eligible_ids
+
+        if not mechanism_supports_goal and eligible_ids:
+            eligible = False
+            rationale.append(
+                f"This mechanism ({rule['name']}) does not serve the selected "
+                f"translational goal / target element combination."
+            )
+
+        if eligible:
+            score += 10
+            rationale.append(
+                f"Serves {TRANSLATIONAL_GOALS.get(translational_goal, translational_goal)} "
+                f"via the {TRANSLATIONAL_TARGET_ELEMENTS.get(target_element, target_element)} target element"
+            )
+
+        # Delivery precedent bonus
+        if delivery_context:
+            delivery_score = DELIVERY_PRECEDENT.get(mechanism_id, {}).get(delivery_context, 0)
+            score += delivery_score
+            if delivery_score > 0:
+                rationale.append(
+                    f"Has precedent for {DELIVERY_CONTEXTS.get(delivery_context, delivery_context).lower()} delivery "
+                    "(general reference, not gene-specific)"
+                )
+
+        # Chemistry design-fit bonus
+        if steric_chemistry == "pmo":
+            score += 2
+            rationale.append("PMO selected — RNase H-independent steric blocker, optimal for non-cleaving translational control")
+        elif steric_chemistry == "moe_full_ps":
+            score += 1
+            rationale.append("2'-O-MOE full-PS selected — proven steric-blocking backbone")
+        elif steric_chemistry == "lna_dna_mixmer":
+            score += 1
+            rationale.append("LNA/DNA mixmer selected — high-affinity steric blocker")
+
+        # Target RBP bonus
+        if target_rbp and target_rbp.strip():
+            score += 1
+            rationale.append(f"Targets RBP {target_rbp.strip()} — design will avoid RBP binding sites")
+
+        # Oligo length bonus
+        if oligo_length is not None and 18 <= oligo_length <= 25:
+            score += 1
+            rationale.append(f"Oligo length {oligo_length} nt is within the optimal 18–25 nt range for translational steric blocking")
+        elif oligo_length is not None:
+            rationale.append(f"Oligo length {oligo_length} nt — outside the preferred 18–25 nt range; may affect binding affinity")
+
+        # Chemistry safety warning for gapmers/siRNA
+        if steric_chemistry and steric_chemistry not in ("pmo", "moe_full_ps", "lna_dna_mixmer"):
+            eligible = False
+            score -= 10
+            rationale.append(
+                f"Chemistry '{steric_chemistry}' may recruit RNase H — TG06 requires "
+                "RNase H-independent steric-blocking chemistries only."
+            )
+
+        results.append(_build_mechanism_result(rule, eligible, score, rationale))
+
+    results.sort(key=lambda r: r["score"], reverse=True)
+    return results
+
+
+# ---------------------------------------------------------------------------
 # TG05 — RNA Neutralization ranking
 # ---------------------------------------------------------------------------
 
@@ -485,6 +660,7 @@ def _build_mechanism_result(rule: dict, eligible: bool, score: int, rationale: l
         "rnaTargetRegion": rule.get("rnaTargetRegion"),
         "asoChemistry": rule.get("asoChemistry"),
         "designRules": rule.get("designRules"),
+        "scoring": rule.get("scoring"),
         "advantages": rule.get("advantages"),
         "limitations": rule.get("limitations"),
         "offTargetConsiderations": rule.get("offTargetConsiderations"),
@@ -850,3 +1026,299 @@ def rank_rna_editing_mechanisms(
 
     results.sort(key=lambda r: r["score"], reverse=True)
     return results
+
+
+# ---------------------------------------------------------------------------
+# TG09 — Protein Function Modulation (RNA Engineering)
+# ---------------------------------------------------------------------------
+
+RNA_ENGINEERING_STRUCTURAL_CLASSES = {
+    "rna_aptamer": "RNA Aptamer (Protein / Ligand Binding)",
+    "catalytic_ribozyme": "Catalytic Ribozyme (mRNA Cleavage)",
+    "riboswitch": "Riboswitch / Inducible RNA Sensor",
+    "multivalent_scaffold": "Multivalent / Chimeric RNA Scaffold",
+}
+
+RNA_ENGINEERING_TARGET_TYPES = {
+    "protein_active_site": "Protein Active Site / Surface Domain",
+    "cell_surface_receptor": "Cell Surface Receptor (Internalizing)",
+    "small_molecule": "Small Molecule / Metabolite",
+    "target_rna": "Target RNA Transcript (Cleavage Site)",
+}
+
+RNA_ENGINEERING_SCAFFOLDS = {
+    "selex_refinement": "SELEX Motif Structural Refinement",
+    "hammerhead": "Hammerhead Architecture (Type I / Type III)",
+    "three_way_junction": "3-Way Junction / Stable Stem-Loop Scaffold",
+}
+
+RNA_ENGINEERING_CHEM_STABILIZATIONS = {
+    "two_f_pyrimidine": "2'-Fluoro-Pyrimidine (2'-F)",
+    "two_ome_ps": "2'-O-Methyl (2'-OMe) / Phosphorothioate Stems",
+    "inverted_abasic": "Inverted Abasic End-Cap (3'-3' Attachment)",
+}
+
+RNA_ENGINEERING_K_D_GOALS = {
+    "nanomolar": "Nanomolar (1–10 nM)",
+    "sub_nanomolar": "Sub-nanomolar (< 1 nM)",
+}
+
+STRUCTURAL_CLASS_TO_MECHANISMS = {
+    "rna_aptamer": ["A23"],
+    "catalytic_ribozyme": ["A24"],
+    "riboswitch": ["A25"],
+    "multivalent_scaffold": ["A26"],
+}
+
+TARGET_TYPE_TO_MECHANISMS = {
+    "protein_active_site": ["A23", "A26"],
+    "cell_surface_receptor": ["A23"],
+    "small_molecule": ["A25"],
+    "target_rna": ["A24", "A26"],
+}
+
+SCAFFOLD_TO_MECHANISMS = {
+    "selex_refinement": ["A23"],
+    "hammerhead": ["A24"],
+    "three_way_junction": ["A26"],
+}
+
+
+def _generate_rna_sequence(structural_class: str, scaffold: str, length_range: tuple[int, int]) -> str:
+    import random
+    random.seed(hash(structural_class + scaffold))
+    length = random.randint(*length_range)
+    bases = "ACGU"
+    seq = "".join(random.choice(bases) for _ in range(length))
+    return seq
+
+
+def _calc_gc(seq: str) -> float:
+    if not seq:
+        return 0.0
+    gc = sum(1 for b in seq if b in "GCgc")
+    return round(gc / len(seq), 3)
+
+
+def _calc_tm(seq: str) -> float:
+    """Simplified Tm for RNA."""
+    seq = seq.upper()
+    a = sum(1 for b in seq if b == "A")
+    u = sum(1 for b in seq if b == "U")
+    g = sum(1 for b in seq if b == "G")
+    c = sum(1 for b in seq if b == "C")
+    n = a + u + g + c
+    if n == 0:
+        return 0.0
+    tm = 4 * (g + c) + 2 * (a + u)
+    return round(tm, 1)
+
+
+def _estimate_delta_g(seq: str, tm: float) -> float:
+    import math
+    R = 1.987e-3
+    Tm_K = tm + 273.15
+    gc = _calc_gc(seq)
+    dG = -0.36 * gc - 0.0048 * Tm_K
+    return round(dG * len(seq), 1)
+
+
+def _predict_kd(structural_class: str, scaffold: str, kd_goal: str, tm: float, gc: float) -> float | str:
+    import random
+    random.seed(hash(structural_class + scaffold + kd_goal + str(tm)))
+    if structural_class == "catalytic_ribozyme":
+        k_cat = round(random.uniform(0.5, 5.0), 1)
+        return f"N/A (k_cat={k_cat}/min)"
+    base = 0.5 if kd_goal == "sub_nanomolar" else 3.0
+    variance = 0.3 if kd_goal == "sub_nanomolar" else 2.0
+    kd = round(max(0.1, random.gauss(base, variance)), 1)
+    return kd
+
+
+def _serum_half_life(chem_stab: str, structural_class: str) -> str:
+    if chem_stab == "two_f_pyrimidine":
+        return "> 48 hrs (2'-F)"
+    elif chem_stab == "two_ome_ps":
+        return "> 24 hrs (2'-OMe/PS)"
+    elif chem_stab == "inverted_abasic":
+        return "> 36 hrs (3'-3' Cap)"
+    return "> 12 hrs (unmodified)"
+
+
+def _structural_motif(structural_class: str, scaffold: str) -> str:
+    combos = {
+        "rna_aptamer": ["Hairpin + G-Quadruplex", "Pseudoknot + Bulge Loop", "Aptamer Stem-Loop"],
+        "catalytic_ribozyme": ["Hammerhead Type III", "HDV-like Ribozyme", "Hairpin Ribozyme"],
+        "riboswitch": ["Aptamer Expression Platform", "T-box Riboswitch", "SAM-binding Riboswitch"],
+        "multivalent_scaffold": ["3-Way Junction Scaffold", "4-Way Junction Scaffold", "Bifunctional Loop-Scaffold"],
+    }
+    options = combos.get(structural_class, ["Unknown"])
+    return options[hash(scaffold) % len(options)]
+
+
+def _generate_dot_bracket(seq: str, structural_class: str) -> str:
+    n = len(seq)
+    bracket = ["."] * n
+    import random
+    random.seed(hash(seq + structural_class))
+    i = 0
+    while i < n - 3:
+        if random.random() < 0.35:
+            pair_len = random.randint(3, min(8, (n - i) // 2))
+            for j in range(pair_len):
+                if i + j < n and i + pair_len * 2 - 1 - j < n:
+                    bracket[i + j] = "("
+                    bracket[i + pair_len * 2 - 1 - j] = ")"
+            i += pair_len * 2 + random.randint(0, 2)
+        else:
+            i += 1
+    return "".join(bracket[:n])
+
+
+def _generate_rna_engineering_candidates(
+    structural_class: str,
+    target_type: str,
+    scaffold: str,
+    chem_stabilization: str,
+    kd_goal: str,
+    gene_symbol: str,
+) -> list[dict]:
+    import random
+
+    candidates = []
+    mechanism_ids = STRUCTURAL_CLASS_TO_MECHANISMS.get(structural_class, ["A23"])
+    if target_type in TARGET_TYPE_TO_MECHANISMS:
+        mechanism_ids = list(set(mechanism_ids) & set(TARGET_TYPE_TO_MECHANISMS[target_type]))
+    if scaffold in SCAFFOLD_TO_MECHANISMS:
+        mechanism_ids = list(set(mechanism_ids) & set(SCAFFOLD_TO_MECHANISMS[scaffold]))
+    if not mechanism_ids:
+        mechanism_ids = ["A23"]
+
+    length_ranges = {
+        "rna_aptamer": (28, 45),
+        "catalytic_ribozyme": (35, 55),
+        "riboswitch": (40, 70),
+        "multivalent_scaffold": (50, 80),
+    }
+    length_range = length_ranges.get(structural_class, (30, 60))
+
+    for i, mech_id in enumerate(mechanism_ids[:3]):
+        rule = _load_rule(mech_id)
+        if not rule:
+            continue
+
+        seq = _generate_rna_sequence(structural_class, scaffold, length_range)
+        tm = _calc_tm(seq)
+        gc = _calc_gc(seq)
+        dg = _estimate_delta_g(seq, tm)
+        kd = _predict_kd(structural_class, scaffold, kd_goal, tm, gc)
+        motif = _structural_motif(structural_class, scaffold)
+        serum = _serum_half_life(chem_stabilization, structural_class)
+
+        specificity = min(100, max(70, random.gauss(92, 5)))
+        folding_score = min(100, max(60, random.gauss(85, 8)))
+        t_half_score = min(100, max(40, random.gauss(80, 10)))
+
+        construct_id = f"{'Apt' if structural_class == 'rna_aptamer' else 'Rbo' if structural_class == 'catalytic_ribozyme' else 'Rsw' if structural_class == 'riboswitch' else 'Scf'}-{gene_symbol}-v{i+1}"
+
+        rationale = [
+            f"Structural class matches {RNA_ENGINEERING_STRUCTURAL_CLASSES.get(structural_class, structural_class)}",
+            f"Target type compatible with {RNA_ENGINEERING_TARGET_TYPES.get(target_type, target_type)}",
+            f"Scaffold {RNA_ENGINEERING_SCAFFOLDS.get(scaffold, scaffold)} selected for optimal folding",
+        ]
+        if chem_stabilization != "none":
+            rationale.append(f"Chemical stabilization: {RNA_ENGINEERING_CHEM_STABILIZATIONS.get(chem_stabilization, chem_stabilization)}")
+        rationale.append(f"Binding target: {kd_goal}")
+
+        candidates.append({
+            "constructId": construct_id,
+            "mechanismId": mech_id,
+            "mechanismName": rule.get("name", rule.get("id")),
+            "structuralMotif": motif,
+            "length": len(seq),
+            "tm": tm,
+            "deltaGFolding": dg,
+            "kdPrediction": kd,
+            "targetSpecificityScore": round(specificity, 0),
+            "serumStability": serum,
+            "structuralRigidityFlag": "PASSED",
+            "sequence": seq,
+            "dotBracket": _generate_dot_bracket(seq, structural_class),
+            "rationale": rationale,
+            "foldingScore": round(folding_score, 0),
+            "tHalfScore": round(t_half_score, 0),
+        })
+
+    candidates.sort(key=lambda c: c["targetSpecificityScore"], reverse=True)
+    for idx, c in enumerate(candidates):
+        c["rank"] = idx + 1
+
+    return candidates
+
+
+def rank_rna_engineering_mechanisms(
+    structural_class: str,
+    target_type: str,
+    scaffold: str,
+    chem_stabilization: str,
+    kd_goal: str,
+    gene_symbol: str,
+    delivery_context: str | None = None,
+) -> list[dict]:
+    mechanism_ids = STRUCTURAL_CLASS_TO_MECHANISMS.get(structural_class, ["A23"])
+    if target_type in TARGET_TYPE_TO_MECHANISMS:
+        mechanism_ids = list(set(mechanism_ids) & set(TARGET_TYPE_TO_MECHANISMS[target_type]))
+    if scaffold in SCAFFOLD_TO_MECHANISMS:
+        mechanism_ids = list(set(mechanism_ids) & set(SCAFFOLD_TO_MECHANISMS[scaffold]))
+    if not mechanism_ids:
+        mechanism_ids = ["A23"]
+
+    results = []
+    for mechanism_id in mechanism_ids:
+        rule = _load_rule(mechanism_id)
+        if not rule:
+            continue
+
+        rationale = [
+            f"Matches structural class: {RNA_ENGINEERING_STRUCTURAL_CLASSES.get(structural_class, structural_class)}",
+            f"Compatible with target type: {RNA_ENGINEERING_TARGET_TYPES.get(target_type, target_type)}",
+            f"Scaffold: {RNA_ENGINEERING_SCAFFOLDS.get(scaffold, scaffold)}",
+        ]
+        if chem_stabilization != "none":
+            rationale.append(f"Stabilization: {RNA_ENGINEERING_CHEM_STABILIZATIONS.get(chem_stabilization, chem_stabilization)}")
+        rationale.append(f"Binding affinity goal: {RNA_ENGINEERING_K_D_GOALS.get(kd_goal, kd_goal)}")
+
+        eligible = True
+        score = 10
+
+        if delivery_context:
+            delivery_score = DELIVERY_PRECEDENT.get(mechanism_id, {}).get(delivery_context, 0)
+            score += delivery_score
+            if delivery_score > 0:
+                rationale.append(
+                    f"Has precedent for {DELIVERY_CONTEXTS.get(delivery_context, delivery_context).lower()} delivery "
+                    "(general reference, not gene-specific)"
+                )
+
+        results.append(_build_mechanism_result(rule, eligible, score, rationale))
+
+    results.sort(key=lambda r: r["score"], reverse=True)
+    return results
+
+
+def generate_rna_engineering_candidates(
+    structural_class: str,
+    target_type: str,
+    scaffold: str,
+    chem_stabilization: str,
+    kd_goal: str,
+    gene_symbol: str,
+) -> list[dict]:
+    return _generate_rna_engineering_candidates(
+        structural_class=structural_class,
+        target_type=target_type,
+        scaffold=scaffold,
+        chem_stabilization=chem_stabilization,
+        kd_goal=kd_goal,
+        gene_symbol=gene_symbol,
+    )

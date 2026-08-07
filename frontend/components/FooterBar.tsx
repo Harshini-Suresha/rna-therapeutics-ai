@@ -8,7 +8,7 @@ export default function FooterBar({
   onConfirm: () => void;
 }) {
   return (
-    <div className="sticky bottom-0 z-10 border-t border-slate-200 bg-white/95 backdrop-blur px-6 py-3">
+    <div className="sticky bottom-0 z-10 border-t border-[#E5E7EB] bg-white/95 backdrop-blur px-6 py-3">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <p className="flex items-center gap-2 text-[11.5px] text-slate-500">
           <Info className="h-3.5 w-3.5 shrink-0 text-slate-400" />

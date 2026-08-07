@@ -16,7 +16,7 @@ const STEPS = [
   {
     icon: PenSquare,
     title: "3. Candidate Design",
-    body: "Once a mechanism is selected, the platform fetches the real transcript sequence from Ensembl and generates candidate oligonucleotides using a sliding window, filtered by GC content, self-complementarity, and poly-G tracts, then ranked by a transparent quality score. This does not include genome-wide off-target screening — that requires real alignment tooling and is intentionally out of scope for now.",
+     body: "Once a mechanism is selected, the platform fetches the real transcript sequence from Ensembl and generates candidate oligonucleotides using a sliding window, filtered by GC content, self-structure MFE, and poly-G tracts, then ranked by predicted target duplex energy (ΔG). This does not include genome-wide off-target screening — that requires real alignment tooling and is intentionally out of scope for now.",
   },
   {
     icon: UploadCloud,

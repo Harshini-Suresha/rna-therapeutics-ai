@@ -22,20 +22,26 @@ function ExpandableOption({
       className={`rounded-lg border transition-colors ${
         selected
           ? "border-brand bg-brand/5 ring-1 ring-brand"
-          : "border-slate-200 hover:border-slate-300"
+          : "border-[#E5E7EB] hover:border-slate-300"
       }`}
     >
       <div className="flex items-start gap-2.5 px-3 py-2.5">
         {type === "radio" ? (
-          <span
+          <button
+            type="button"
+            onClick={onSelect}
+            aria-label={`Select ${option.label}`}
             className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 ${
               selected ? "border-brand" : "border-slate-300"
             }`}
           >
             {selected && <span className="h-2 w-2 rounded-full bg-brand" />}
-          </span>
+          </button>
         ) : (
-          <span
+          <button
+            type="button"
+            onClick={onSelect}
+            aria-label={`${selected ? "Remove" : "Add"} ${option.label}`}
             className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
               selected ? "border-brand bg-brand text-white" : "border-slate-300"
             }`}
@@ -51,7 +57,7 @@ function ExpandableOption({
                 />
               </svg>
             )}
-          </span>
+          </button>
         )}
         <div className="min-w-0 flex-1">
           <button onClick={onSelect} className="text-left w-full">
@@ -93,9 +99,7 @@ export default function AssoDesignForm({
   setChemistry,
   selectedMods,
   onToggleMod,
-  deliveryContext,
-  setDeliveryContext,
-  onGenerate,
+   onGenerate,
   loading,
   disabled,
   hasResults,
@@ -106,10 +110,8 @@ export default function AssoDesignForm({
   chemistry: string;
   setChemistry: (id: string) => void;
   selectedMods: string[];
-  onToggleMod: (id: string) => void;
-  deliveryContext: string;
-  setDeliveryContext: (v: string) => void;
-  onGenerate: () => void;
+   onToggleMod: (id: string) => void;
+   onGenerate: () => void;
   loading: boolean;
   disabled: boolean;
   hasResults?: boolean;
@@ -170,41 +172,6 @@ export default function AssoDesignForm({
             />
           ))}
         </div>
-      </div>
-
-      {/* Delivery / Tissue Context */}
-      <div>
-        <label className="mb-1.5 block text-[12.5px] font-medium text-slate-600">
-          Target Tissue <span className="text-[11px] font-normal text-slate-400">(optional)</span>
-        </label>
-        <p className="mb-2 text-[11px] text-slate-400">
-          Select target tissue to apply tissue-specific scoring adjustments (uptake, BBB crossing, immune response).
-        </p>
-        <select
-          value={deliveryContext}
-          onChange={(e) => setDeliveryContext(e.target.value)}
-          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[12.5px] text-slate-700 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
-        >
-          <option value="">No tissue preference (default)</option>
-          <option value="liver">Liver — High uptake, gapmer-validated</option>
-          <option value="kidney">Kidney — Good uptake, rapid clearance</option>
-          <option value="cns">CNS / Brain — Requires BBB crossing, intrathecal</option>
-          <option value="muscle">Skeletal Muscle — Moderate uptake, large mass</option>
-          <option value="heart">Heart — Limited uptake, systemic delivery</option>
-          <option value="lung">Lung — Accessible via inhalation</option>
-          <option value="eye">Eye / Retina — Immune-privileged, intravitreal</option>
-          <option value="tumor">Tumor — Microenvironment-enhanced uptake</option>
-          <option value="blood">Blood / Bone Marrow — Hematopoietic cells</option>
-          <option value="skin">Skin — Topical/intradermal delivery</option>
-          <option value="pancreas">Pancreas — Limited uptake</option>
-          <option value="gut">Gut / Intestine — Oral delivery challenging</option>
-          <option value="spinal cord">Spinal Cord — Intrathecal required</option>
-        </select>
-        {deliveryContext && (
-          <p className="mt-1.5 text-[10.5px] text-slate-400 italic">
-            Tissue-specific adjustments will be applied to candidate scoring.
-          </p>
-        )}
       </div>
 
       {/* Generate button */}

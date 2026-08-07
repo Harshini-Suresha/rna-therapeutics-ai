@@ -17,7 +17,7 @@ export default function PagePlaceholder({
   sections: { label: string; items: string[] }[];
 }) {
   return (
-    <div className="flex min-h-screen bg-[#F5F6FA]">
+    <div className="flex min-h-screen bg-[#F8FAFC]">
       <Sidebar />
       <div className="flex min-h-screen flex-1 flex-col">
         <Topbar />
@@ -42,7 +42,7 @@ export default function PagePlaceholder({
                     {section.items.map((item) => (
                       <div
                         key={item}
-                        className="border border-dashed border-slate-200 bg-slate-50/50 px-3 py-2 text-[11px] text-slate-400"
+                        className="border border-dashed border-[#E5E7EB] bg-slate-50/50 px-3 py-2 text-[11px] text-slate-400"
                       >
                         {item}
                       </div>

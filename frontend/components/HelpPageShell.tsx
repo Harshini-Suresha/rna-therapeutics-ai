@@ -12,7 +12,7 @@ export default function HelpPageShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-screen bg-[#F5F6FA]">
+    <div className="flex min-h-screen bg-[#F8FAFC]">
       <Sidebar />
       <div className="flex min-h-screen flex-1 flex-col">
         <Topbar />

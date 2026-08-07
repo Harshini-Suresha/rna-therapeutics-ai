@@ -30,8 +30,8 @@ export default function SignupPage() {
 
   if (submitted) {
     return (
-      <div className="flex min-h-screen bg-[#F5F6FA]">
-        <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-navy-950 to-navy-900 items-center justify-center">
+      <div className="flex min-h-screen bg-[#F8FAFC]">
+        <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-sidebar to-sidebar items-center justify-center">
           <div className="max-w-md px-8 text-center">
             <div className="flex items-center justify-center gap-2.5 mb-6">
               <Dna className="h-8 w-8 text-indigo-400" strokeWidth={2} />
@@ -66,8 +66,8 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-[#F5F6FA] dark:bg-[#0f172a]">
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-navy-950 to-navy-900 items-center justify-center">
+    <div className="flex min-h-screen bg-[#F8FAFC] dark:bg-[#0f172a]">
+      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-sidebar to-sidebar items-center justify-center">
         <div className="max-w-md px-8 text-center">
           <div className="flex items-center justify-center gap-2.5 mb-6">
             <Dna className="h-8 w-8 text-indigo-400" strokeWidth={2} />
@@ -107,7 +107,7 @@ export default function SignupPage() {
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="h-10 w-full rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 text-[13px] text-slate-800 dark:text-slate-200 outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15"
+                className="h-10 w-full rounded-lg border border-[#E5E7EB] dark:border-slate-600 bg-white dark:bg-slate-800 px-3 text-[13px] text-slate-800 dark:text-slate-200 outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15"
                 placeholder="Jane Doe"
               />
             </div>
@@ -118,7 +118,7 @@ export default function SignupPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="h-10 w-full rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 text-[13px] text-slate-800 dark:text-slate-200 outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15"
+                className="h-10 w-full rounded-lg border border-[#E5E7EB] dark:border-slate-600 bg-white dark:bg-slate-800 px-3 text-[13px] text-slate-800 dark:text-slate-200 outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15"
                 placeholder="you@example.com"
               />
             </div>
@@ -129,7 +129,7 @@ export default function SignupPage() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="h-10 w-full rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 text-[13px] text-slate-800 dark:text-slate-200 outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15"
+                className="h-10 w-full rounded-lg border border-[#E5E7EB] dark:border-slate-600 bg-white dark:bg-slate-800 px-3 text-[13px] text-slate-800 dark:text-slate-200 outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15"
                 placeholder="At least 6 characters"
               />
             </div>

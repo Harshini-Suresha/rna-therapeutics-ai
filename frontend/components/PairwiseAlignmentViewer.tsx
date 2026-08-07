@@ -145,7 +145,7 @@ export default function PairwiseAlignmentViewer({
 
       {/* Selected feature detail */}
       {selectedFeat && (
-        <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+        <div className="mt-3 rounded-lg border border-[#E5E7EB] bg-slate-50 p-3">
           <div className="flex items-center gap-2 mb-1">
             <span
               className="h-2.5 w-2.5 rounded-full"

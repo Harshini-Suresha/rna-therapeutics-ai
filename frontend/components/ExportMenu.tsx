@@ -178,7 +178,7 @@ export default function ExportMenu(props: ExportMenuProps) {
         Export
       </button>
       {open && (
-        <div className="absolute right-0 top-full z-50 mt-1 w-44 rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
+        <div className="absolute right-0 top-full z-50 mt-1 w-44 rounded-xl border border-[#E5E7EB] bg-white py-1 shadow-lg">
           {(["fasta", "json", "csv", "report"] as ExportFormat[]).map((fmt) => {
             const labels: Record<ExportFormat, string> = {
               fasta: "FASTA file",

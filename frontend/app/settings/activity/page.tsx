@@ -28,10 +28,10 @@ export default function ActivityPage() {
     getProfile().then((p) => { if (p) setActivity(p.activity); }).finally(() => setLoading(false));
   }, [user, router]);
 
-  if (loading) return <div className="flex min-h-screen bg-[#F5F6FA]"><Sidebar /><div className="flex min-h-screen flex-1 flex-col"><Topbar /><main className="flex-1 flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></main></div></div>;
+  if (loading) return <div className="flex min-h-screen bg-[#F8FAFC]"><Sidebar /><div className="flex min-h-screen flex-1 flex-col"><Topbar /><main className="flex-1 flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></main></div></div>;
 
   return (
-    <div className="flex min-h-screen bg-[#F5F6FA]">
+    <div className="flex min-h-screen bg-[#F8FAFC]">
       <Sidebar />
       <div className="flex min-h-screen flex-1 flex-col">
         <Topbar />

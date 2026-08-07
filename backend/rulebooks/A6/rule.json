@@ -4,7 +4,8 @@
   "name": "miRNA Binding Site Blocking (Target Protector / BlockmiR / miR-Mask)",
   "category": "Translation enhancement / Post-transcriptional regulation",
   "therapeuticGoalIds": [
-    "TG02"
+    "TG02",
+    "TG06"
   ],
   "therapeuticGoalDescription": "Increase expression of a specific target gene by preventing binding of a regulatory miRNA to its binding site on the target mRNA.",
   "molecularDefect": "Reduced protein expression caused by pathogenic or excessive miRNA-mediated repression of a disease-relevant transcript.",

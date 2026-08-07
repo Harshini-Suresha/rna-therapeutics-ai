@@ -186,7 +186,7 @@ export default function HairpinDiagram({
 
       {/* Detail card */}
       {selected !== null && hairpins[selected] && (
-        <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+        <div className="mt-3 rounded-lg border border-[#E5E7EB] bg-slate-50 p-3">
           <div className="flex items-center gap-2 mb-2">
             <span
               className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${typeBg(hairpins[selected].type)}`}

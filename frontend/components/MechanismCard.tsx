@@ -23,6 +23,8 @@ export default function MechanismCard({
   onSelect: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [scoreHelpOpen, setScoreHelpOpen] = useState(false);
+  const [evidenceHelpOpen, setEvidenceHelpOpen] = useState(false);
   const rating = mechanism.evidenceLevel?.rating ?? null;
   const tone = rating ? EVIDENCE_TONE[rating] ?? "slate" : "slate";
 
@@ -44,10 +46,42 @@ export default function MechanismCard({
                   Poor fit
                 </span>
               )}
-              <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500">
-                Match score: {mechanism.score}
+              <span className="relative inline-flex items-center gap-1 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500">
+                Contextual fit: {mechanism.score}
+                <button
+                  type="button"
+                  onClick={() => setScoreHelpOpen((open) => !open)}
+                  onBlur={() => setScoreHelpOpen(false)}
+                  aria-label="Explain contextual fit score"
+                  className="flex h-3.5 w-3.5 items-center justify-center rounded-full border border-slate-300 text-[9px] text-slate-500 hover:border-slate-400 hover:text-slate-700"
+                >
+                  ?
+                </button>
+                {scoreHelpOpen && (
+                  <span role="tooltip" className="absolute left-0 top-5 z-20 w-64 rounded border border-[#E5E7EB] bg-white px-2.5 py-1.5 text-[11px] font-normal leading-relaxed text-slate-600 shadow-md">
+                    A rule-based fit score for the options selected here, such as therapeutic goal, defect type, delivery context, and chemistry. It is not a percentage, probability, or evidence rating.
+                  </span>
+                )}
               </span>
-              {rating && <Pill tone={tone}>{rating} evidence</Pill>}
+              {rating && (
+                <span className="relative inline-flex items-center gap-1">
+                  <Pill tone={tone}>{rating} evidence</Pill>
+                  <button
+                    type="button"
+                    onClick={() => setEvidenceHelpOpen((open) => !open)}
+                    onBlur={() => setEvidenceHelpOpen(false)}
+                    aria-label="Explain evidence rating"
+                    className="flex h-3.5 w-3.5 items-center justify-center rounded-full border border-slate-300 text-[9px] text-slate-500 hover:border-slate-400 hover:text-slate-700"
+                  >
+                    ?
+                  </button>
+                  {evidenceHelpOpen && (
+                    <span role="tooltip" className="absolute left-0 top-5 z-20 w-64 rounded border border-[#E5E7EB] bg-white px-2.5 py-1.5 text-[11px] leading-relaxed text-slate-600 shadow-md">
+                      Evidence reflects the strength of published and clinical support for this mechanism in general. It is independent of the contextual fit score.
+                    </span>
+                  )}
+                </span>
+              )}
             </div>
             <h3 className="mt-1 text-[15px] font-semibold text-slate-800">{mechanism.name}</h3>
             {mechanism.category && (
@@ -104,6 +138,7 @@ export default function MechanismCard({
             <Detail label="RNA target region" value={mechanism.rnaTargetRegion} />
             <Detail label="ASO chemistry" value={mechanism.asoChemistry} />
             <Detail label="Design rules" value={mechanism.designRules} />
+            <Detail label="Scoring" value={mechanism.scoring} />
             <Detail label="Advantages" value={mechanism.advantages} />
             <Detail label="Limitations" value={mechanism.limitations} />
             <Detail label="Off-target considerations" value={mechanism.offTargetConsiderations} />

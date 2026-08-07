@@ -25,6 +25,18 @@ export interface MechanismOptions {
     neutralizationModes: MechanismOption[];
     stericChemistries: MechanismOption[];
   };
+  translationalRegulation: {
+    translationalGoals: MechanismOption[];
+    targetElements: MechanismOption[];
+    stericChemistries: MechanismOption[];
+  };
+  rnaEngineering: {
+    structuralClasses: MechanismOption[];
+    targetTypes: MechanismOption[];
+    scaffolds: MechanismOption[];
+    chemStabilizations: MechanismOption[];
+    kdGoals: MechanismOption[];
+  };
   deliveryContexts: MechanismOption[];
 }
 
@@ -49,6 +61,7 @@ export interface RankedMechanism {
   rnaTargetRegion: string | null;
   asoChemistry: string | null;
   designRules: string | null;
+  scoring: string | null;
   advantages: string | null;
   limitations: string | null;
   offTargetConsiderations: string | null;
@@ -83,6 +96,13 @@ export interface MechanismRankingResponse {
     targetRbp?: string | null;
     oligoLength?: number | null;
     targetGeneType?: string | null;
+    translationalGoal?: string | null;
+    targetElement?: string | null;
+    structuralClass?: string;
+    targetType?: string;
+    scaffold?: string;
+    chemStabilization?: string;
+    kdGoal?: string;
   };
   results: RankedMechanism[];
 }
@@ -107,6 +127,26 @@ export interface GeneFeatureWarning {
   type: string;
   severity: "high" | "medium" | "low";
   message: string;
+}
+
+export interface RnaEngineeringCandidate {
+  rank: number;
+  constructId: string;
+  mechanismId: string;
+  mechanismName: string;
+  structuralMotif: string;
+  length: number;
+  tm: number;
+  deltaGFolding: number;
+  kdPrediction: number | string;
+  targetSpecificityScore: number;
+  serumStability: string;
+  structuralRigidityFlag: string;
+  sequence: string;
+  dotBracket: string;
+  rationale: string[];
+  foldingScore: number;
+  tHalfScore: number;
 }
 
 export interface GeneFeaturesResponse {

@@ -87,7 +87,7 @@ export default function AccountMenu({
       </button>
 
       {open && (
-        <div className="absolute right-0 z-20 mt-2 w-64 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-lg">
+        <div className="absolute right-0 z-20 mt-2 w-64 border border-[#E5E7EB] dark:border-slate-700 bg-white dark:bg-slate-800 shadow-lg">
           {/* User Header */}
           <div className="border-b border-slate-100 dark:border-slate-700 px-4 py-3">
             <div className="flex items-center gap-3">

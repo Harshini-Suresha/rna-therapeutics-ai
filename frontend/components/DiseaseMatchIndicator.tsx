@@ -39,7 +39,7 @@ export default function DiseaseMatchIndicator({ enteredDisease, gene }: Props) {
 
   if (uniqueDiseases.length === 0) {
     return (
-      <div className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] text-slate-400">
+      <div className="flex items-center gap-1.5 rounded-md border border-[#E5E7EB] bg-slate-50 px-3 py-1.5 text-[11px] text-slate-400">
         <MinusCircle className="h-3 w-3 shrink-0" />
         No disease association data available for this gene to cross-check against.
       </div>

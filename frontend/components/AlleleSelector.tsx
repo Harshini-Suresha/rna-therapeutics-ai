@@ -49,7 +49,7 @@ export default function AlleleSelector({
               )}
             </div>
 
-            <div className="max-h-[320px] overflow-y-auto rounded-lg border border-slate-200 card-scroll">
+            <div className="max-h-[320px] overflow-y-auto rounded-lg border border-[#E5E7EB] card-scroll">
               <table className="w-full text-left">
                 <thead className="sticky top-0 bg-slate-50 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                   <tr>

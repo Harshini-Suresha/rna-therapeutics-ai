@@ -16,6 +16,7 @@
   "asoChemistry": "RNase H-compatible phosphorothioate gapmers and other modified ASOs, depending on the experimental platform.",
   "typicalLength": "~18–20 nt in most published studies.",
   "designRules": "Literature synthesis: identify functional promoter-associated RNAs; design ASOs complementary to regulatory promoter transcripts; experimentally verify transcriptional repression by qPCR and chromatin assays.",
+  "scoring": "Candidates are ranked by predicted target duplex free energy (ΔG, kcal/mol) computed using ViennaRNA duplexfold — more negative values indicate stronger predicted ASO-target binding. Biophysical metrics reported: GC content, nearest-neighbor Tm (primer3), self-structure MFE (ViennaRNA fold), poly-G tracts, CpG count, homopolymer runs, purine content, GC skew, sequence complexity, molecular weight, extinction coefficient. Drug-like estimates: nuclease resistance, cellular uptake, BBB crossing, off-target risk, immune stimulation, synthesis difficulty.",
   "secondaryStructureRequirement": "Accessible promoter-associated RNA regions are preferred.",
   "offTargetConsiderations": "Potential epigenetic effects on unintended loci; evaluate transcriptome-wide and chromatin-wide specificity.",
   "advantages": "Regulates gene expression at the transcriptional level; may provide durable suppression compared with post-transcriptional approaches.",

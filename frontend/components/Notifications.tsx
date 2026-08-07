@@ -168,10 +168,10 @@ export default function Notifications({ onClose }: { onClose: () => void }) {
   return (
     <div
       ref={panelRef}
-      className="absolute right-0 top-full mt-2 w-[400px] max-h-[80vh] rounded-xl border border-slate-200 bg-white shadow-xl z-50 flex flex-col overflow-hidden"
+      className="absolute right-0 top-full mt-2 w-[400px] max-h-[80vh] rounded-xl border border-[#E5E7EB] bg-white shadow-xl z-50 flex flex-col overflow-hidden"
     >
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+      <div className="flex items-center justify-between border-b border-[#E5E7EB] px-4 py-3">
         <div className="flex items-center gap-2">
           <Bell className="h-4 w-4 text-slate-600" />
           <p className="text-[13px] font-semibold text-slate-800">Notifications</p>

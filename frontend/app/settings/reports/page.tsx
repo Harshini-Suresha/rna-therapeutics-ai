@@ -54,7 +54,7 @@ export default function ReportsPage() {
   };
 
   return (
-    <div className="flex min-h-screen bg-[#F5F6FA]">
+    <div className="flex min-h-screen bg-[#F8FAFC]">
       <Sidebar />
       <div className="flex min-h-screen flex-1 flex-col">
         <Topbar />
@@ -77,7 +77,7 @@ export default function ReportsPage() {
                     const Icon = STEP_ICONS[report.step] || FileText;
                     const isExpanded = expandedId === report.id;
                     return (
-                      <div key={report.id} className="rounded-lg border border-slate-200 bg-white">
+                      <div key={report.id} className="rounded-lg border border-[#E5E7EB] bg-white">
                         <div
                           className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-slate-50"
                           onClick={() => setExpandedId(isExpanded ? null : report.id)}

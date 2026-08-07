@@ -76,13 +76,13 @@ export default function GeneOverviewCard({ gene, onRefresh }: GeneOverviewCardPr
           </div>
 
           {/* Gene function has its own space so it never stretches the identifier grid. */}
-          <div className="flex flex-col rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+          <div className="flex flex-col rounded-xl border border-[#E5E7EB] bg-slate-50/70 p-4">
             <p className="text-[12px] font-medium uppercase tracking-wider text-slate-400">Gene Function</p>
             <p className="mt-2 text-[13px] font-medium leading-6 text-slate-700">
               {gene.geneFunction ?? "Function summary is not available for this gene."}
             </p>
 
-            <div className="mt-4 grid gap-3 border-t border-slate-200 pt-3 sm:grid-cols-2">
+            <div className="mt-4 grid gap-3 border-t border-[#E5E7EB] pt-3 sm:grid-cols-2">
               <div>
                 <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Verification Sources</p>
                 <div className="mt-1.5 flex flex-wrap gap-1.5">
@@ -113,7 +113,7 @@ export default function GeneOverviewCard({ gene, onRefresh }: GeneOverviewCardPr
               </div>
             </div>
 
-            <div className="mt-4 border-t border-slate-200 pt-3">
+            <div className="mt-4 border-t border-[#E5E7EB] pt-3">
               <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400">Genomic Reference</p>
               <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
                 <div className="rounded-lg border border-violet-100 bg-violet-50/50 p-2">

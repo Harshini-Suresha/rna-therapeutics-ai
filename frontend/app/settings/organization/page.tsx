@@ -38,10 +38,10 @@ export default function OrganizationPage() {
     finally { setSaving(false); }
   }
 
-  if (loading) return <div className="flex min-h-screen bg-[#F5F6FA]"><Sidebar /><div className="flex min-h-screen flex-1 flex-col"><Topbar /><main className="flex-1 flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></main></div></div>;
+  if (loading) return <div className="flex min-h-screen bg-[#F8FAFC]"><Sidebar /><div className="flex min-h-screen flex-1 flex-col"><Topbar /><main className="flex-1 flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></main></div></div>;
 
   return (
-    <div className="flex min-h-screen bg-[#F5F6FA]">
+    <div className="flex min-h-screen bg-[#F8FAFC]">
       <Sidebar />
       <div className="flex min-h-screen flex-1 flex-col">
         <Topbar />
@@ -58,11 +58,11 @@ export default function OrganizationPage() {
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className="mb-1 block text-[12px] font-medium text-slate-600">Institution</label>
-                  <input value={institution} onChange={(e) => setInstitution(e.target.value)} placeholder="e.g. MIT" className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-[13px] text-slate-800 outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15" />
+                  <input value={institution} onChange={(e) => setInstitution(e.target.value)} placeholder="e.g. MIT" className="h-10 w-full rounded-lg border border-[#E5E7EB] bg-white px-3 text-[13px] text-slate-800 outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15" />
                 </div>
                 <div>
                   <label className="mb-1 block text-[12px] font-medium text-slate-600">Department</label>
-                  <input value={department} onChange={(e) => setDepartment(e.target.value)} placeholder="e.g. RNA Biology Lab" className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-[13px] text-slate-800 outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15" />
+                  <input value={department} onChange={(e) => setDepartment(e.target.value)} placeholder="e.g. RNA Biology Lab" className="h-10 w-full rounded-lg border border-[#E5E7EB] bg-white px-3 text-[13px] text-slate-800 outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15" />
                 </div>
               </div>
               <div className="flex justify-end">

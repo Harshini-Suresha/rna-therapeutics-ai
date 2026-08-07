@@ -282,7 +282,7 @@ function GeneRow({ gene, index, expanded, onToggle, onUseGene, organismId, organ
             onClick={onUseGene}
             disabled={!usable}
             title={usable ? undefined : mapping ? `Mapping ${organismName} ortholog…` : `No ${organismName} ortholog to add to the project`}
-            className="rounded-lg border border-slate-200 px-3 py-1 text-[11px] font-medium text-slate-600 hover:border-brand hover:text-brand transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-lg border border-[#E5E7EB] px-3 py-1 text-[11px] font-medium text-slate-600 hover:border-brand hover:text-brand transition-colors disabled:cursor-not-allowed disabled:opacity-40"
           >
             Use this gene
           </button>
@@ -762,7 +762,7 @@ export default function DiseaseSearchResultsPage() {
   const totalGenes = detail?.genes.length ?? 0;
 
   return (
-    <div className="flex min-h-screen bg-[#F5F6FA]">
+    <div className="flex min-h-screen bg-[#F8FAFC]">
       <Sidebar />
       <div className="flex min-h-screen flex-1 flex-col">
         <Topbar />
@@ -1168,7 +1168,7 @@ export default function DiseaseSearchResultsPage() {
                     <div className="px-5 py-2">
                       <table className="w-full">
                         <thead>
-                          <tr className="border-b border-slate-200 text-[11px] font-medium text-slate-500">
+                          <tr className="border-b border-[#E5E7EB] text-[11px] font-medium text-slate-500">
                             <th className="w-10 py-2 pr-2 text-left">#</th>
                             <th className="py-2 pr-4 text-left">Drug Name</th>
                             <th className="py-2 pr-4 text-left">Type</th>
@@ -1224,7 +1224,7 @@ export default function DiseaseSearchResultsPage() {
                   <div className="overflow-x-auto">
                     <table className="w-full min-w-[760px]">
                       <thead>
-                        <tr className="border-b border-slate-200 text-[11px] font-medium text-slate-500">
+                        <tr className="border-b border-[#E5E7EB] text-[11px] font-medium text-slate-500">
                           <th className="w-12 py-2.5 pl-5 pr-2 text-left">#</th>
                           <th className="py-2.5 pr-4 text-left">Symbol</th>
                           <th className="py-2.5 pr-4 text-left">Name</th>

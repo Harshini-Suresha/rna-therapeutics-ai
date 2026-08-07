@@ -97,7 +97,7 @@ export default function BasicInfoForm({
         <button
           onClick={onLoadGene}
           disabled={loading || !geneSymbol.trim() || geneFieldsDisabled}
-          className="flex items-center gap-1.5 rounded bg-[#061b49] px-4 py-2 text-[12.5px] font-medium text-white transition-colors hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex items-center gap-1.5 rounded bg-brand px-4 py-2 text-[12.5px] font-medium text-white transition-colors hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-50"
         >
           {loading ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -111,7 +111,7 @@ export default function BasicInfoForm({
       {/* Loading bar */}
       {loading && (
         <div className="px-5 pb-4">
-          <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+          <div className="rounded-lg border border-[#E5E7EB] bg-slate-50 px-4 py-3">
             <div className="flex items-center gap-3 mb-2">
               <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
               <p className="text-[12px] font-medium text-slate-500">

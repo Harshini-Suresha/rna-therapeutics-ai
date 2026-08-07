@@ -71,7 +71,7 @@ export default function PlatformAssistant({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+        <div className="flex items-center justify-between border-b border-[#E5E7EB] px-5 py-4">
           <div className="flex items-center gap-2">
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-blue-600">
               <Sparkles className="h-4 w-4 text-white" />
@@ -95,7 +95,7 @@ export default function PlatformAssistant({
                 <button
                   key={s}
                   onClick={() => send(s)}
-                  className="block w-full rounded-lg border border-slate-200 px-3 py-2 text-left text-[12.5px] text-slate-600 hover:bg-slate-50"
+                  className="block w-full rounded-lg border border-[#E5E7EB] px-3 py-2 text-left text-[12.5px] text-slate-600 hover:bg-slate-50"
                 >
                   {s}
                 </button>
@@ -133,7 +133,7 @@ export default function PlatformAssistant({
         </div>
 
         {/* Input */}
-        <div className="border-t border-slate-200 p-4">
+        <div className="border-t border-[#E5E7EB] p-4">
           <div className="flex items-center gap-2">
             <input
               value={input}

@@ -40,7 +40,7 @@ function VerifyContent() {
   }
 
   return (
-    <div className="flex min-h-screen bg-[#F5F6FA] items-center justify-center px-6">
+    <div className="flex min-h-screen bg-[#F8FAFC] items-center justify-center px-6">
       <div className="w-full max-w-sm text-center">
         <div className="flex items-center justify-center gap-2.5 mb-8">
           <Dna className="h-7 w-7 text-indigo-500" strokeWidth={2} />
@@ -70,14 +70,14 @@ function VerifyContent() {
             <AlertCircle className="h-12 w-12 text-red-500 mx-auto" />
             <h1 className="text-[18px] font-bold text-slate-900">Verification failed</h1>
             <p className="text-[13px] text-slate-500">{message}</p>
-            <div className="rounded-lg border border-slate-200 bg-white p-4 space-y-3">
+            <div className="rounded-lg border border-[#E5E7EB] bg-white p-4 space-y-3">
               <p className="text-[12px] font-medium text-slate-600">Resend verification email</p>
               <input
                 type="email"
                 value={resendEmail}
                 onChange={(e) => setResendEmail(e.target.value)}
                 placeholder="your@email.com"
-                className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-[12px] text-slate-800 outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15"
+                className="h-9 w-full rounded-lg border border-[#E5E7EB] bg-white px-3 text-[12px] text-slate-800 outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15"
               />
               <button
                 onClick={handleResend}
@@ -95,14 +95,14 @@ function VerifyContent() {
             <AlertCircle className="h-12 w-12 text-amber-500 mx-auto" />
             <h1 className="text-[18px] font-bold text-slate-900">No verification link</h1>
             <p className="text-[13px] text-slate-500">Please use the verification link from your email.</p>
-            <div className="rounded-lg border border-slate-200 bg-white p-4 space-y-3">
+            <div className="rounded-lg border border-[#E5E7EB] bg-white p-4 space-y-3">
               <p className="text-[12px] font-medium text-slate-600">Resend verification email</p>
               <input
                 type="email"
                 value={resendEmail}
                 onChange={(e) => setResendEmail(e.target.value)}
                 placeholder="your@email.com"
-                className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-[12px] text-slate-800 outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15"
+                className="h-9 w-full rounded-lg border border-[#E5E7EB] bg-white px-3 text-[12px] text-slate-800 outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15"
               />
               <button
                 onClick={handleResend}

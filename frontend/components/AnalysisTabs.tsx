@@ -23,7 +23,7 @@ export default function AnalysisTabs({
   return (
     <div>
       {/* Tab bar */}
-      <div className="flex items-center gap-1 border-b border-slate-200 bg-white rounded-t-2xl px-4 pt-1 overflow-x-auto">
+      <div className="flex items-center gap-1 border-b border-[#E5E7EB] bg-white rounded-t-2xl px-4 pt-1 overflow-x-auto">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -49,7 +49,7 @@ export default function AnalysisTabs({
         })}
       </div>
       {/* Tab content */}
-      <div className="rounded-b-2xl bg-white border border-t-0 border-slate-200 shadow-card">
+      <div className="rounded-b-2xl bg-white border border-t-0 border-[#E5E7EB] shadow-card">
         {children}
       </div>
     </div>

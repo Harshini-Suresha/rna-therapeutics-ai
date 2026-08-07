@@ -72,7 +72,7 @@ export default function HelpMenu() {
       </button>
 
       {open && (
-        <div className="absolute right-0 z-20 mt-2 w-80 border border-slate-200 bg-white shadow-lg">
+        <div className="absolute right-0 z-20 mt-2 w-80 border border-[#E5E7EB] bg-white shadow-lg">
           {/* Header */}
           <div className="px-4 py-3 border-b border-slate-100">
             <p className="text-[13px] font-semibold text-slate-800">Help Center</p>
@@ -86,7 +86,7 @@ export default function HelpMenu() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search documentation..."
-                className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 pl-8 pr-3 text-[12px] text-slate-700 placeholder:text-slate-400 focus:border-brand focus:bg-white focus:outline-none focus:ring-1 focus:ring-brand/20"
+                className="w-full rounded-lg border border-[#E5E7EB] bg-slate-50 py-1.5 pl-8 pr-3 text-[12px] text-slate-700 placeholder:text-slate-400 focus:border-brand focus:bg-white focus:outline-none focus:ring-1 focus:ring-brand/20"
               />
             </div>
           </div>

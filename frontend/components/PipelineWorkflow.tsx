@@ -106,7 +106,7 @@ export default function PipelineWorkflow() {
 
         {/* Sidebar Info/Status block */}
         <div className="lg:col-span-1">
-          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="rounded-xl border border-[#E5E7EB] bg-white p-6 shadow-sm">
             <h3 className="font-semibold text-slate-800 text-sm">Target Status</h3>
             {!isSubmitted ? (
               <p className="mt-2 text-[13px] text-slate-400">

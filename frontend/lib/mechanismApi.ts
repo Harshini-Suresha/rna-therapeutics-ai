@@ -190,6 +190,64 @@ export async function rankRnaNeutralizationMechanisms(params: {
   return res.json();
 }
 
+export async function rankTranslationalRegulationMechanisms(params: {
+  geneSymbol: string;
+  translationalGoal?: string | null;
+  targetElement?: string | null;
+  stericChemistry?: string | null;
+  targetRbp?: string | null;
+  oligoLength?: number | null;
+  deliveryContext?: string | null;
+}): Promise<MechanismRankingResponse> {
+  const res = await fetch(`${API_BASE}/api/mechanisms/translational-regulation`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      gene_symbol: params.geneSymbol,
+      translational_goal: params.translationalGoal || null,
+      target_element: params.targetElement || null,
+      steric_chemistry: params.stericChemistry || null,
+      target_rbp: params.targetRbp || null,
+      oligo_length: params.oligoLength ?? null,
+      delivery_context: params.deliveryContext || null,
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail || "Could not rank mechanisms.");
+  }
+  return res.json();
+}
+
+export async function rankRnaEngineeringMechanisms(params: {
+  geneSymbol: string;
+  structuralClass: string;
+  targetType: string;
+  scaffold: string;
+  chemStabilization: string;
+  kdGoal: string;
+  deliveryContext?: string | null;
+}): Promise<MechanismRankingResponse & { candidates: any[] }> {
+  const res = await fetch(`${API_BASE}/api/mechanisms/rna-engineering`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      gene_symbol: params.geneSymbol,
+      structural_class: params.structuralClass,
+      target_type: params.targetType,
+      scaffold: params.scaffold,
+      chem_stabilization: params.chemStabilization,
+      kd_goal: params.kdGoal,
+      delivery_context: params.deliveryContext || null,
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail || "Could not rank RNA engineering mechanisms.");
+  }
+  return res.json();
+}
+
 export function getGoalLabel(goalId: TherapeuticGoalId): string {
   const labels: Record<TherapeuticGoalId, string> = {
     TG01: "Gene Silencing",

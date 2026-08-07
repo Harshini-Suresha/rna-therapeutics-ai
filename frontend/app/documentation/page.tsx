@@ -171,7 +171,7 @@ function DesignParamSection({ param }: { param: typeof DESIGN_PARAMS[number] }) 
   const t = DESIGN_TONE_MAP[param.id];
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-white">
+    <section className="rounded-xl border border-[#E5E7EB] bg-white">
       <button
         onClick={() => setExpanded((e) => !e)}
         className="flex w-full items-center gap-3 px-5 py-4 text-left"
@@ -193,7 +193,7 @@ function DesignParamSection({ param }: { param: typeof DESIGN_PARAMS[number] }) 
             {param.fields.map((field) => (
               <div
                 key={field.name}
-                className={`rounded-lg border border-slate-200 ${t.bg} p-3`}
+                className={`rounded-lg border border-[#E5E7EB] ${t.bg} p-3`}
               >
                 <p className="text-[12.5px] font-semibold text-slate-800">{field.name}</p>
                 <p className="mt-1 text-[11.5px] leading-relaxed text-slate-600">{field.detail}</p>
@@ -391,7 +391,7 @@ function GoalSection({ goal }: { goal: TherapeuticGoalSection }) {
   const [expanded, setExpanded] = useState(true);
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-white">
+    <section className="rounded-xl border border-[#E5E7EB] bg-white">
       <button
         onClick={() => setExpanded((e) => !e)}
         className="flex w-full items-center gap-3 px-5 py-4 text-left"
@@ -415,7 +415,7 @@ function GoalSection({ goal }: { goal: TherapeuticGoalSection }) {
               return (
                 <div
                   key={mech.code}
-                  className="rounded-lg border border-slate-200 bg-slate-50/50 p-4"
+                  className="rounded-lg border border-[#E5E7EB] bg-slate-50/50 p-4"
                 >
                   <div className="flex items-center gap-2">
                     <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${t.pill}`}>
@@ -454,7 +454,7 @@ function GoalSection({ goal }: { goal: TherapeuticGoalSection }) {
           </div>
 
           {/* Summary table for this goal */}
-          <div className="mt-4 overflow-x-auto rounded-lg border border-slate-200">
+          <div className="mt-4 overflow-x-auto rounded-lg border border-[#E5E7EB]">
             <table className="w-full text-left text-[11px]">
               <thead className="bg-slate-100 text-slate-600">
                 <tr>
@@ -484,7 +484,7 @@ function GoalSection({ goal }: { goal: TherapeuticGoalSection }) {
 
 export default function DocumentationPage() {
   return (
-    <div className="flex h-screen overflow-hidden bg-[#f4f6fa]">
+    <div className="flex h-screen overflow-hidden bg-[#F8FAFC]">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar />
@@ -510,8 +510,31 @@ export default function DocumentationPage() {
               ))}
             </div>
 
+            <section className="rounded-xl border border-[#E5E7EB] bg-white">
+              <div className="px-5 py-4">
+                <h2 className="text-[15px] font-bold text-slate-900">Understanding Mechanism Rankings</h2>
+                <p className="mt-1 text-[12.5px] text-slate-500">
+                  The ranking page shows two independent signals to help distinguish general scientific support from fit for the selected design context.
+                </p>
+              </div>
+              <div className="grid gap-3 border-t border-slate-100 px-5 py-4 sm:grid-cols-2">
+                <div className="rounded-lg bg-indigo-50/60 p-3">
+                  <h3 className="text-[12px] font-semibold text-indigo-800">Contextual fit score</h3>
+                  <p className="mt-1 text-[11.5px] leading-relaxed text-slate-600">
+                    A rule-based score calculated from the inputs selected for the current ranking, including therapeutic goal, defect type, scope, delivery context, and compatible chemistry. It orders mechanisms for this use case; it is not a percentage, probability, or clinical-confidence measure.
+                  </p>
+                </div>
+                <div className="rounded-lg bg-emerald-50/60 p-3">
+                  <h3 className="text-[12px] font-semibold text-emerald-800">Evidence rating</h3>
+                  <p className="mt-1 text-[11.5px] leading-relaxed text-slate-600">
+                    A rulebook label describing the level of published and clinical support for the mechanism in general. It is shown separately and is not added to the contextual fit score. A well-established mechanism can therefore have a low fit for a particular target or delivery setting.
+                  </p>
+                </div>
+              </div>
+            </section>
+
             {/* Tissue Expression & Delivery */}
-            <section className="rounded-xl border border-slate-200 bg-white">
+            <section className="rounded-xl border border-[#E5E7EB] bg-white">
               <div className="px-5 py-4">
                 <h2 className="text-[15px] font-bold text-slate-900">Tissue Expression &amp; Delivery</h2>
                 <p className="mt-1 text-[12.5px] text-slate-500">
@@ -524,19 +547,19 @@ export default function DocumentationPage() {
                 <div>
                   <h3 className="mb-2 text-[13px] font-semibold text-slate-800">Expression Data Sources</h3>
                   <div className="grid gap-2 sm:grid-cols-3">
-                    <div className="rounded-lg border border-slate-200 bg-indigo-50/40 p-3">
+                    <div className="rounded-lg border border-[#E5E7EB] bg-indigo-50/40 p-3">
                       <p className="text-[11px] font-bold text-indigo-700">GTEx Portal v8</p>
                       <p className="mt-1 text-[11px] leading-relaxed text-slate-600">
                         Primary source. Median gene expression (TPM) across 54 human tissues. Provides tissue-level and transcript-level expression data via API v2.
                       </p>
                     </div>
-                    <div className="rounded-lg border border-slate-200 bg-blue-50/40 p-3">
+                    <div className="rounded-lg border border-[#E5E7EB] bg-blue-50/40 p-3">
                       <p className="text-[11px] font-bold text-blue-700">Human Protein Atlas</p>
                       <p className="mt-1 text-[11px] leading-relaxed text-slate-600">
                         Fallback source. RNA tissue specific nTPM, tissue specificity index, and single-cell type enrichment data from HPA JSON API.
                       </p>
                     </div>
-                    <div className="rounded-lg border border-slate-200 bg-emerald-50/40 p-3">
+                    <div className="rounded-lg border border-[#E5E7EB] bg-emerald-50/40 p-3">
                       <p className="text-[11px] font-bold text-emerald-700">UniProt</p>
                       <p className="mt-1 text-[11px] leading-relaxed text-slate-600">
                         Last-resort source. Tissue specificity comments from protein annotations when GTEx and HPA are unavailable.
@@ -576,7 +599,7 @@ export default function DocumentationPage() {
                       { key: "ocular", label: "Ocular", desc: "Intravitreal injection. Immune-privileged site with minimal systemic exposure." },
                       { key: "other", label: "Other / TBD", desc: "Not yet determined or experimental delivery route." },
                     ].map((ctx) => (
-                      <div key={ctx.key} className="rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2">
+                      <div key={ctx.key} className="rounded-lg border border-[#E5E7EB] bg-slate-50/60 px-3 py-2">
                         <p className="text-[11px] font-bold text-slate-700">{ctx.label}</p>
                         <p className="mt-0.5 text-[11px] text-slate-500">{ctx.desc}</p>
                       </div>
@@ -587,10 +610,10 @@ export default function DocumentationPage() {
                 {/* Tissue Scoring Matrix */}
                 <div>
                   <h3 className="mb-2 text-[13px] font-semibold text-slate-800">Tissue Delivery Scoring Matrix</h3>
-                  <p className="mb-2 text-[11px] text-slate-500">
-                    Each tissue receives three scoring modifiers that adjust ASO candidate quality scores. Higher uptake = better cellular entry. BBB = blood-brain barrier crossing ability. Immune = immune response profile.
+                   <p className="mb-2 text-[11px] text-slate-500">
+                    Each tissue receives scoring modifiers that adjust ASO candidate drug-like estimates (nuclease resistance, cellular uptake, BBB crossing, immune stimulation). These are reported alongside the primary ranking metric — target duplex energy.
                   </p>
-                  <div className="overflow-x-auto rounded-lg border border-slate-200">
+                  <div className="overflow-x-auto rounded-lg border border-[#E5E7EB]">
                     <table className="w-full text-left text-[11px]">
                       <thead className="bg-slate-100 text-slate-600">
                         <tr>
@@ -634,19 +657,19 @@ export default function DocumentationPage() {
                 <div>
                   <h3 className="mb-2 text-[13px] font-semibold text-slate-800">Chemistry–Tissue Interaction Bonuses</h3>
                   <div className="grid gap-2 sm:grid-cols-2">
-                    <div className="rounded-lg border border-slate-200 bg-indigo-50/40 px-3 py-2">
+                    <div className="rounded-lg border border-[#E5E7EB] bg-indigo-50/40 px-3 py-2">
                       <p className="text-[11px] font-bold text-indigo-700">CNS / Brain / Spinal Cord</p>
                       <p className="mt-0.5 text-[11px] text-slate-600">PMO or LNA gapmer: <span className="font-semibold text-emerald-600">+8</span> bonus. Standard gapmer: <span className="font-semibold text-rose-500">-3</span> penalty.</p>
                     </div>
-                    <div className="rounded-lg border border-slate-200 bg-amber-50/40 px-3 py-2">
+                    <div className="rounded-lg border border-[#E5E7EB] bg-amber-50/40 px-3 py-2">
                       <p className="text-[11px] font-bold text-amber-700">Liver</p>
                       <p className="mt-0.5 text-[11px] text-slate-600">Gapmer chemistry: <span className="font-semibold text-emerald-600">+5</span> bonus for hepatic uptake.</p>
                     </div>
-                    <div className="rounded-lg border border-slate-200 bg-emerald-50/40 px-3 py-2">
+                    <div className="rounded-lg border border-[#E5E7EB] bg-emerald-50/40 px-3 py-2">
                       <p className="text-[11px] font-bold text-emerald-700">Eye / Retina</p>
                       <p className="mt-0.5 text-[11px] text-slate-600">PMO chemistry: <span className="font-semibold text-emerald-600">+5</span> bonus for intravitreal delivery.</p>
                     </div>
-                    <div className="rounded-lg border border-slate-200 bg-rose-50/40 px-3 py-2">
+                    <div className="rounded-lg border border-[#E5E7EB] bg-rose-50/40 px-3 py-2">
                       <p className="text-[11px] font-bold text-rose-700">Length Penalty (CNS)</p>
                       <p className="mt-0.5 text-[11px] text-slate-600">ASO &gt; 20 nt targeting CNS/Brain/Spinal Cord: <span className="font-semibold text-rose-500">-5</span> penalty for reduced BBB permeability.</p>
                     </div>

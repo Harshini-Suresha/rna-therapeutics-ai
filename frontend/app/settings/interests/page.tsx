@@ -42,10 +42,10 @@ export default function InterestsPage() {
     setInterests(interests.filter((i) => i.id !== id));
   }
 
-  if (loading) return <div className="flex min-h-screen bg-[#F5F6FA]"><Sidebar /><div className="flex min-h-screen flex-1 flex-col"><Topbar /><main className="flex-1 flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></main></div></div>;
+  if (loading) return <div className="flex min-h-screen bg-[#F8FAFC]"><Sidebar /><div className="flex min-h-screen flex-1 flex-col"><Topbar /><main className="flex-1 flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></main></div></div>;
 
   return (
-    <div className="flex min-h-screen bg-[#F5F6FA]">
+    <div className="flex min-h-screen bg-[#F8FAFC]">
       <Sidebar />
       <div className="flex min-h-screen flex-1 flex-col">
         <Topbar />
@@ -59,8 +59,8 @@ export default function InterestsPage() {
             <div className="px-5 pb-5 space-y-3">
               {error && <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-[12px] text-red-600"><AlertCircle className="h-4 w-4 shrink-0" />{error}</div>}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <input value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="Topic (e.g. Spinal Muscular Atrophy)" className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-[13px] text-slate-800 outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15" />
-                <input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Brief description (optional)" className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-[13px] text-slate-800 outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15" />
+                <input value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="Topic (e.g. Spinal Muscular Atrophy)" className="h-10 rounded-lg border border-[#E5E7EB] bg-white px-3 text-[13px] text-slate-800 outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15" />
+                <input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Brief description (optional)" className="h-10 rounded-lg border border-[#E5E7EB] bg-white px-3 text-[13px] text-slate-800 outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15" />
               </div>
               <button onClick={handleAdd} disabled={adding || !topic.trim()} className="flex h-9 items-center gap-1.5 rounded-lg bg-indigo-600 px-3 text-[12px] font-semibold text-white hover:bg-indigo-700 disabled:opacity-50">
                 {adding ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}Add

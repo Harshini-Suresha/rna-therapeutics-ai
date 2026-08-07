@@ -79,10 +79,10 @@ export default function HelpAssistant({ onClose }: { onClose: () => void }) {
   return (
     <div
       ref={panelRef}
-      className="absolute right-0 top-full mt-2 w-[420px] max-h-[80vh] rounded-xl border border-slate-200 bg-white shadow-xl z-50 flex flex-col overflow-hidden"
+      className="absolute right-0 top-full mt-2 w-[420px] max-h-[80vh] rounded-xl border border-[#E5E7EB] bg-white shadow-xl z-50 flex flex-col overflow-hidden"
     >
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+      <div className="flex items-center justify-between border-b border-[#E5E7EB] px-4 py-3">
         <div className="flex items-center gap-2">
           <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600">
             <Sparkles className="h-3.5 w-3.5 text-white" />
@@ -103,7 +103,7 @@ export default function HelpAssistant({ onClose }: { onClose: () => void }) {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search documentation..."
-            className="w-full rounded-lg border border-slate-200 bg-slate-50 pl-8 pr-3 py-2 text-[12px] text-slate-700 placeholder:text-slate-400 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/20"
+            className="w-full rounded-lg border border-[#E5E7EB] bg-slate-50 pl-8 pr-3 py-2 text-[12px] text-slate-700 placeholder:text-slate-400 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/20"
           />
         </div>
       </div>
@@ -166,7 +166,7 @@ export default function HelpAssistant({ onClose }: { onClose: () => void }) {
             onChange={(e) => setAiQuery(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleAsk()}
             placeholder="Ask anything about RNA therapeutics..."
-            className="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-700 placeholder:text-slate-400 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/20"
+            className="flex-1 rounded-lg border border-[#E5E7EB] bg-slate-50 px-3 py-2 text-[12px] text-slate-700 placeholder:text-slate-400 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/20"
           />
           <button
             onClick={handleAsk}
@@ -184,7 +184,7 @@ export default function HelpAssistant({ onClose }: { onClose: () => void }) {
               <button
                 key={i}
                 onClick={() => setAiQuery(s)}
-                className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+                className="rounded-full border border-[#E5E7EB] bg-slate-50 px-2.5 py-1 text-[10px] text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
               >
                 {s}
               </button>

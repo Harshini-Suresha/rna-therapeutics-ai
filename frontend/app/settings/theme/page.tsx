@@ -24,7 +24,7 @@ export default function ThemePage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-[#F5F6FA] dark:bg-[#0f172a]">
+    <div className="flex min-h-screen bg-[#F8FAFC] dark:bg-[#0f172a]">
       <Sidebar />
       <div className="flex min-h-screen flex-1 flex-col">
         <Topbar />
@@ -59,7 +59,7 @@ export default function ThemePage() {
                     className={`flex flex-col items-center gap-3 rounded-xl border-2 px-4 py-5 transition-all ${
                       active
                         ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-950 shadow-sm"
-                        : "border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600"
+                        : "border-[#E5E7EB] dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600"
                     }`}
                   >
                     <span className={`flex h-12 w-12 items-center justify-center rounded-full ${t.bg} ring-2 ${active ? "ring-indigo-500" : t.ring}`}>

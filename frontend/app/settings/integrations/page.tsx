@@ -26,7 +26,7 @@ export default function IntegrationsPage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-[#F5F6FA]">
+    <div className="flex min-h-screen bg-[#F8FAFC]">
       <Sidebar />
       <div className="flex min-h-screen flex-1 flex-col">
         <Topbar />
@@ -48,7 +48,7 @@ export default function IntegrationsPage() {
                       value={values[k.key] || ""}
                       onChange={(e) => setValues({ ...values, [k.key]: e.target.value })}
                       placeholder={k.placeholder}
-                      className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 pr-10 text-[13px] font-mono text-slate-800 outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15"
+                      className="h-10 w-full rounded-lg border border-[#E5E7EB] bg-white px-3 pr-10 text-[13px] font-mono text-slate-800 outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15"
                     />
                     <button type="button" onClick={() => setVisible({ ...visible, [k.key]: !visible[k.key] })} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
                       {visible[k.key] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}

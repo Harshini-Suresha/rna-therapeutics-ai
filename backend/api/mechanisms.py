@@ -9,6 +9,7 @@ Supports multiple therapeutic goals:
 - TG03: RNA Editing / Correction (A13, A16, A17, A18, A19, A20)
 - TG04: RNA Processing Modulation (A7, A8, A9, A10, A11)
 - TG05: RNA Neutralization (A12, A14, A25)
+- TG06: Translational Regulation (A2, A5, A6, A27)
 """
 
 from fastapi import APIRouter, HTTPException, Query
@@ -21,6 +22,9 @@ from services.mechanism_service import (
     rank_rna_processing_mechanisms,
     rank_rna_editing_mechanisms,
     rank_rna_neutralization_mechanisms,
+    rank_translational_regulation_mechanisms,
+    rank_rna_engineering_mechanisms,
+    generate_rna_engineering_candidates,
     DEFECT_TYPES,
     SILENCING_SCOPES,
     GENE_UPREGULATION_DEFECT_TYPES,
@@ -33,6 +37,14 @@ from services.mechanism_service import (
     NEUTRALIZATION_DEFECT_TYPES,
     NEUTRALIZATION_MODES,
     STERIC_CHEMISTRIES,
+    TRANSLATIONAL_GOALS,
+    TRANSLATIONAL_TARGET_ELEMENTS,
+    TRANSLATIONAL_CHEMISTRIES,
+    RNA_ENGINEERING_STRUCTURAL_CLASSES,
+    RNA_ENGINEERING_TARGET_TYPES,
+    RNA_ENGINEERING_SCAFFOLDS,
+    RNA_ENGINEERING_CHEM_STABILIZATIONS,
+    RNA_ENGINEERING_K_D_GOALS,
 )
 from services.gene_feature_service import analyze_gene_features
 
@@ -93,6 +105,26 @@ class RnaNeutralizationRequest(BaseModel):
     target_gene_type: Optional[str] = None
 
 
+class TranslationalRegulationRequest(BaseModel):
+    gene_symbol: str
+    translational_goal: Optional[str] = None
+    target_element: Optional[str] = None
+    steric_chemistry: Optional[str] = None
+    target_rbp: Optional[str] = None
+    oligo_length: Optional[int] = None
+    delivery_context: Optional[str] = None
+
+
+class RnaEngineeringRequest(BaseModel):
+    gene_symbol: str
+    structural_class: str
+    target_type: str
+    scaffold: str
+    chem_stabilization: str
+    kd_goal: str
+    delivery_context: Optional[str] = None
+
+
 @router.get("/api/mechanisms/options")
 async def mechanism_options():
     """Input options for all mechanism selection forms."""
@@ -117,6 +149,18 @@ async def mechanism_options():
             "molecularDefects": [{"id": k, "label": v} for k, v in NEUTRALIZATION_DEFECT_TYPES.items()],
             "neutralizationModes": [{"id": k, "label": v} for k, v in NEUTRALIZATION_MODES.items()],
             "stericChemistries": [{"id": k, "label": v} for k, v in STERIC_CHEMISTRIES.items()],
+        },
+        "translationalRegulation": {
+            "translationalGoals": [{"id": k, "label": v} for k, v in TRANSLATIONAL_GOALS.items()],
+            "targetElements": [{"id": k, "label": v} for k, v in TRANSLATIONAL_TARGET_ELEMENTS.items()],
+            "stericChemistries": [{"id": k, "label": v} for k, v in TRANSLATIONAL_CHEMISTRIES.items()],
+        },
+        "rnaEngineering": {
+            "structuralClasses": [{"id": k, "label": v} for k, v in RNA_ENGINEERING_STRUCTURAL_CLASSES.items()],
+            "targetTypes": [{"id": k, "label": v} for k, v in RNA_ENGINEERING_TARGET_TYPES.items()],
+            "scaffolds": [{"id": k, "label": v} for k, v in RNA_ENGINEERING_SCAFFOLDS.items()],
+            "chemStabilizations": [{"id": k, "label": v} for k, v in RNA_ENGINEERING_CHEM_STABILIZATIONS.items()],
+            "kdGoals": [{"id": k, "label": v} for k, v in RNA_ENGINEERING_K_D_GOALS.items()],
         },
         "deliveryContexts": [{"id": k, "label": v} for k, v in DELIVERY_CONTEXTS.items()],
     }
@@ -297,7 +341,112 @@ async def rna_neutralization_mechanisms(payload: RnaNeutralizationRequest):
             "deliveryContext": payload.delivery_context,
             "targetGeneType": payload.target_gene_type,
         },
-        "results": results,
+         "results": results,
+     }
+
+
+@router.post("/api/mechanisms/translational-regulation")
+async def translational_regulation_mechanisms(payload: TranslationalRegulationRequest):
+     if payload.translational_goal and payload.translational_goal not in TRANSLATIONAL_GOALS:
+         raise HTTPException(
+             status_code=400,
+             detail=f"Unknown translational_goal: {payload.translational_goal}",
+         )
+     if payload.target_element and payload.target_element not in TRANSLATIONAL_TARGET_ELEMENTS:
+         raise HTTPException(
+             status_code=400,
+             detail=f"Unknown target_element: {payload.target_element}",
+         )
+     if payload.steric_chemistry and payload.steric_chemistry not in TRANSLATIONAL_CHEMISTRIES:
+         raise HTTPException(
+             status_code=400,
+             detail=f"Unknown steric_chemistry: {payload.steric_chemistry}",
+         )
+
+     results = rank_translational_regulation_mechanisms(
+         translational_goal=payload.translational_goal,
+         target_element=payload.target_element,
+         steric_chemistry=payload.steric_chemistry,
+         target_rbp=payload.target_rbp,
+         oligo_length=payload.oligo_length,
+         delivery_context=payload.delivery_context,
+     )
+
+     return {
+         "geneSymbol": payload.gene_symbol.strip().upper(),
+         "therapeuticGoal": "Translational Regulation",
+         "inputs": {
+             "translationalGoal": payload.translational_goal,
+             "targetElement": payload.target_element,
+             "stericChemistry": payload.steric_chemistry,
+             "targetRbp": payload.target_rbp,
+             "oligoLength": payload.oligo_length,
+             "deliveryContext": payload.delivery_context,
+         },
+         "results": results,
+      }
+
+
+@router.post("/api/mechanisms/rna-engineering")
+async def rna_engineering_mechanisms(payload: RnaEngineeringRequest):
+    if payload.structural_class not in RNA_ENGINEERING_STRUCTURAL_CLASSES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown structural_class: {payload.structural_class}",
+        )
+    if payload.target_type not in RNA_ENGINEERING_TARGET_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown target_type: {payload.target_type}",
+        )
+    if payload.scaffold not in RNA_ENGINEERING_SCAFFOLDS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown scaffold: {payload.scaffold}",
+        )
+    if payload.chem_stabilization not in RNA_ENGINEERING_CHEM_STABILIZATIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown chem_stabilization: {payload.chem_stabilization}",
+        )
+    if payload.kd_goal not in RNA_ENGINEERING_K_D_GOALS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown kd_goal: {payload.kd_goal}",
+        )
+
+    mechanisms = rank_rna_engineering_mechanisms(
+        structural_class=payload.structural_class,
+        target_type=payload.target_type,
+        scaffold=payload.scaffold,
+        chem_stabilization=payload.chem_stabilization,
+        kd_goal=payload.kd_goal,
+        gene_symbol=payload.gene_symbol,
+        delivery_context=payload.delivery_context,
+    )
+
+    candidates = generate_rna_engineering_candidates(
+        structural_class=payload.structural_class,
+        target_type=payload.target_type,
+        scaffold=payload.scaffold,
+        chem_stabilization=payload.chem_stabilization,
+        kd_goal=payload.kd_goal,
+        gene_symbol=payload.gene_symbol,
+    )
+
+    return {
+        "geneSymbol": payload.gene_symbol.strip().upper(),
+        "therapeuticGoal": "Protein Function Modulation",
+        "inputs": {
+            "structuralClass": payload.structural_class,
+            "targetType": payload.target_type,
+            "scaffold": payload.scaffold,
+            "chemStabilization": payload.chem_stabilization,
+            "kdGoal": payload.kd_goal,
+            "deliveryContext": payload.delivery_context,
+        },
+        "mechanisms": mechanisms,
+        "candidates": candidates,
     }
 
 

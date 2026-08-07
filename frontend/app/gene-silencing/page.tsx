@@ -1,22 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { AlertCircle, ArrowLeft, Loader2, Dna, Beaker } from "lucide-react";
+import { AlertCircle, ArrowLeft, Loader2, Dna, Beaker, Download, ChevronDown, Mail } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import Topbar from "@/components/Topbar";
 import TargetAnalysisCard from "@/components/TargetAnalysisCard";
 import AssoDesignForm from "@/components/AssoDesignForm";
 import AssoCandidateCard from "@/components/AssoCandidateCard";
-import AlleleSelector from "@/components/AlleleSelector";
 import { Card, SectionHeader } from "@/components/ui";
 import { GeneTargetObject } from "@/types/gene";
-import { TargetAnalysis, DesignOptions, GenerateResponse, ClinVarVariant } from "@/types/geneSilencing";
+import { TargetAnalysis, DesignOptions, GenerateResponse } from "@/types/geneSilencing";
 import {
   fetchTargetAnalysis,
   fetchDesignOptions,
   generateCandidates,
-  fetchClinVarVariants,
+  emailAsoReport,
 } from "@/lib/geneSilencingApi";
 import { saveReport } from "@/lib/auth";
 
@@ -58,9 +57,6 @@ export default function GeneSilencingPage() {
 
   const [options, setOptions] = useState<DesignOptions | null>(null);
 
-  const [variants, setVariants] = useState<ClinVarVariant[]>([]);
-  const [selectedVariant, setSelectedVariant] = useState<ClinVarVariant | null>(null);
-
   const [selectedExons, setSelectedExons] = useState<number[]>([]);
   const [isTotalKnockdown, setIsTotalKnockdown] = useState(false);
   const [asoLength, setAsoLength] = useState(18);
@@ -72,6 +68,154 @@ export default function GeneSilencingPage() {
   const [results, setResults] = useState<GenerateResponse | null>(null);
   const [genLoading, setGenLoading] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
+  const [showExport, setShowExport] = useState(false);
+  const [emailStatus, setEmailStatus] = useState<string | null>(null);
+  const [emailSending, setEmailSending] = useState(false);
+  const exportRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (exportRef.current && !exportRef.current.contains(e.target as Node)) setShowExport(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  function triggerDownload(content: string, filename: string, mime: string) {
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function exportCsv() {
+    if (!results) return;
+    const header = "Rank,Sequence,Length,GC%,Tm (C),MFE,Duplex Energy,Target Region,Chemistry,Modifications,Exon,CPG Count,Purine Content,Complexity,Molecular Weight,Extinction Coeff\n";
+    const body = results.candidates.map((c, i) =>
+      `${i + 1},${c.sequence},${c.length},${c.gcContent},${c.meltingTempC},${c.selfStructureMfe},${c.targetDuplexEnergy},"${c.targetRegion}",${c.chemistry},"${c.modifications.join("; ")}",${c.exonNumber ?? ""},${c.cpgCount},${c.purineContent},${c.sequenceComplexity},${c.molecularWeight},${c.extinctionCoefficient}`
+    ).join("\n");
+    triggerDownload(header + body, `${gene?.geneSymbol ?? "aso"}-candidates.csv`, "text/csv");
+    setShowExport(false);
+  }
+
+  function exportTsv() {
+    if (!results) return;
+    const header = "Rank\tSequence\tLength (nt)\tGC (%)\tTm (C)\tSelf-structure MFE\tTarget duplex ΔG\tTarget region\tChemistry\tModifications\tExon\n";
+    const body = results.candidates.map((c, i) =>
+      [i + 1, c.sequence, c.length, c.gcContent, c.meltingTempC, c.selfStructureMfe, c.targetDuplexEnergy, c.targetRegion, c.chemistry, c.modifications.join("; "), c.exonNumber ?? ""].join("\t")
+    ).join("\n");
+    triggerDownload(header + body, `${gene?.geneSymbol ?? "aso"}-candidates.tsv`, "text/tab-separated-values");
+    setShowExport(false);
+  }
+
+  function exportJson() {
+    if (!results) return;
+    triggerDownload(JSON.stringify(results, null, 2), `${gene?.geneSymbol ?? "aso"}-results.json`, "application/json");
+    setShowExport(false);
+  }
+
+  function exportFasta() {
+    if (!results) return;
+    const content = results.candidates.map((c, i) =>
+      `>ASO_${i + 1} rank=${i + 1} region=${c.targetRegion} gc=${c.gcContent}% tm=${c.meltingTempC}C\n${c.sequence.match(/.{1,80}/g)?.join("\n") || c.sequence}`
+    ).join("\n\n");
+    triggerDownload(content, `${gene?.geneSymbol ?? "aso"}-sequences.fasta`, "text/plain");
+    setShowExport(false);
+  }
+
+  function buildReportContent() {
+    if (!results || !gene) return;
+    const lines = [
+      "═══════════════════════════════════════════════════",
+      "  ASO DESIGN REPORT",
+      `  ${gene.geneSymbol} — ${mechanism?.name ?? results.mechanismId}`,
+      "═══════════════════════════════════════════════════",
+      "",
+      `  Gene:          ${gene.geneSymbol} (${gene.geneName ?? "—"})`,
+      `  Organism:      ${gene.organism ?? "—"}`,
+      `  Mechanism:     ${mechanism?.name ?? results.mechanismId}`,
+      `  Chemistry:     ${results.chemistry}`,
+      `  ASO Length:    ${results.asoLength} nt`,
+      `  Modifications: ${results.modifications.join(", ")}`,
+      `  Candidates:    ${results.candidates.length}`,
+      `  Target scope:  ${results.targetExons?.length ? `Exons ${results.targetExons.join(", ")}` : "Total transcript"}`,
+      `  Ranked by:     Predicted target duplex free energy (ΔG)`,
+      "",
+    ];
+    if (results.mechanismNotes) lines.push(`  Mechanism note: ${results.mechanismNotes}`, "");
+    lines.push(
+      "───────────────────────────────────────────────────",
+      "  RESULTS",
+      "───────────────────────────────────────────────────",
+      "  Lower (more negative) target duplex ΔG indicates stronger predicted",
+      "  binding for the unmodified target window. Chemistry and modifications",
+      "  are reported separately because they do not change the base sequence.",
+      ""
+    );
+    results.candidates.forEach((c, i) => {
+      lines.push(
+        `  #${i + 1}  ${c.targetRegion}`,
+        `    Sequence:     ${c.sequence}`,
+        `    Length:       ${c.length} nt`,
+        `    GC Content:   ${c.gcContent}%`,
+        `    Melting Temp: ${c.meltingTempC} C`,
+        `    MFE:          ${c.selfStructureMfe} kcal/mol`,
+        `    Duplex Energy:${c.targetDuplexEnergy} kcal/mol`,
+        `    Chemistry:    ${c.chemistry}`,
+        `    Modifications:${c.modifications.join(", ") || "None selected"}`,
+        `    Nuclease resistance: ${c.nucleaseResistance}/100`,
+        `    Cellular uptake:    ${c.cellularUptake}/100`,
+        `    Off-target risk:    ${c.offTargetRisk}/100`,
+        `    Immune stimulation: ${c.immuneStimulation}/100`,
+        `    Purine %:     ${c.purineContent}`,
+        `    Complexity:   ${c.sequenceComplexity}`,
+        ""
+      );
+    });
+    lines.push(
+      "───────────────────────────────────────────────────",
+      "  INTERPRETATION",
+      "───────────────────────────────────────────────────",
+      "  These are computational design candidates, not experimentally validated",
+      "  therapeutic recommendations. Confirm target accessibility, specificity,",
+      "  cellular activity, and safety experimentally before further use.",
+      "═══════════════════════════════════════════════════"
+    );
+    return lines.join("\n");
+  }
+
+  function exportReport() {
+    const content = buildReportContent();
+    if (!content || !gene) return;
+    triggerDownload(content, `${gene.geneSymbol}-design-report.txt`, "text/plain");
+    setShowExport(false);
+  }
+
+  function exportHtmlReport() {
+    const content = buildReportContent();
+    if (!content || !gene) return;
+    const escaped = content.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    triggerDownload(`<!doctype html><html><head><meta charset="utf-8"><title>ASO Design Report</title></head><body style="font-family:ui-monospace,monospace;white-space:pre-wrap;line-height:1.5;padding:32px;color:#1e293b">${escaped}</body></html>`, `${gene.geneSymbol}-design-report.html`, "text/html");
+    setShowExport(false);
+  }
+
+  async function emailReport() {
+    const content = buildReportContent();
+    if (!content || !gene) return;
+    setEmailSending(true);
+    setEmailStatus(null);
+    try {
+      const response = await emailAsoReport(content, `${gene.geneSymbol}-design-report.txt`);
+      setEmailStatus(response.message);
+    } catch (error) {
+      setEmailStatus(error instanceof Error ? error.message : "Could not email the report.");
+    } finally {
+      setEmailSending(false);
+    }
+  }
 
   // Load gene + mechanism from sessionStorage
   useEffect(() => {
@@ -88,9 +232,6 @@ export default function GeneSilencingPage() {
         setDefectType(parsed.defectType ?? null);
         setTherapeuticGoal(parsed.therapeuticGoal ?? null);
         setKnownVariant(parsed.knownVariant ?? "");
-        if (parsed.silencingScope === "total_knockdown") {
-          setIsTotalKnockdown(true);
-        }
       } catch { setMechanism(null); }
     }
 
@@ -120,22 +261,18 @@ export default function GeneSilencingPage() {
     fetchDesignOptions().then(setOptions).catch(() => {});
   }, []);
 
-  // Fetch ClinVar variants for allele-specific silencing
-  useEffect(() => {
-    if (!gene?.geneId) return;
-    fetchClinVarVariants(gene.geneId).then(setVariants).catch(() => {});
-  }, [gene?.geneId]);
-
   function handleToggleMod(id: string) {
     setSelectedMods((prev) =>
       prev.includes(id) ? prev.filter((m) => m !== id) : [...prev, id]
     );
+    setResults(null);
   }
 
   function handleToggleExon(idx: number) {
     setSelectedExons((prev) =>
       prev.includes(idx) ? prev.filter((e) => e !== idx) : [...prev, idx]
     );
+    setResults(null);
   }
 
   function handleSelectAllExons(allIndices: number[]) {
@@ -149,6 +286,7 @@ export default function GeneSilencingPage() {
       if (!prev) setSelectedExons([]);
       return !prev;
     });
+    setResults(null);
   }
 
   async function handleGenerate() {
@@ -192,7 +330,7 @@ export default function GeneSilencingPage() {
   // No gene → redirect
   if (!gene) {
     return (
-      <div className="flex min-h-screen bg-[#F5F6FA]">
+      <div className="flex min-h-screen bg-[#F8FAFC]">
         <Sidebar />
         <div className="flex min-h-screen flex-1 flex-col">
           <Topbar />
@@ -217,7 +355,7 @@ export default function GeneSilencingPage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-[#F5F6FA]">
+    <div className="flex min-h-screen bg-[#F8FAFC]">
       <Sidebar />
       <div className="flex min-h-screen flex-1 flex-col">
         <Topbar />
@@ -272,11 +410,12 @@ export default function GeneSilencingPage() {
               selectedExons={selectedExons}
               isTotalKnockdown={isTotalKnockdown}
               onToggleTotalKnockdown={handleToggleTotalKnockdown}
+              showTargetingMode={true}
             />
           ) : null}
 
           {/* Step 1a: Target Selection — Exon picker */}
-          {target && !targetLoading && (
+          {target && !targetLoading && !isTotalKnockdown && mechanism?.id !== "A2" && (
             <Card className="p-5">
               <SectionHeader step="1a" title="Target Selection" />
               <div className="px-5 pb-5">
@@ -315,59 +454,40 @@ export default function GeneSilencingPage() {
             </Card>
           )}
 
-          {/* Allele-specific variant selector */}
-          {!isTotalKnockdown && !targetLoading && target && (
-            <AlleleSelector
-              variants={variants}
-              selectedVariant={selectedVariant}
-              onSelectVariant={(v) => {
-                setSelectedVariant(v);
-                // Wire the selected ClinVar variant to knownVariant for generation
-                if (v) {
-                  const parts = [v.hgvsp || v.hgvsc || "", v.variantId, v.rsid].filter(Boolean);
-                  setKnownVariant(parts.join(" ") || v.variantId);
-                } else {
-                  // Revert to sessionStorage value if available, else clear
-                  const mechStored = sessionStorage.getItem(SELECTED_MECHANISM_KEY);
-                  if (mechStored) {
-                    try {
-                      const parsed = JSON.parse(mechStored);
-                      setKnownVariant(parsed.knownVariant ?? "");
-                    } catch { setKnownVariant(""); }
-                  } else {
-                    setKnownVariant("");
-                  }
-                }
-              }}
-            />
-          )}
-
           {/* Steps 2 + 3: Design Form + Results */}
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-5">
-            <div className="lg:col-span-2 space-y-4">
-              {/* ASO Design Parameters */}
-              <Card className="p-5">
+             <div className="lg:col-span-2 space-y-4">
+                {/* ASO Design Parameters */}
+                <Card className="p-5">
                 <SectionHeader step="2" title="ASO Design Parameters" />
                 <div className="px-5 pb-5">
+                  {mechanism?.id === "A2" && (
+                    <p className="mb-3 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-[11.5px] leading-relaxed text-blue-700">
+                      Translation-blocking designs target the 5′ translation-initiation region. Exon selection is not applicable for this mechanism.
+                    </p>
+                  )}
+                  {mechanism?.id === "A21" && (
+                    <p className="mb-3 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-[11.5px] leading-relaxed text-blue-700">
+                      siRNA/RISC designs require a 21-nt siRNA duplex. The generated result uses those required settings even if a different chemistry or length is selected above.
+                    </p>
+                  )}
                   <AssoDesignForm
                     options={options}
                     asoLength={asoLength}
-                    setAsoLength={setAsoLength}
+                    setAsoLength={(length) => { setAsoLength(length); setResults(null); }}
                     chemistry={chemistry}
-                    setChemistry={setChemistry}
+                    setChemistry={(selectedChemistry) => { setChemistry(selectedChemistry); setResults(null); }}
                     selectedMods={selectedMods}
                     onToggleMod={handleToggleMod}
-                    deliveryContext={deliveryContext}
-                    setDeliveryContext={setDeliveryContext}
-                    onGenerate={handleGenerate}
-                    loading={genLoading}
-                    disabled={!isTotalKnockdown && selectedExons.length === 0 || !target}
-                    hasResults={!!results}
-                  />
+                     onGenerate={handleGenerate}
+                     loading={genLoading}
+                     disabled={!target || (!isTotalKnockdown && selectedExons.length === 0)}
+                     hasResults={!!results}
+                   />
                   {results && (
                     <button
                       onClick={() => { setResults(null); setGenError(null); }}
-                      className="mt-3 w-full rounded-lg border border-slate-200 px-4 py-2 text-[12.5px] font-medium text-slate-500 hover:bg-slate-50 transition-colors"
+                      className="mt-3 w-full rounded-lg border border-[#E5E7EB] px-4 py-2 text-[12.5px] font-medium text-slate-500 hover:bg-slate-50 transition-colors"
                     >
                       Reset & choose different options
                     </button>
@@ -377,7 +497,50 @@ export default function GeneSilencingPage() {
             </div>
 
             <div className="lg:col-span-3 space-y-3">
-              <SectionHeader step="3" title="Generated ASO Candidates" />
+              <SectionHeader
+                step="3"
+                title="Generated ASO Candidates"
+                right={results && results.candidates.length > 0 ? (
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={emailReport}
+                      disabled={emailSending}
+                      className="flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-[12.5px] font-medium text-slate-600 shadow-sm transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <Mail className="h-3.5 w-3.5" />
+                      {emailSending ? "Sending…" : "Email report"}
+                    </button>
+                    <div ref={exportRef} className="relative inline-block">
+                      <button
+                        onClick={() => setShowExport(!showExport)}
+                        className="flex items-center gap-1.5 rounded-lg bg-brand px-3 py-2 text-[12.5px] font-medium text-white shadow-sm transition-colors hover:bg-brand-dark"
+                        aria-expanded={showExport}
+                        aria-haspopup="menu"
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                        Download report
+                        <ChevronDown className="h-3.5 w-3.5" />
+                      </button>
+                      {showExport && (
+                        <div role="menu" className="absolute right-0 top-full z-50 mt-1 w-48 rounded-xl border border-[#E5E7EB] bg-white py-1 shadow-lg">
+                          <button onClick={exportCsv} className="w-full px-3 py-2 text-left text-[12.5px] text-slate-600 hover:bg-slate-50">CSV summary</button>
+                          <button onClick={exportTsv} className="w-full px-3 py-2 text-left text-[12.5px] text-slate-600 hover:bg-slate-50">TSV spreadsheet</button>
+                          <button onClick={exportJson} className="w-full px-3 py-2 text-left text-[12.5px] text-slate-600 hover:bg-slate-50">Raw JSON</button>
+                          <button onClick={exportFasta} className="w-full px-3 py-2 text-left text-[12.5px] text-slate-600 hover:bg-slate-50">FASTA sequences</button>
+                          <button onClick={exportReport} className="w-full px-3 py-2 text-left text-[12.5px] text-slate-600 hover:bg-slate-50">Detailed text report</button>
+                          <button onClick={exportHtmlReport} className="w-full px-3 py-2 text-left text-[12.5px] text-slate-600 hover:bg-slate-50">HTML report</button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : undefined}
+              />
+
+              {emailStatus && (
+                <p className={`rounded-lg px-3 py-2 text-[11.5px] ${emailStatus.startsWith("Report emailed") ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
+                  {emailStatus}
+                </p>
+              )}
 
               {genError && (
                 <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-600">
@@ -389,12 +552,12 @@ export default function GeneSilencingPage() {
                 <Card className="flex flex-col items-center justify-center px-6 py-12 text-center">
                   <Beaker className="h-8 w-8 text-slate-300" />
                   <p className="mt-3 text-[13px] font-medium text-slate-500">
-                    {isTotalKnockdown
-                      ? "Click Generate to create ASO candidates for total transcript knockdown"
-                      : "Select exon(s) and click Generate to create ASO candidates"}
+                  {isTotalKnockdown
+                    ? "Click Generate to create ASO candidates for total transcript knockdown"
+                    : "Select exon(s) and click Generate to create ASO candidates"}
                   </p>
                   <p className="mt-1 text-[12px] text-slate-400">
-                    Candidates are ranked by composite quality score (GC%, Tm, self-dimer risk)
+                    Candidates are ranked by target duplex energy (ΔG, kcal/mol)
                   </p>
                 </Card>
               )}

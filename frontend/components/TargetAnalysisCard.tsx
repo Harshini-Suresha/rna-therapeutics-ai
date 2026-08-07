@@ -9,11 +9,13 @@ export default function TargetAnalysisCard({
   selectedExons,
   isTotalKnockdown,
   onToggleTotalKnockdown,
+  showTargetingMode = true,
 }: {
   target: TargetAnalysis;
   selectedExons: number[];
   isTotalKnockdown: boolean;
   onToggleTotalKnockdown: () => void;
+  showTargetingMode?: boolean;
 }) {
   return (
     <Card>
@@ -45,7 +47,8 @@ export default function TargetAnalysisCard({
         </div>
 
         {/* Targeting mode toggle */}
-        <div>
+        {showTargetingMode && (
+          <div>
           <p className="mb-2 text-[12.5px] font-medium text-slate-600">
             Knockdown targeting mode:
           </p>
@@ -55,7 +58,7 @@ export default function TargetAnalysisCard({
               className={`flex items-center gap-2.5 rounded-lg border p-3 text-left transition-colors ${
                 !isTotalKnockdown
                   ? "border-brand bg-brand/5 ring-1 ring-brand"
-                  : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                  : "border-[#E5E7EB] hover:border-slate-300 hover:bg-slate-50"
               }`}
             >
               <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${
@@ -73,7 +76,7 @@ export default function TargetAnalysisCard({
               className={`flex items-center gap-2.5 rounded-lg border p-3 text-left transition-colors ${
                 isTotalKnockdown
                   ? "border-emerald-300 bg-emerald-50 ring-1 ring-emerald-400"
-                  : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                  : "border-[#E5E7EB] hover:border-slate-300 hover:bg-slate-50"
               }`}
             >
               <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${
@@ -87,7 +90,8 @@ export default function TargetAnalysisCard({
               </div>
             </button>
           </div>
-        </div>
+          </div>
+        )}
 
         {/* Total knockdown banner */}
         {isTotalKnockdown && (

@@ -27,7 +27,7 @@ export default function PreferencesPage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-[#F5F6FA]">
+    <div className="flex min-h-screen bg-[#F8FAFC]">
       <Sidebar />
       <div className="flex min-h-screen flex-1 flex-col">
         <Topbar />
@@ -41,7 +41,7 @@ export default function PreferencesPage() {
             <div className="px-5 pb-5 space-y-4">
               <div>
                 <label className="mb-1 block text-[12px] font-medium text-slate-600">Default Organism</label>
-                <select value={organism} onChange={(e) => { setOrganism(e.target.value); save(); }} className="h-10 w-full max-w-xs rounded-lg border border-slate-200 bg-white px-3 text-[13px] text-slate-800 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15">
+                <select value={organism} onChange={(e) => { setOrganism(e.target.value); save(); }} className="h-10 w-full max-w-xs rounded-lg border border-[#E5E7EB] bg-white px-3 text-[13px] text-slate-800 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15">
                   {ORGANISMS.map((o) => <option key={o} value={o}>{o}</option>)}
                 </select>
               </div>
@@ -49,7 +49,7 @@ export default function PreferencesPage() {
                 <label className="mb-1 block text-[12px] font-medium text-slate-600">Unit System</label>
                 <div className="flex gap-2">
                   {UNITS.map((u) => (
-                    <button key={u} onClick={() => { setUnit(u); save(); }} className={`h-9 rounded-lg border px-4 text-[12px] font-medium ${unit === u ? "border-indigo-500 bg-indigo-50 text-indigo-700" : "border-slate-200 text-slate-600 hover:border-slate-300"}`}>{u}</button>
+                    <button key={u} onClick={() => { setUnit(u); save(); }} className={`h-9 rounded-lg border px-4 text-[12px] font-medium ${unit === u ? "border-indigo-500 bg-indigo-50 text-indigo-700" : "border-[#E5E7EB] text-slate-600 hover:border-slate-300"}`}>{u}</button>
                   ))}
                 </div>
               </div>

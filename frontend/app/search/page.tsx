@@ -56,7 +56,7 @@ export default function SearchPage() {
   }, [query]);
 
   return (
-    <div className="flex min-h-screen bg-[#F5F6FA]">
+    <div className="flex min-h-screen bg-[#F8FAFC]">
       <Sidebar />
       <div className="flex min-h-screen flex-1 flex-col">
         <Topbar />
@@ -73,7 +73,7 @@ export default function SearchPage() {
               <button
                 type="button"
                 onClick={() => router.push(`/?q=${encodeURIComponent(query)}`)}
-                className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-left transition hover:border-slate-300"
+                className="rounded-xl border border-[#E5E7EB] bg-slate-50 p-4 text-left transition hover:border-slate-300"
               >
                 <p className="text-[12px] font-semibold text-slate-700">Genes</p>
                 <p className="mt-2 text-[11px] text-slate-500">Search across gene names, symbols, and identifiers.</p>
@@ -81,7 +81,7 @@ export default function SearchPage() {
               <button
                 type="button"
                 onClick={() => router.push(`/targets?search=${encodeURIComponent(query)}`)}
-                className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-left transition hover:border-slate-300"
+                className="rounded-xl border border-[#E5E7EB] bg-slate-50 p-4 text-left transition hover:border-slate-300"
               >
                 <p className="text-[12px] font-semibold text-slate-700">Targets</p>
                 <p className="mt-2 text-[11px] text-slate-500">Browse target discovery content for the search term.</p>
@@ -89,7 +89,7 @@ export default function SearchPage() {
               <button
                 type="button"
                 onClick={() => router.push(`/projects?search=${encodeURIComponent(query)}`)}
-                className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-left transition hover:border-slate-300"
+                className="rounded-xl border border-[#E5E7EB] bg-slate-50 p-4 text-left transition hover:border-slate-300"
               >
                 <p className="text-[12px] font-semibold text-slate-700">Projects</p>
                 <p className="mt-2 text-[11px] text-slate-500">Locate projects by name, disease, or owner.</p>
@@ -97,7 +97,7 @@ export default function SearchPage() {
             </div>
 
             <div className="grid gap-4 lg:grid-cols-2">
-              <div className="rounded-xl border border-slate-200 p-4">
+              <div className="rounded-xl border border-[#E5E7EB] p-4">
                 <p className="text-[12px] font-semibold text-slate-700">Gene match</p>
                 {loading ? (
                   <p className="mt-2 text-[11px] text-slate-500">Resolving gene...</p>
@@ -131,14 +131,14 @@ export default function SearchPage() {
                   <p className="mt-2 text-[11px] text-slate-500">Enter a gene query to lookup the live backend.</p>
                 )}
               </div>
-              <div className="rounded-xl border border-slate-200 p-4">
+              <div className="rounded-xl border border-[#E5E7EB] p-4">
                 <p className="text-[12px] font-semibold text-slate-700">Project match</p>
                 {projectResults.length > 0 ? (
                   <div className="mt-2 space-y-2">
                     {projectResults.slice(0, 5).map((p) => (
                       <div
                         key={p.id}
-                        className="rounded-lg border border-slate-200 bg-white p-3 hover:border-brand/30 transition-colors"
+                        className="rounded-lg border border-[#E5E7EB] bg-white p-3 hover:border-brand/30 transition-colors"
                       >
                         <p className="text-[12px] font-semibold text-slate-800">{p.name}</p>
                         <div className="flex items-center gap-2 mt-1 text-[10.5px] text-slate-400">
@@ -172,7 +172,7 @@ export default function SearchPage() {
             </div>
 
             {geneResult && (
-              <div className="rounded-xl border border-slate-200 bg-white p-4">
+              <div className="rounded-xl border border-[#E5E7EB] bg-white p-4">
                 <p className="text-[12px] font-semibold uppercase tracking-wide text-slate-500">Gene details</p>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                   <div className="rounded-xl bg-slate-50 p-3">
@@ -194,7 +194,7 @@ export default function SearchPage() {
               </div>
             )}
 
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div className="rounded-xl border border-[#E5E7EB] bg-slate-50 p-4">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Next steps</p>
               <ul className="mt-3 space-y-2 text-[11px] text-slate-600 list-disc list-inside">
                 <li>Gene searches resolve via the live backend and can be opened in the dashboard.</li>

@@ -17,6 +17,7 @@
   "asoChemistry": "Fully modified RNase H-independent oligonucleotides including LNA, 2′-O-Me, 2′-MOE and phosphorothioate chemistries.",
   "typicalLength": "Approximately 15–23 nucleotides, complementary to the mature miRNA.",
   "designRules": "Literature synthesis: target mature miRNA sequence; optimize affinity for seed-region binding; avoid RNase H activation; experimentally validate derepression of downstream targets.",
+  "scoring": "Candidates are ranked by predicted target duplex free energy (ΔG, kcal/mol) computed using ViennaRNA duplexfold — more negative values indicate stronger predicted ASO-target binding. Biophysical metrics reported: GC content, nearest-neighbor Tm (primer3), self-structure MFE (ViennaRNA fold), poly-G tracts, CpG count, homopolymer runs, purine content, GC skew, sequence complexity, molecular weight, extinction coefficient. Drug-like estimates: nuclease resistance, cellular uptake, BBB crossing, off-target risk, immune stimulation, synthesis difficulty.",
   "secondaryStructureRequirement": "Minimal concern because mature miRNAs are short single-stranded RNAs within the RISC complex; accessibility of the miRNA-RISC complex remains an experimental consideration.",
   "offTargetConsiderations": "Because one miRNA regulates many transcripts, inhibition may affect multiple biological pathways; evaluate transcriptome-wide downstream effects.",
   "advantages": "Can simultaneously restore multiple disease-relevant genes regulated by a single pathogenic miRNA.",
