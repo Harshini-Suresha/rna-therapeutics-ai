@@ -17,3 +17,4 @@ scikit-learn
 pyyaml
 huggingface_hub
 rna-fm
+ViennaRNA
