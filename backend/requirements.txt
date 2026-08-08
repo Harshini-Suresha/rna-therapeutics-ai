@@ -18,3 +18,4 @@ pyyaml
 huggingface_hub
 rna-fm
 ViennaRNA
+primer3-py
