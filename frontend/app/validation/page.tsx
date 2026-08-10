@@ -36,7 +36,7 @@ export default function ValidationPage() {
           label: "Integration",
           items: [
             "Upload experimental results",
-            "Compare AI vs experiment",
+            "Compare predictions vs experiment",
             "Efficacy correlation",
           ],
         },

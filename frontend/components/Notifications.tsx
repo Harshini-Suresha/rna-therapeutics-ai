@@ -98,7 +98,7 @@ const NOTIFICATIONS: Notification[] = [
   },
   {
     id: "7",
-    title: "AI found 3 higher-scoring ASOs",
+    title: "Platform found 3 higher-scoring ASOs",
     description: "New candidates with improved specificity scores.",
     time: "6 hours ago",
     read: true,

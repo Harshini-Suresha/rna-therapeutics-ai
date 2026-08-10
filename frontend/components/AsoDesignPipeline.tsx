@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { RnaNeutralizationCandidate } from "@/types/rnaNeutralization";
 import {
   CheckCircle,
@@ -10,6 +10,7 @@ import {
   Shield,
   Wind,
 } from "lucide-react";
+import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
 
 interface AsoDesignPipelineProps {
   candidate: RnaNeutralizationCandidate;
@@ -34,6 +35,8 @@ export default function AsoDesignPipeline({
   const [selectedModPattern, setSelectedModPattern] = useState<string>("");
   const [selectedConjugation, setSelectedConjugation] = useState<string>("");
   const [secondaryChecked, setSecondaryChecked] = useState(false);
+
+  useKeyboardShortcut("escape", onBack);
 
   const chemistryModPatterns: Record<string, { id: string; label: string; description: string }[]> = {
     "2-o-moe-full-ps": [

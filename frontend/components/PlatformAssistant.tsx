@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { X, Send, Loader2, Sparkles, AlertCircle } from "lucide-react";
 import { askAssistant } from "@/lib/platformApi";
+import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
 
 interface Message {
   role: "user" | "assistant" | "error";
@@ -42,6 +43,8 @@ export default function PlatformAssistant({
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [open, onClose]);
+
+  useKeyboardShortcut("p", onClose, { ctrl: true, shift: true });
 
   async function send(text: string) {
     if (!text.trim() || loading) return;

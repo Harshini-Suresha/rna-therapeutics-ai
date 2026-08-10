@@ -17,6 +17,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
 
 const PROFILE_ITEMS = [
   { label: "Profile", icon: User, href: "/settings" },
@@ -62,6 +63,9 @@ export default function AccountMenu({
     document.addEventListener("mousedown", onClickOutside);
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
+
+  useKeyboardShortcut("escape", () => setOpen(false), { enabled: open });
+  useKeyboardShortcut("a", () => setOpen((o) => !o), { ctrl: true, shift: true });
 
   function navigate(href: string) {
     setOpen(false);

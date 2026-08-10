@@ -271,7 +271,7 @@ export default function AsoAnalysisDashboard({
           <p className="text-[11.5px] font-semibold text-slate-700">Top candidate deep-dive</p>
           <span className="text-[10px] text-slate-400">per-candidate profile for the top {topCandidates.length}</span>
         </div>
-        <div className="space-y-4">
+    <div id="aso-analysis-dashboard" className="space-y-4">
           {topCandidates.map((c, i) => (
             <CandidateDeepDiveCard key={c.sequence} candidate={c} rank={i + 1} />
           ))}

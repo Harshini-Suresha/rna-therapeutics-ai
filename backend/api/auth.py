@@ -82,6 +82,7 @@ def signup(req: SignupRequest, db: Session = Depends(get_db)):
 
     token = create_token(user.id)
 
+    now = time.time()
     default_project = Project(
         user_id=user.id,
         name="General",

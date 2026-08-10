@@ -91,6 +91,52 @@ If you did not create an account, you can safely ignore this email.
         return False
 
 
+def send_bug_report_email(email: str, name: str, area: str, summary: str, steps: str, expected: str, actual: str, page_url: str) -> tuple[bool, str]:
+    """Send a bug report to support via SMTP.
+
+    Returns (sent, message).
+    """
+    if not SMTP_HOST:
+        logger.warning("Bug report email requested for %s, but SMTP is not configured.", email)
+        return False, "SMTP is not configured, so the bug report could not be emailed."
+
+    subject = f"[Bug] {area}: {summary}"
+    body = (
+        f"Area: {area}\n\n"
+        f"Summary:\n{summary}\n\n"
+        f"Steps to reproduce:\n{steps}\n\n"
+        f"Expected behavior:\n{expected}\n\n"
+        f"Actual behavior:\n{actual}\n\n"
+        f"Page URL: {page_url}\n\n"
+        f"---\n"
+        f"Reported by: {name} <{email}>\n"
+    )
+
+    try:
+        msg = EmailMessage()
+        msg["Subject"] = subject
+        msg["From"] = SMTP_FROM
+        msg["To"] = "mail@koshkey.com"
+        msg["Reply-To"] = email
+        msg.set_content(
+            f"Bug report from {name or 'a user'} <{email}>:\n\n{body}"
+        )
+
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+            server.ehlo()
+            if SMTP_PORT != 25:
+                server.starttls()
+            if SMTP_USER:
+                server.login(SMTP_USER, SMTP_PASS)
+            server.send_message(msg)
+
+        logger.info("Bug report email sent from %s", email)
+        return True, f"Bug report emailed to support from {email}."
+    except Exception as exc:
+        logger.error("Failed to send bug report email from %s: %s", email, exc)
+        return False, "The bug report could not be emailed. Please try again later."
+
+
 def send_report_email(email: str, name: str, report_content: str, filename: str) -> tuple[bool, str]:
     """Email a user-requested report to the account's registered address.
 

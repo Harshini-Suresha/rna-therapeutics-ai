@@ -13,12 +13,15 @@ The eligibility/scope compatibility tables below are read directly from
 each mechanism's rule.json (suitableVariantTypes / transcriptRequirement)
 — they are not invented.
 
-The delivery-context scoring is explicitly a separate, softer signal: it's
-a general chemistry/delivery precedent from known approved ASO drugs
-(e.g. GalNAc-siRNA for liver, intrathecal gapmers for CNS), not a field
-that exists in the mechanism dataset itself. It's surfaced to the user
-labeled as a "general precedent," not as data-backed fact, to avoid
-implying more certainty than we actually have.
+The delivery-context input is explicitly a separate, softer signal: it's a
+tie-breaker, not an eligibility input. It uses a tiered precedent table
+(approved drug / clinical trial / unestablished / contraindicated) drawn from
+real approved ASO drugs and published trials (e.g. GalNAc-siRNA for liver,
+intrathecal gapmers for CNS), not a field that exists in the mechanism
+dataset itself. Each cell carries a citation to the actual drug/trial;
+unverified cells are absent and treated as genuinely "unestablished." It is
+consulted only when the rulebook evidence level is tied, and is surfaced to
+the user as a citation or an honest unknown — never a bare number.
 """
 
 from __future__ import annotations
@@ -39,46 +42,58 @@ DELIVERY_CONTEXTS = {
     "liver": "Liver-targeted",
     "local_intramuscular": "Local / intramuscular",
     "ocular": "Ocular",
+    "skin": "Skin / intradermal",
     "other": "Other / not yet determined",
 }
 
-# NOT from the mechanism dataset — a general precedent heuristic from known
-# approved ASO/siRNA drug delivery routes. Soft tie-breaker only, scored
-# 0-2, clearly labeled as such in the API response.
-DELIVERY_PRECEDENT = {
-    "A1": {"cns": 2, "systemic": 2, "liver": 1, "local_intramuscular": 1, "ocular": 1, "other": 0},
-    "A2": {"cns": 1, "local_intramuscular": 2, "systemic": 1, "liver": 0, "ocular": 1, "other": 0},
-    "A12": {"systemic": 1, "liver": 1, "cns": 0, "local_intramuscular": 0, "ocular": 0, "other": 0},
-    "A15": {"systemic": 1, "local_intramuscular": 1, "cns": 0, "liver": 0, "ocular": 0, "other": 0},
-    "A21": {"liver": 2, "systemic": 2, "cns": 1, "local_intramuscular": 0, "ocular": 0, "other": 0},
-    "A7": {"systemic": 1, "local_intramuscular": 2, "cns": 1, "ocular": 1, "liver": 0, "other": 0},
-    "A8": {"systemic": 1, "cns": 2, "local_intramuscular": 0, "liver": 0, "ocular": 0, "other": 0},
-    "A9": {"systemic": 1, "ocular": 2, "cns": 1, "local_intramuscular": 0, "liver": 0, "other": 0},
-    "A10": {"systemic": 1, "ocular": 1, "cns": 1, "local_intramuscular": 0, "liver": 0, "other": 0},
-    "A11": {"systemic": 1, "liver": 0, "cns": 0, "local_intramuscular": 0, "ocular": 0, "other": 0},
-    "A3": {"cns": 2, "systemic": 1, "liver": 1, "local_intramuscular": 1, "ocular": 0, "other": 0},
-    "A4": {"cns": 1, "systemic": 2, "liver": 1, "local_intramuscular": 0, "ocular": 0, "other": 0},
-    "A5": {"cns": 1, "systemic": 1, "liver": 0, "local_intramuscular": 0, "ocular": 0, "other": 0},
-    "A6": {"systemic": 1, "liver": 1, "cns": 0, "local_intramuscular": 0, "ocular": 0, "other": 0},
-    "A22": {"systemic": 1, "liver": 2, "cns": 0, "local_intramuscular": 0, "ocular": 0, "other": 0},
-    "A23": {"cns": 1, "systemic": 1, "liver": 1, "local_intramuscular": 1, "ocular": 0, "other": 0},
-    # TG03 — RNA Editing / Correction
-    "A13": {"cns": 2, "systemic": 2, "liver": 1, "local_intramuscular": 1, "ocular": 2, "other": 0},
-    "A16": {"systemic": 2, "liver": 2, "cns": 1, "local_intramuscular": 0, "ocular": 0, "other": 0},
-    "A17": {"cns": 2, "systemic": 1, "liver": 1, "local_intramuscular": 0, "ocular": 2, "other": 0},
-    "A18": {"systemic": 2, "cns": 1, "liver": 1, "local_intramuscular": 0, "ocular": 1, "other": 0},
-    "A19": {"cns": 2, "systemic": 1, "liver": 1, "local_intramuscular": 0, "ocular": 1, "other": 0},
-    "A20": {"systemic": 2, "local_intramuscular": 1, "liver": 1, "cns": 0, "ocular": 1, "other": 0},
-    # TG05 — RNA Neutralization
-    # A14 steric repeat masking: PMO/steric blockers are delivered systemically
-    # for muscle (myotonic dystrophy) or intrathecally for CNS (C9orf72 ALS/FTD).
-    "A14": {"systemic": 2, "cns": 2, "local_intramuscular": 2, "liver": 0, "ocular": 0, "other": 0},
-    # A25 aptamer decoy: systemic exposure typical; Pegaptanib is intravitreal.
-    "A25": {"ocular": 2, "systemic": 1, "cns": 0, "liver": 0, "local_intramuscular": 0, "other": 0},
-    # TG06 — Translational Regulation
-    # A27 (riboswitch / structure targeting): systemic typical; CNS for
-    # structured element targeting in neurological contexts.
-    "A27": {"systemic": 1, "cns": 2, "ocular": 1, "local_intramuscular": 0, "liver": 0, "other": 0},
+# NOT from the mechanism dataset — a general precedent heuristic from real
+# approved ASO/siRNA drugs and published clinical trials. Each cell is
+# verified against an actual drug/trial; cells we have not personally
+# verified are deliberately ABSENT from this table (never backfilled with a
+# guess) and therefore default to the "unestablished" tier.
+#
+# Delivery context is a tie-breaker, not an eligibility input: a mechanism
+# is eligible or not on its own, and this table only describes how
+# well-precedented each delivery route is for an already-eligible mechanism.
+# It is consulted ONLY when the evidence level is tied (see _mechanism_sort_key),
+# and is never blended into a numeric score.
+DELIVERY_PRECEDENT: dict[str, dict[str, dict[str, str]]] = {
+    # A1 — RNase H gapmer
+    "A1": {
+        "cns": {"tier": "approved", "citation": "Nusinersen (Spinraza), intrathecal"},
+        "liver": {"tier": "approved", "citation": "Inotersen (Tegsedi), subcutaneous, hepatic uptake"},
+    },
+    # A21 — RNA interference / siRNA
+    "A21": {
+        "liver": {"tier": "approved", "citation": "Patisiran (Onpattro) / givosiran (Givlaari), hepatic"},
+        "skin": {"tier": "trial", "citation": "TD101 siRNA, intradermal, Phase 1b (Leachman et al. 2010, pachyonychia congenita)"},
+    },
+    # A14 — PMO steric repeat masking
+    "A14": {
+        "local_intramuscular": {"tier": "approved", "citation": "Eteplirsen (Exondys 51)"},
+    },
+}
+
+# Ordinal ranks (3 > 2 > 0 > -1), not magnitudes with quantitative meaning.
+# "unestablished" is genuinely unknown, so it scores 0 and is shown as "—".
+DELIVERY_TIER_WEIGHT = {
+    "approved": 3,
+    "trial": 2,
+    "unestablished": 0,
+    "contraindicated": -1,
+}
+
+# Ordinal ranks for the primary sort factor (real rulebook evidence level).
+# Parenthetical qualifiers and trailing punctuation in the rule.json rating
+# strings are stripped before lookup (e.g. "Moderate (strong preclinical
+# evidence)." → "Moderate").
+EVIDENCE_WEIGHT = {
+    "very high": 6,
+    "high": 5,
+    "moderate-high": 4,
+    "moderate": 3,
+    "low-moderate": 2,
+    "low": 1,
 }
 
 # ---------------------------------------------------------------------------
@@ -114,6 +129,30 @@ SCOPE_COMPATIBILITY = {
 }
 
 GENE_SILENCING_MECHANISM_IDS = ["A1", "A2", "A12", "A15", "A21"]
+
+# Platform-capability gate, distinct from biological compatibility: mechanisms
+# the single-stranded ASO designer cannot produce. A21 (RNAi) stays a valid
+# biological mechanism (incl. allele-specific silencing, which is real), but
+# it requires a double-stranded siRNA duplex the designer never emits — so it
+# must never rank as an eligible, selectable design option.
+NON_DESIGNABLE_SILENCING_MECHANISMS = {"A21"}
+NON_DESIGNABLE_SILENCING_REASON = (
+    "Not designable in this pipeline: RNA interference (A21) requires a "
+    "double-stranded siRNA duplex, which the single-stranded ASO designer "
+    "cannot generate. Choose a single-stranded mechanism (A1, A2, A12, A15)."
+)
+
+# Same platform-capability gate for TG02. A22 (miRNA replacement) delivers a
+# synthetic miRNA mimic — a double-stranded duplex the single-stranded ASO
+# designer cannot produce — even though replacing a deficient miRNA is a
+# biologically valid strategy.
+NON_DESIGNABLE_UPREGULATION_MECHANISMS = {"A22"}
+NON_DESIGNABLE_UPREGULATION_REASON = (
+    "Not designable in this pipeline: miRNA replacement (A22) delivers a "
+    "double-stranded miRNA mimic duplex, which the single-stranded ASO "
+    "designer cannot generate. Choose a single-stranded mechanism (A3, A4, "
+    "A5, A6, or A23)."
+)
 
 # ---------------------------------------------------------------------------
 # TG02 — Gene Activation / Upregulation
@@ -428,15 +467,10 @@ def rank_translational_regulation_mechanisms(
                 f"via the {TRANSLATIONAL_TARGET_ELEMENTS.get(target_element, target_element)} target element"
             )
 
-        # Delivery precedent bonus
+        # Delivery precedent — tie-breaker only, never added to score
+        delivery_tier, delivery_citation = _delivery_precedent(mechanism_id, delivery_context)
         if delivery_context:
-            delivery_score = DELIVERY_PRECEDENT.get(mechanism_id, {}).get(delivery_context, 0)
-            score += delivery_score
-            if delivery_score > 0:
-                rationale.append(
-                    f"Has precedent for {DELIVERY_CONTEXTS.get(delivery_context, delivery_context).lower()} delivery "
-                    "(general reference, not gene-specific)"
-                )
+            rationale.append(_delivery_fit_rationale(delivery_tier, delivery_citation))
 
         # Chemistry design-fit bonus
         if steric_chemistry == "pmo":
@@ -470,9 +504,17 @@ def rank_translational_regulation_mechanisms(
                 "RNase H-independent steric-blocking chemistries only."
             )
 
-        results.append(_build_mechanism_result(rule, eligible, score, rationale))
+        results.append(_build_mechanism_result(
+            rule,
+            eligible,
+            score,
+            rationale,
+            delivery_tier=delivery_tier,
+            delivery_citation=delivery_citation,
+            keyword_match=False,
+        ))
 
-    results.sort(key=lambda r: r["score"], reverse=True)
+    results.sort(key=_mechanism_sort_key)
     return results
 
 
@@ -576,14 +618,10 @@ def rank_rna_neutralization_mechanisms(
                 f"Matches the '{NEUTRALIZATION_MODES.get(neutralization_mode, neutralization_mode)}' strategy"
             )
 
+        # Delivery precedent — tie-breaker only, never added to score
+        delivery_tier, delivery_citation = _delivery_precedent(mechanism_id, delivery_context)
         if delivery_context:
-            delivery_score = DELIVERY_PRECEDENT.get(mechanism_id, {}).get(delivery_context, 0)
-            score += delivery_score
-            if delivery_score > 0:
-                rationale.append(
-                    f"Has precedent for {DELIVERY_CONTEXTS.get(delivery_context, delivery_context).lower()} delivery "
-                    "(general reference, not gene-specific)"
-                )
+            rationale.append(_delivery_fit_rationale(delivery_tier, delivery_citation))
 
         # Steric repeat masking — design-fit bonuses
         if mechanism_id == "A14":
@@ -618,9 +656,17 @@ def rank_rna_neutralization_mechanisms(
         if oligo_length is not None and 15 <= oligo_length <= 25:
             score += 1
 
-        results.append(_build_mechanism_result(rule, eligible, score, rationale))
+        results.append(_build_mechanism_result(
+            rule,
+            eligible,
+            score,
+            rationale,
+            delivery_tier=delivery_tier,
+            delivery_citation=delivery_citation,
+            keyword_match=False,
+        ))
 
-    results.sort(key=lambda r: r["score"], reverse=True)
+    results.sort(key=_mechanism_sort_key)
     return results
 
 
@@ -645,14 +691,88 @@ def _variant_keyword_hit(rule: dict, known_variant: str | None) -> bool:
     )
 
 
-def _build_mechanism_result(rule: dict, eligible: bool, score: int, rationale: list[str]) -> dict:
+def _delivery_precedent(
+    mechanism_id: str, delivery_context: str | None
+) -> tuple[str | None, str | None]:
+    """Return the (tier, citation) for a mechanism×delivery-context pair.
+
+    With no delivery context provided, returns (None, None) so the result is
+    marked as "not evaluated" rather than "unestablished" (which means the
+    user picked a context with no verified precedent). Absent cells default
+    to ("unestablished", None) — genuinely unknown, not a guessed number.
+    Only mechanism×context combinations verified against a real approved drug
+    or published clinical trial exist in DELIVERY_PRECEDENT.
+    """
+    if not delivery_context:
+        return None, None
+    cell = DELIVERY_PRECEDENT.get(mechanism_id, {}).get(delivery_context)
+    if not cell:
+        return "unestablished", None
+    return cell["tier"], cell.get("citation")
+
+
+def _delivery_fit_rationale(tier: str, citation: str | None) -> str:
+    """Human-readable delivery-fit line: a citation or an honest unknown."""
+    if tier == "approved":
+        return f"Delivery fit: Approved precedent — {citation}"
+    if tier == "trial":
+        return f"Delivery fit: Clinical trial precedent — {citation}"
+    if tier == "contraindicated":
+        return f"Delivery fit: Documented barrier against this route — {citation}"
+    return "Delivery fit: No established precedent for this combination"
+
+
+def _evidence_weight(evidence_level: dict | None) -> int:
+    """Map a rulebook evidenceLevel rating to its ordinal rank.
+
+    Rule.json ratings carry parenthetical qualifiers (e.g. "Moderate (strong
+    preclinical evidence)."); those are stripped before the lookup so the
+    rank reflects the rating proper, not the qualifier.
+    """
+    rating = (evidence_level or {}).get("rating") or ""
+    normalized = (
+        rating.split("(")[0].strip().rstrip(".").replace("\u2013", "-").lower()
+    )
+    return EVIDENCE_WEIGHT.get(normalized, 0)
+
+
+def _mechanism_sort_key(result: dict) -> tuple:
+    """Lexicographic rank: eligibility first, then real rulebook evidence
+    level, then delivery precedent, then keyword overlap.
+
+    Each factor only breaks ties left over by the factor before it, so a
+    mechanism can never win on delivery precedent against one that is
+    genuinely better-evidenced, and nothing is blended into a single number.
+    """
+    return (
+        not result["eligible"],
+        -_evidence_weight(result.get("evidenceLevel")),
+        -DELIVERY_TIER_WEIGHT.get(result.get("deliveryTier") or "unestablished", 0),
+        not result.get("keywordMatch", False),
+    )
+
+
+def _build_mechanism_result(
+    rule: dict,
+    eligible: bool,
+    score: int,
+    rationale: list[str],
+    designable: bool = True,
+    delivery_tier: str | None = None,
+    delivery_citation: str | None = None,
+    keyword_match: bool = False,
+) -> dict:
     return {
         "id": rule["id"],
         "name": rule["name"],
         "category": rule.get("category"),
         "eligible": eligible,
+        "designable": designable,
         "score": score,
         "rationale": rationale,
+        "deliveryTier": delivery_tier,
+        "deliveryCitation": delivery_citation,
+        "keywordMatch": keyword_match,
         "evidenceLevel": rule.get("evidenceLevel"),
         "fdaApprovedDrugs": rule.get("fdaApprovedDrugs"),
         "clinicalTrialExamples": rule.get("clinicalTrialExamples"),
@@ -686,35 +806,47 @@ def rank_gene_silencing_mechanisms(
 
         defect_ok = defect_type in DEFECT_COMPATIBILITY.get(mechanism_id, set())
         scope_ok = silencing_scope in SCOPE_COMPATIBILITY.get(mechanism_id, set())
+        designable = mechanism_id not in NON_DESIGNABLE_SILENCING_MECHANISMS
 
-        delivery_score = 0
-        if delivery_context:
-            delivery_score = DELIVERY_PRECEDENT.get(mechanism_id, {}).get(delivery_context, 0)
+        delivery_tier, delivery_citation = _delivery_precedent(mechanism_id, delivery_context)
 
         vkh = _variant_keyword_hit(rule, known_variant)
-        eligible = defect_ok and scope_ok
+        # A non-designable mechanism (e.g. A21 / ds-siRNA) is never eligible,
+        # even when it matches the defect and scope: the designer cannot
+        # produce it, so presenting it as selectable would be a dead end.
+        eligible = designable and defect_ok and scope_ok
 
         score = 0
         if defect_ok:
             score += 10
-        if scope_ok:
+        if designable and scope_ok:
             score += 5
-        score += delivery_score
-        if vkh:
+        if designable and vkh:
             score += 2
 
         rationale = [
             f"{'Matches' if defect_ok else 'Does not clearly match'} the '{DEFECT_TYPES.get(defect_type, defect_type)}' defect type",
             f"{'Supports' if scope_ok else 'Not described as supporting'} {SILENCING_SCOPES.get(silencing_scope, silencing_scope).lower()}",
         ]
-        if delivery_context and delivery_score > 0:
-            rationale.append(f"Has precedent for {DELIVERY_CONTEXTS.get(delivery_context, delivery_context).lower()} delivery (general reference, not gene-specific)")
-        if vkh:
+        if not designable:
+            rationale.append(NON_DESIGNABLE_SILENCING_REASON)
+        if delivery_context:
+            rationale.append(_delivery_fit_rationale(delivery_tier, delivery_citation))
+        if designable and vkh:
             rationale.append("Your noted variant description overlaps with this mechanism's typical variant profile")
 
-        results.append(_build_mechanism_result(rule, eligible, score, rationale))
+        results.append(_build_mechanism_result(
+            rule,
+            eligible,
+            score,
+            rationale,
+            designable=designable,
+            delivery_tier=delivery_tier,
+            delivery_citation=delivery_citation,
+            keyword_match=bool(vkh),
+        ))
 
-    results.sort(key=lambda r: r["score"], reverse=True)
+    results.sort(key=_mechanism_sort_key)
     return results
 
 
@@ -761,10 +893,9 @@ def rank_gene_upregulation_mechanisms(
             continue
 
         defect_ok = defect_type in UPREGULATION_DEFECT_COMPATIBILITY.get(mechanism_id, set())
+        designable = mechanism_id not in NON_DESIGNABLE_UPREGULATION_MECHANISMS
 
-        delivery_score = 0
-        if delivery_context:
-            delivery_score = DELIVERY_PRECEDENT.get(mechanism_id, {}).get(delivery_context, 0)
+        delivery_tier, delivery_citation = _delivery_precedent(mechanism_id, delivery_context)
 
         element_hit = _variant_keyword_hit(rule, known_regulatory_element)
 
@@ -777,35 +908,46 @@ def rank_gene_upregulation_mechanisms(
             feature_available = feat.get("available", True)
             feature_reason = feat.get("reason")
 
-        # Mechanism is eligible only if defect matches AND gene has the required features
-        eligible = defect_ok and feature_available
+        # Eligible only if defect matches, the gene has the required features,
+        # AND the mechanism is designable by the single-stranded ASO designer.
+        # Exclusion is gate-only (matching TG01): non-designable or feature-less
+        # mechanisms are marked ineligible and carry whatever honest score their
+        # inputs produce — no fabricated negative penalty is applied.
+        eligible = designable and defect_ok and feature_available
 
         score = 0
         if defect_ok:
             score += 10
-        score += delivery_score
-        if element_hit:
+        if designable and element_hit:
             score += 2
-        if not feature_available:
-            # Penalize unavailable mechanisms so they sort to the bottom
-            score = max(score - 15, -5)
 
         rationale = [
             f"{'Matches' if defect_ok else 'Does not clearly match'} the '{GENE_UPREGULATION_DEFECT_TYPES.get(defect_type, defect_type)}' defect type",
         ]
+        if not designable:
+            rationale.append(NON_DESIGNABLE_UPREGULATION_REASON)
         transcript_req = rule.get("transcriptRequirement")
         if transcript_req:
             rationale.append(f"Requires: {transcript_req}")
-        if delivery_context and delivery_score > 0:
-            rationale.append(f"Has precedent for {DELIVERY_CONTEXTS.get(delivery_context, delivery_context).lower()} delivery (general reference, not gene-specific)")
-        if element_hit:
+        if delivery_context:
+            rationale.append(_delivery_fit_rationale(delivery_tier, delivery_citation))
+        if designable and element_hit:
             rationale.append("Your noted regulatory element description overlaps with this mechanism's typical profile")
         if not feature_available and feature_reason:
             rationale.append(f"Gene feature check: {feature_reason}")
 
-        results.append(_build_mechanism_result(rule, eligible, score, rationale))
+        results.append(_build_mechanism_result(
+            rule,
+            eligible,
+            score,
+            rationale,
+            designable=designable,
+            delivery_tier=delivery_tier,
+            delivery_citation=delivery_citation,
+            keyword_match=bool(element_hit),
+        ))
 
-    results.sort(key=lambda r: r["score"], reverse=True)
+    results.sort(key=_mechanism_sort_key)
     return results
 
 
@@ -827,9 +969,7 @@ def rank_rna_processing_mechanisms(
 
         defect_ok = splice_defect_type in SPLICE_DEFECT_COMPATIBILITY.get(mechanism_id, set())
 
-        delivery_score = 0
-        if delivery_context:
-            delivery_score = DELIVERY_PRECEDENT.get(mechanism_id, {}).get(delivery_context, 0)
+        delivery_tier, delivery_citation = _delivery_precedent(mechanism_id, delivery_context)
 
         vkh = _variant_keyword_hit(rule, known_variant)
 
@@ -845,7 +985,6 @@ def rank_rna_processing_mechanisms(
         score = 0
         if defect_ok:
             score += 10
-        score += delivery_score
         if vkh:
             score += 2
         score += exon_bonus
@@ -853,16 +992,24 @@ def rank_rna_processing_mechanisms(
         rationale = [
             f"{'Matches' if defect_ok else 'Does not clearly match'} the '{SPLICE_DEFECT_TYPES.get(splice_defect_type, splice_defect_type)}' defect type",
         ]
-        if delivery_context and delivery_score > 0:
-            rationale.append(f"Has precedent for {DELIVERY_CONTEXTS.get(delivery_context, delivery_context).lower()} delivery (general reference, not gene-specific)")
+        if delivery_context:
+            rationale.append(_delivery_fit_rationale(delivery_tier, delivery_citation))
         if vkh:
             rationale.append("Your noted variant description overlaps with this mechanism's typical variant profile")
         if exon_rationale:
             rationale.append(exon_rationale)
 
-        results.append(_build_mechanism_result(rule, eligible, score, rationale))
+        results.append(_build_mechanism_result(
+            rule,
+            eligible,
+            score,
+            rationale,
+            delivery_tier=delivery_tier,
+            delivery_citation=delivery_citation,
+            keyword_match=bool(vkh),
+        ))
 
-    results.sort(key=lambda r: r["score"], reverse=True)
+    results.sort(key=_mechanism_sort_key)
     return results
 
 
@@ -991,14 +1138,10 @@ def rank_rna_editing_mechanisms(
         if eligible:
             score += 10  # member of the selected editing modality
 
+        # Delivery precedent — tie-breaker only, never added to score
+        delivery_tier, delivery_citation = _delivery_precedent(mechanism_id, delivery_context)
         if delivery_context:
-            delivery_score = DELIVERY_PRECEDENT.get(mechanism_id, {}).get(delivery_context, 0)
-            score += delivery_score
-            if delivery_score > 0:
-                rationale.append(
-                    f"Has precedent for {DELIVERY_CONTEXTS.get(delivery_context, delivery_context).lower()} delivery "
-                    "(general reference, not gene-specific)"
-                )
+            rationale.append(_delivery_fit_rationale(delivery_tier, delivery_citation))
 
         # Endogenous enzyme expression feasibility (soft, general reference)
         if enzyme_recruitment and enzyme_recruitment in EDIT_ENZYME_TISSUE_PRECEDENT:
@@ -1022,9 +1165,17 @@ def rank_rna_editing_mechanisms(
         if max_bystander_edits is not None and max_bystander_edits == 0:
             score += 1
 
-        results.append(_build_mechanism_result(rule, eligible, score, rationale))
+        results.append(_build_mechanism_result(
+            rule,
+            eligible,
+            score,
+            rationale,
+            delivery_tier=delivery_tier,
+            delivery_citation=delivery_citation,
+            keyword_match=False,
+        ))
 
-    results.sort(key=lambda r: r["score"], reverse=True)
+    results.sort(key=_mechanism_sort_key)
     return results
 
 
@@ -1291,18 +1442,107 @@ def rank_rna_engineering_mechanisms(
         eligible = True
         score = 10
 
+        # Delivery precedent — tie-breaker only, never added to score
+        delivery_tier, delivery_citation = _delivery_precedent(mechanism_id, delivery_context)
         if delivery_context:
-            delivery_score = DELIVERY_PRECEDENT.get(mechanism_id, {}).get(delivery_context, 0)
-            score += delivery_score
-            if delivery_score > 0:
-                rationale.append(
-                    f"Has precedent for {DELIVERY_CONTEXTS.get(delivery_context, delivery_context).lower()} delivery "
-                    "(general reference, not gene-specific)"
-                )
+            rationale.append(_delivery_fit_rationale(delivery_tier, delivery_citation))
 
-        results.append(_build_mechanism_result(rule, eligible, score, rationale))
+        results.append(_build_mechanism_result(
+            rule,
+            eligible,
+            score,
+            rationale,
+            delivery_tier=delivery_tier,
+            delivery_citation=delivery_citation,
+            keyword_match=False,
+        ))
 
-    results.sort(key=lambda r: r["score"], reverse=True)
+    results.sort(key=_mechanism_sort_key)
+    return results
+
+
+# ---------------------------------------------------------------------------
+# TG07 — Isoform Engineering ranking
+# ---------------------------------------------------------------------------
+
+ISO_ENGINEERING_MECHANISM_IDS = ["A7", "A8", "A9", "A10"]
+
+ISOFORM_GOAL_DEFECT_MAP = {
+    "exon_skipping": "exon_skipping_mutation",
+    "exon_inclusion": "exon_inclusion_defect",
+    "intron_retention": "apa_dysregulation",
+    "alternative_splice_site": "cryptic_splice_site",
+    "mutually_exclusive_exon": "exon_inclusion_defect",
+}
+
+
+def rank_isoform_engineering_mechanisms(
+    isoform_goal: str,
+    target_exon_locus: str | None,
+    splice_element_target: str | None,
+    steric_chemistry: str | None,
+    delivery_context: str | None,
+) -> list[dict]:
+    splice_defect_type = ISOFORM_GOAL_DEFECT_MAP.get(isoform_goal, isoform_goal)
+    results = []
+    for mechanism_id in ISO_ENGINEERING_MECHANISM_IDS:
+        rule = _load_rule(mechanism_id)
+        if not rule:
+            continue
+
+        defect_ok = splice_defect_type in SPLICE_DEFECT_COMPATIBILITY.get(mechanism_id, set())
+
+        delivery_tier, delivery_citation = _delivery_precedent(mechanism_id, delivery_context)
+
+        vkh = _variant_keyword_hit(rule, None)
+
+        exon_bonus = 0
+        exon_rationale = None
+        if target_exon_locus and target_exon_locus.strip():
+            region_text = (rule.get("rnaTargetRegion") or "").lower()
+            if any(kw in region_text for kw in ["exon", "splice donor", "splice acceptor", "ese", "ess"]):
+                exon_bonus = 3
+                exon_rationale = f"Mechanism targets exon-adjacent splice elements relevant to {target_exon_locus}"
+
+        splice_element_bonus = 0
+        splice_element_rationale = None
+        if splice_element_target and splice_element_target.strip():
+            target_text = (rule.get("rnaTargetRegion") or "").lower()
+            target_label = splice_element_target.lower().replace("_", " ")
+            if any(kw in target_text for kw in [target_label, target_label.replace(" site", ""), target_label.replace(" (5' ss)", ""), target_label.replace(" (3' ss)", "")]):
+                splice_element_bonus = 2
+                splice_element_rationale = f"Mechanism targets {splice_element_target.replace('_', ' ')} which aligns with your selection"
+
+        eligible = defect_ok
+        score = 0
+        if defect_ok:
+            score += 10
+        if vkh:
+            score += 2
+        score += exon_bonus
+        score += splice_element_bonus
+
+        rationale = [
+            f"{'Matches' if defect_ok else 'Does not clearly match'} the isoform goal '{isoform_goal.replace('_', ' ')}'",
+        ]
+        if delivery_context:
+            rationale.append(_delivery_fit_rationale(delivery_tier, delivery_citation))
+        if exon_rationale:
+            rationale.append(exon_rationale)
+        if splice_element_rationale:
+            rationale.append(splice_element_rationale)
+
+        results.append(_build_mechanism_result(
+            rule,
+            eligible,
+            score,
+            rationale,
+            delivery_tier=delivery_tier,
+            delivery_citation=delivery_citation,
+            keyword_match=bool(vkh),
+        ))
+
+    results.sort(key=_mechanism_sort_key)
     return results
 
 

@@ -117,7 +117,40 @@ export default function RnaEditingPage() {
   }
 
   function exportReport() {
-    if (!results || !gene) return;
+    const content = exportReportContent();
+    if (!content || !gene) return;
+    triggerDownload(content, `${gene.geneSymbol}-rna-editing-report.txt`, "text/plain");
+    setShowExport(false);
+  }
+
+  function collectVisualizationSvg(): string {
+    const root = document.getElementById("aso-analysis-dashboard");
+    if (!root) return "";
+    const svgs = Array.from(root.querySelectorAll("svg"));
+    if (!svgs.length) return "";
+    const gallery = svgs
+      .map((svg) => {
+        const clone = svg.cloneNode(true) as SVGSVGElement;
+        clone.removeAttribute("class");
+        clone.setAttribute("width", "100%");
+        clone.setAttribute("height", "auto");
+        clone.setAttribute("style", "width:100%;height:auto;display:block");
+        return `<div style="margin:24px 0;border:1px solid #e2e8f0;border-radius:12px;padding:20px;background:#fff;overflow:hidden">${new XMLSerializer().serializeToString(clone)}</div>`;
+      })
+      .join("");
+    return `<h2 style="font-family:ui-monospace,monospace;font-size:16px;margin:32px 0 8px;color:#0f172a">VISUALIZATIONS</h2><p style="font-family:ui-monospace,monospace;font-size:12px;color:#64748b;margin:0">Charts captured from the analysis dashboard.</p>${gallery}`;
+  }
+
+  function exportHtmlReport() {
+    const content = exportReportContent();
+    if (!content || !gene) return;
+    const escaped = content.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    triggerDownload(`<!doctype html><html><head><meta charset="utf-8"><title>RNA Editing Design Report</title></head><body style="font-family:ui-monospace,monospace;white-space:pre-wrap;line-height:1.5;padding:32px;color:#1e293b">${escaped}<hr style="border:none;border-top:2px solid #e2e8f0;margin:32px 0">${collectVisualizationSvg()}</body></html>`, `${gene.geneSymbol}-rna-editing-report.html`, "text/html");
+    setShowExport(false);
+  }
+
+  function exportReportContent(): string | null {
+    if (!results || !gene) return null;
     const lines = [
       "═══════════════════════════════════════════════════",
       "  RNA EDITING DESIGN REPORT",
@@ -153,8 +186,7 @@ export default function RnaEditingPage() {
       );
     });
     lines.push("═══════════════════════════════════════════════════");
-    triggerDownload(lines.join("\n"), `${gene.geneSymbol}-rna-editing-report.txt`, "text/plain");
-    setShowExport(false);
+    return lines.join("\n");
   }
 
   // Load gene + mechanism from sessionStorage
@@ -374,9 +406,9 @@ export default function RnaEditingPage() {
             )}
 
             {/* Two-column layout */}
-            <div className="grid grid-cols-1 gap-5 lg:grid-cols-5">
+            <div className="space-y-5">
               {/* Left: Design Form */}
-              <div className="lg:col-span-2 space-y-4">
+              <div className="space-y-4">
                 <div className="flex justify-end">
                   <div ref={exportRef} className="relative">
                     <button
@@ -394,6 +426,7 @@ export default function RnaEditingPage() {
                         <button onClick={exportJson} className="w-full px-3 py-2 text-left text-[12.5px] text-slate-600 hover:bg-slate-50">Raw JSON</button>
                         <button onClick={exportFasta} className="w-full px-3 py-2 text-left text-[12.5px] text-slate-600 hover:bg-slate-50">FASTA sequences</button>
                         <button onClick={exportReport} className="w-full px-3 py-2 text-left text-[12.5px] text-slate-600 hover:bg-slate-50">Text report</button>
+                        <button onClick={exportHtmlReport} className="w-full px-3 py-2 text-left text-[12.5px] text-slate-600 hover:bg-slate-50">HTML report</button>
                       </div>
                     )}
                   </div>
@@ -436,7 +469,7 @@ export default function RnaEditingPage() {
               </div>
 
               {/* Right: Results */}
-              <div className="lg:col-span-3 space-y-3">
+              <div className="space-y-3">
                 <SectionHeader step="3" title="Generated Guide RNA Candidates" />
 
                 {genError && (

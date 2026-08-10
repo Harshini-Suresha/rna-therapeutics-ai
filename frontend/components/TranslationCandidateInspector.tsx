@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { TranslationalCandidate } from "@/types/translational";
 import {
   CheckCircle,
@@ -12,6 +12,7 @@ import {
   Target,
   Activity,
 } from "lucide-react";
+import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
 
 interface TranslationCandidateInspectorProps {
   candidate: TranslationalCandidate;
@@ -27,6 +28,8 @@ export default function TranslationCandidateInspector({
   targetRbp,
 }: TranslationCandidateInspectorProps) {
   const [activeTab, setActiveTab] = useState<"translation" | "structure" | "offtarget">("translation");
+
+  useKeyboardShortcut("escape", onClose);
 
   const changeColor =
     candidate.translationalChangeScore > 0

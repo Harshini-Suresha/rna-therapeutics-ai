@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Download } from "lucide-react";
 import type { ValidateResponse, AnalyzeResponse } from "@/types/upload-types";
+import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
 
 type ExportFormat = "fasta" | "json" | "csv" | "report";
 
@@ -63,7 +64,7 @@ function exportReport(props: ExportMenuProps) {
   const lines = [
     "═══════════════════════════════════════════",
     "  SEQUENCE ANALYSIS REPORT",
-    "  RNA Therapeutics AI Platform",
+    "  RNA Therapeutics Platform",
     "═══════════════════════════════════════════",
     "",
     `  Sequence Length:  ${analysis.length} nt`,
@@ -146,6 +147,8 @@ export default function ExportMenu(props: ExportMenuProps) {
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
+
+  useKeyboardShortcut("escape", () => setOpen(false), { enabled: open });
 
   const seq = props.sequence.toUpperCase().replace(/[^A-Z]/g, "");
 

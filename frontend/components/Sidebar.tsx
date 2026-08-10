@@ -15,6 +15,8 @@ import {
   Dna,
   UploadCloud,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
 
 interface NavItem {
   label: string;
@@ -49,7 +51,6 @@ const PIPELINE_NAV: { section: string; items: NavItem[] }[] = [
     items: [
       { label: "Reports", icon: FileText, href: "/reports", color: "text-pipeline-reports" },
       { label: "Knowledge Base", icon: BookOpen, href: "/knowledge" },
-      { label: "Upload Sequence", icon: UploadCloud, href: "/upload-sequence" },
     ],
   },
   {
@@ -62,17 +63,31 @@ const PIPELINE_NAV: { section: string; items: NavItem[] }[] = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
 
   function isActive(href: string) {
     if (href === "/dashboard") return pathname === "/dashboard" || pathname === "/";
     return pathname.startsWith(href);
   }
 
+  const navItems = PIPELINE_NAV.flatMap((g) => g.items);
+
+  useKeyboardShortcut("1", () => router.push("/new-project"), { alt: true });
+  useKeyboardShortcut("2", () => router.push("/targets"), { alt: true });
+  useKeyboardShortcut("3", () => router.push("/designs"), { alt: true });
+  useKeyboardShortcut("4", () => router.push("/rna-engineering"), { alt: true });
+  useKeyboardShortcut("5", () => router.push("/analysis"), { alt: true });
+  useKeyboardShortcut("6", () => router.push("/validation"), { alt: true });
+  useKeyboardShortcut("7", () => router.push("/reports"), { alt: true });
+  useKeyboardShortcut("p", () => router.push("/projects"), { alt: true });
+  useKeyboardShortcut("u", () => router.push("/upload-sequence"), { alt: true });
+  useKeyboardShortcut("s", () => router.push("/settings"), { alt: true });
+
   return (
     <aside className="hidden lg:flex lg:w-56 shrink-0 flex-col bg-sidebar text-white h-screen sticky top-0">
       <div className="px-3 py-3 border-b border-white/[0.08]">
-        <a href="/dashboard" className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-sidebar-hover transition-colors">
-          <Dna className="h-4 w-4 text-accent-biology shrink-0" strokeWidth={2} />
+        <a href="/dashboard" className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-sidebar-hover transition-all duration-200 group">
+          <Dna className="h-4 w-4 text-accent-biology shrink-0 transition-transform duration-200 group-hover:scale-110" strokeWidth={2} />
           <div className="leading-tight">
             <p className="text-[12px] font-semibold tracking-wide text-white">
               RNA THERAPEUTICS
@@ -105,20 +120,26 @@ export default function Sidebar() {
                   <li key={item.label}>
                     <a
                       href={item.href}
-                      className={`group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium transition-colors ${
+                      className={`group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium transition-all duration-200 ${
                         active
-                          ? "bg-sidebar-active text-white"
-                          : "text-white/80 hover:bg-sidebar-hover hover:text-white"
+                          ? "bg-sidebar-active text-white translate-x-0.5"
+                          : "text-white/80 hover:bg-sidebar-hover hover:text-white hover:translate-x-0.5"
                       }`}
                     >
-                      <Icon
-                        className={`h-4 w-4 shrink-0 ${
-                          active
-                            ? item.color ?? "text-accent-biology"
-                            : "text-white/70 group-hover:text-white"
-                        }`}
-                        strokeWidth={active ? 2.2 : 2}
-                      />
+                      <span className={`flex h-6 w-6 items-center justify-center rounded-md transition-all duration-200 ${
+                        active
+                          ? "bg-white/15"
+                          : "bg-white/5 group-hover:bg-white/10"
+                      }`}>
+                        <Icon
+                          className={`h-3.5 w-3.5 shrink-0 transition-all duration-200 ${
+                            active
+                              ? item.color ?? "text-accent-biology"
+                              : "text-white/70 group-hover:text-white"
+                          }`}
+                          strokeWidth={active ? 2.2 : 2}
+                        />
+                      </span>
                       <span className="flex-1">{item.label}</span>
                       {item.badge && (
                         <span className="rounded bg-brand/20 px-1 py-0.5 text-[8px] font-semibold text-white">

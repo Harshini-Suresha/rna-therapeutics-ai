@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { RnaNeutralizationCandidate } from "@/types/rnaNeutralization";
 import { CheckCircle, XCircle, AlertTriangle, TrendingDown } from "lucide-react";
+import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
 
 interface CandidateInspectorPanelProps {
   candidate: RnaNeutralizationCandidate;
@@ -16,6 +17,8 @@ export default function CandidateInspectorPanel({
   onProceedToDesign,
 }: CandidateInspectorPanelProps) {
   const [activeTab, setActiveTab] = useState<"binding" | "safety">("binding");
+
+  useKeyboardShortcut("escape", onClose);
 
   const displacementColor =
     candidate.rbpDisplacementScore >= 90

@@ -27,7 +27,7 @@ class UpregulationCandidateRequest(BaseModel):
     known_regulatory_element: Optional[str] = None
     gene_symbol: Optional[str] = ""
     organism: Optional[str] = "homo_sapiens"
-    # TANGO-specific fields (mechanism A5 only)
+    # TANGO-specific fields (mechanism A3 only)
     target_poison_exon: Optional[str] = None
     splice_element: Optional[str] = None
 

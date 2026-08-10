@@ -13,9 +13,11 @@ import {
   Keyboard,
   Bug,
   Mail,
+  Ticket,
   ChevronRight,
 } from "lucide-react";
 import PlatformAssistant from "./PlatformAssistant";
+import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
 
 const LEARNING_CENTER = [
   { label: "Getting Started", icon: Rocket, href: "/help/tutorial" },
@@ -29,6 +31,7 @@ const LEARNING_CENTER = [
 
 const RESOURCES = [
   { label: "Report a Bug", icon: Bug, href: "/help/report-bug" },
+  { label: "My Tickets", icon: Ticket, href: "/help/report-bug" },
   { label: "Contact Support", icon: Mail, href: "mailto:mail@koshkey.com" },
 ];
 
@@ -45,6 +48,10 @@ export default function HelpMenu() {
     document.addEventListener("mousedown", onClickOutside);
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
+
+  useKeyboardShortcut("escape", () => setOpen(false), { enabled: open });
+  useKeyboardShortcut("h", () => setOpen((o) => !o), { ctrl: true, shift: true });
+  useKeyboardShortcut("p", () => setAssistantOpen((o) => !o), { ctrl: true, shift: true });
 
   const filteredLearning = searchQuery
     ? LEARNING_CENTER.filter((item) =>
@@ -92,7 +99,7 @@ export default function HelpMenu() {
           </div>
 
           <div className="p-1.5 max-h-[420px] overflow-y-auto">
-            {/* Ask the Platform AI */}
+            {/* Ask the Platform Assistant */}
             <button
               onClick={() => {
                 setAssistantOpen(true);
@@ -104,8 +111,8 @@ export default function HelpMenu() {
                 <Sparkles className="h-3.5 w-3.5 text-white" />
               </span>
               <div className="flex-1 min-w-0">
-                <p className="font-medium text-[12px]">Ask the Platform AI</p>
-                <p className="text-[10.5px] text-slate-500 font-normal mt-0.5">Research assistant powered by AI</p>
+                <p className="font-medium text-[12px]">Ask the Platform Assistant</p>
+                <p className="text-[10.5px] text-slate-500 font-normal mt-0.5">Research assistant</p>
               </div>
               <ChevronRight className="h-3.5 w-3.5 shrink-0 text-slate-400" />
             </button>

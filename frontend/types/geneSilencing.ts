@@ -49,6 +49,15 @@ export interface HeuristicEstimate {
   note: string;
 }
 
+export interface VariantParseResult {
+  parsed: boolean;
+  type?: string;
+  cdsStart?: number;
+  cdsEnd?: number;
+  length?: number;
+  reason?: string;
+}
+
 export interface HeuristicEstimates {
   nucleaseResistance: HeuristicEstimate;
   cellularUptake: HeuristicEstimate;
@@ -82,8 +91,12 @@ export interface AssoCandidate {
   mechanismNotes?: string;
   silencingScope?: string;
   knownVariant?: string;
+  seedSiteStatus?: string | null;
+  seedSiteNote?: string | null;
   alleleSpecific?: boolean;
   alleleNotes?: string;
+  alleleDiscriminationScore?: number | null;
+  alleleDiscriminationNote?: string | null;
   admet?: {
     admetAvailable: boolean;
     absorptionScore: number | null;
@@ -119,6 +132,8 @@ export interface GenerateResponse {
   totalExons: number;
   cdsLength: number | null;
   mechanismNotes: string;
+  isAlleleSpecific?: boolean;
+  variantParse?: VariantParseResult | null;
   admet?: {
     admetAvailable: boolean;
     absorptionScore: number | null;

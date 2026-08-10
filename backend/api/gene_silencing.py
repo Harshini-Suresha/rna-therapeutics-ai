@@ -13,6 +13,7 @@ from services.email_service import send_report_email
 from services.gene_silencing_service import (
     get_target_analysis,
     generate_candidates,
+    parse_hgvs_c,
     CHEMISTRY_OPTIONS,
     MODIFICATION_OPTIONS,
     LENGTH_RANGE,
@@ -125,6 +126,8 @@ async def generate_aso_candidates(payload: CandidateRequest):
         "totalExons": len(target.get("exons", [])),
         "cdsLength": target.get("cdsLength"),
         "mechanismNotes": candidates[0].get("mechanismNotes", "") if candidates else "",
+        "isAlleleSpecific": (payload.silencing_scope or "").lower().strip() == "allele_specific",
+        "variantParse": parse_hgvs_c(payload.known_variant) if payload.known_variant else None,
         "admet": top_admet,
         "candidates": enriched_candidates,
     }

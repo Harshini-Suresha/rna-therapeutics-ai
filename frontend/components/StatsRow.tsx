@@ -26,11 +26,12 @@ interface StatCardProps {
   iconBg: string;
   iconColor: string;
   title: string;
-  rows: { label: string; value: React.ReactNode }[];
+  rows: { label: string; value: React.ReactNode; bar?: number }[];
   sources?: { label: string; url: string }[];
   sourcesColumns?: number;
   notConnected?: boolean;
   extra?: React.ReactNode;
+  className?: string;
 }
 
 function formatValue(value: React.ReactNode): React.ReactNode {
@@ -39,9 +40,9 @@ function formatValue(value: React.ReactNode): React.ReactNode {
   return value;
 }
 
-function StatCard({ icon: Icon, iconBg, iconColor, title, rows, sources, sourcesColumns, notConnected, extra }: StatCardProps) {
+function StatCard({ icon: Icon, iconBg, iconColor, title, rows, sources, sourcesColumns, notConnected, extra, className }: StatCardProps) {
   return (
-    <Card className="flex flex-col rounded-xl">
+    <Card className={`flex flex-col rounded-xl transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 ${className ?? ""}`}>
       <div className="flex items-center gap-2 px-4 pt-4 pb-2">
         <span className="flex h-6 w-6 items-center justify-center rounded-md" style={{ backgroundColor: iconBg }}>
           <Icon className="h-3.5 w-3.5" style={{ color: iconColor }} />
@@ -50,14 +51,35 @@ function StatCard({ icon: Icon, iconBg, iconColor, title, rows, sources, sources
       </div>
       <div className="flex-1 space-y-1.5 px-4 pb-3 overflow-y-auto max-h-60 card-scroll">
         {notConnected ? (
-          <p className="text-[11.5px] text-slate-400">Not yet connected</p>
+          <div className="flex items-center gap-2 rounded-lg bg-slate-50 border border-dashed border-slate-200 px-3 py-2.5">
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-100">
+              <svg className="h-3 w-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            </span>
+            <p className="text-[11px] text-slate-400">Data source not yet connected</p>
+          </div>
         ) : (
-          rows.map((r) => (
-            <div key={r.label} className="flex justify-between gap-2 text-[12px]">
-              <span className="text-slate-400 shrink-0">{r.label}</span>
-              <span className="font-medium text-slate-700 text-right break-words">{formatValue(r.value)}</span>
-            </div>
-            ))
+          rows.map((r) => {
+            const pct = typeof r.bar === "number" ? Math.min(100, Math.max(0, r.bar)) : null;
+            const barColor = pct !== null ? (pct >= 70 ? "bg-emerald-400" : pct >= 50 ? "bg-blue-400" : pct >= 30 ? "bg-amber-400" : "bg-red-400") : undefined;
+            return (
+              <div key={r.label} className="flex flex-col gap-0.5 text-[12px]">
+                <div className="flex justify-between gap-2">
+                  <span className="text-slate-400 shrink-0">{r.label}</span>
+                  <span className="font-medium text-slate-700 text-right break-words">{formatValue(r.value)}</span>
+                </div>
+                {pct !== null && (
+                  <div className="flex items-center gap-2">
+                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
+                      <div className={`h-full rounded-full ${barColor}`} style={{ width: `${pct}%` }} />
+                    </div>
+                    <span className="text-[10px] font-semibold text-slate-600 w-7 text-right">{pct}</span>
+                  </div>
+                )}
+              </div>
+            );
+          })
         )}
         {sources && sources.length > 0 && (
           <div
@@ -483,43 +505,151 @@ export default function StatsRow({ gene }: { gene: GeneTargetObject }) {
         iconColor="#059669"
         title="ADMET Prediction"
         notConnected={!gene.admetAvailable}
-        rows={
-          gene.admetAvailable
-            ? [
-                { label: "Absorption", value: gene.absorptionLevel ? `${gene.absorptionLevel} (${gene.absorptionScore})` : DASH },
-                { label: "Distribution", value: gene.distributionLevel ? `${gene.distributionLevel} (${gene.distributionScore})` : DASH },
-                { label: "Metabolism", value: gene.metabolismLevel ? `${gene.metabolismLevel} (${gene.metabolismScore})` : DASH },
-                { label: "Excretion", value: gene.excretionLevel ? `${gene.excretionLevel} (${gene.excretionScore})` : DASH },
-                { label: "Toxicity", value: gene.toxicityLevel ? `${gene.toxicityLevel} (${gene.toxicityScore})` : DASH },
-                { label: "Immunogenicity", value: gene.immunogenicity?.level ?? DASH },
-                { label: "Off-target Risk", value: gene.offTargetRisk?.level ?? DASH },
-                { label: "Nuclease Stability", value: gene.nucleaseSensitivity?.level ?? DASH },
-              ]
-            : [{ label: "Status", value: "Provide ASO sequence for prediction" }]
-        }
+        className="col-span-2 md:col-span-4"
+        rows={gene.admetAvailable ? [] : [{ label: "Status", value: "Provide ASO sequence for prediction" }]}
         extra={
-          gene.admetAvailable && gene.admetAnalysis ? (
-            <div className="mt-2 space-y-1.5 text-[11px] leading-4 text-slate-600">
-              {gene.admetWarnings?.length > 0 && (
-                <div>
-                  <div className="font-medium text-amber-700">Warnings</div>
-                  <ul className="mt-0.5 list-disc list-inside">
-                    {gene.admetWarnings.slice(0, 3).map((w, i) => (
-                      <li key={`warn-${i}`} className="truncate">{w}</li>
-                    ))}
-                  </ul>
+          gene.admetAvailable ? (
+            <div className="mt-3 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {(() => {
+                  const bars = [
+                    { label: "Absorption", score: gene.absorptionScore != null ? Math.round(gene.absorptionScore * 100) : null, color: "bg-emerald-400" },
+                    { label: "Distribution", score: gene.distributionScore != null ? Math.round(gene.distributionScore * 100) : null, color: "bg-blue-400" },
+                    { label: "Metabolism", score: gene.metabolismScore != null ? Math.round(gene.metabolismScore * 100) : null, color: "bg-violet-400" },
+                    { label: "Excretion", score: gene.excretionScore != null ? Math.round(gene.excretionScore * 100) : null, color: "bg-violet-400" },
+                    { label: "Toxicity", score: gene.toxicityScore != null ? Math.round((1 - gene.toxicityScore) * 100) : null, color: "bg-amber-400" },
+                    { label: "Immunogenicity", score: gene.immunogenicity?.score != null ? Math.round((1 - gene.immunogenicity.score) * 100) : null, color: "bg-amber-400" },
+                    { label: "Off-target Risk", score: gene.offTargetRisk?.score != null ? Math.round((1 - gene.offTargetRisk.score) * 100) : null, color: "bg-amber-400" },
+                    { label: "Nuclease Stability", score: gene.nucleaseSensitivity?.score != null ? Math.round(gene.nucleaseSensitivity.score * 100) : null, color: "bg-violet-400" },
+                    { label: "Protein Binding", score: gene.proteinBinding?.score != null ? Math.round((1 - gene.proteinBinding.score) * 100) : null, color: "bg-blue-400" },
+                    { label: "Renal Clearance", score: gene.renalClearance?.score != null ? Math.round(gene.renalClearance.score * 100) : null, color: "bg-blue-400" },
+                    { label: "Hemolysis Risk", score: gene.hemolysisRisk?.score != null ? Math.round((1 - gene.hemolysisRisk.score) * 100) : null, color: "bg-red-400" },
+                    { label: "Cell Uptake", score: gene.cellUptake?.score != null ? Math.round(gene.cellUptake.score * 100) : null, color: "bg-emerald-400" },
+                  ];
+                  return (
+                    <div className="space-y-2">
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">ADMET Scores</div>
+                      {bars.map((item) => {
+                        const pct = typeof item.score === "number" ? Math.min(100, Math.max(0, item.score)) : null;
+                        return (
+                          <div key={item.label} className="space-y-0.5">
+                            <div className="flex items-center justify-between text-[10px]">
+                              <span className="text-slate-500 shrink-0">{item.label}</span>
+                              <span className="font-medium text-slate-700">{pct != null ? `${pct}%` : "—"}</span>
+                            </div>
+                            <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
+                              <div className={`h-full rounded-full ${item.color}`} style={{ width: `${pct ?? 0}%` }} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+                {(() => {
+                  const labels = ["Absorption", "Distribution", "Metabolism", "Excretion", "Toxicity"];
+                  const scores = [
+                    gene.absorptionScore != null ? Math.round(gene.absorptionScore * 100) : null,
+                    gene.distributionScore != null ? Math.round(gene.distributionScore * 100) : null,
+                    gene.metabolismScore != null ? Math.round(gene.metabolismScore * 100) : null,
+                    gene.excretionScore != null ? Math.round(gene.excretionScore * 100) : null,
+                    gene.toxicityScore != null ? Math.round((1 - gene.toxicityScore) * 100) : null,
+                  ];
+                  const cx = 70;
+                  const cy = 65;
+                  const r = 50;
+                  const n = 5;
+                  const points = labels.map((_, i) => {
+                    const angle = (Math.PI * 2 * i) / n - Math.PI / 2;
+                    const score = scores[i] != null ? scores[i] : 0;
+                    const rr = (score / 100) * r;
+                    return `${cx + rr * Math.cos(angle)},${cy + rr * Math.sin(angle)}`;
+                  }).join(" ");
+                  return (
+                    <div className="space-y-2">
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Radar View</div>
+                      <div className="flex justify-center">
+                        <svg viewBox="0 0 140 130" className="h-[130px] w-[140px]">
+                          <polygon points={`${cx},${cy - r} ${cx + r * Math.cos(Math.PI / 2)},${cy - r * Math.sin(Math.PI / 2)} ${cx + r * Math.cos(Math.PI)},${cy - r * Math.sin(Math.PI)} ${cx + r * Math.cos(Math.PI * 1.5)},${cy - r * Math.sin(Math.PI * 1.5)}`} fill="none" stroke="#E2E8F0" strokeWidth="1" />
+                          <polygon points={`${cx},${cy - r * 0.66} ${cx + r * 0.66 * Math.cos(Math.PI / 2)},${cy - r * 0.66 * Math.sin(Math.PI / 2)} ${cx + r * 0.66 * Math.cos(Math.PI)},${cy - r * 0.66 * Math.sin(Math.PI)} ${cx + r * 0.66 * Math.cos(Math.PI * 1.5)},${cy - r * 0.66 * Math.sin(Math.PI * 1.5)}`} fill="none" stroke="#E2E8F0" strokeWidth="1" />
+                          <polygon points={`${cx},${cy - r * 0.33} ${cx + r * 0.33 * Math.cos(Math.PI / 2)},${cy - r * 0.33 * Math.sin(Math.PI / 2)} ${cx + r * 0.33 * Math.cos(Math.PI)},${cy - r * 0.33 * Math.sin(Math.PI)} ${cx + r * 0.33 * Math.cos(Math.PI * 1.5)},${cy - r * 0.33 * Math.sin(Math.PI * 1.5)}`} fill="none" stroke="#E2E8F0" strokeWidth="1" />
+                          <line x1={cx} y1={cy} x2={cx + r * Math.cos(0)} y2={cy - r * Math.sin(0)} stroke="#E2E8F0" strokeWidth="1" />
+                          <line x1={cx} y1={cy} x2={cx + r * Math.cos(Math.PI / 2)} y2={cy - r * Math.sin(Math.PI / 2)} stroke="#E2E8F0" strokeWidth="1" />
+                          <line x1={cx} y1={cy} x2={cx + r * Math.cos(Math.PI)} y2={cy - r * Math.sin(Math.PI)} stroke="#E2E8F0" strokeWidth="1" />
+                          <line x1={cx} y1={cy} x2={cx + r * Math.cos(Math.PI * 1.5)} y2={cy - r * Math.sin(Math.PI * 1.5)} stroke="#E2E8F0" strokeWidth="1" />
+                          <line x1={cx} y1={cy} x2={cx + r * Math.cos(Math.PI * 2.5)} y2={cy - r * Math.sin(Math.PI * 2.5)} stroke="#E2E8F0" strokeWidth="1" />
+                          <polygon points={points} fill="rgba(5, 150, 105, 0.15)" stroke="#059669" strokeWidth="2" strokeLinejoin="round" />
+                          {labels.map((label, i) => {
+                            const angle = (Math.PI * 2 * i) / n - Math.PI / 2;
+                            const score = scores[i] != null ? scores[i] : 0;
+                            const tx = cx + (r + 14) * Math.cos(angle);
+                            const ty = cy + (r + 14) * Math.sin(angle);
+                            const textAnchor = Math.abs(Math.cos(angle)) < 0.1 ? "middle" : Math.cos(angle) > 0 ? "start" : "end";
+                            return <text key={label} x={tx} y={ty} textAnchor={textAnchor} dominantBaseline="middle" className="text-[8px] fill-slate-500 font-medium">{label}</text>;
+                          })}
+                          {labels.map((label, i) => {
+                            const angle = (Math.PI * 2 * i) / n - Math.PI / 2;
+                            const score = scores[i] != null ? scores[i] : 0;
+                            const rr = (score / 100) * r;
+                            return <circle key={`dot-${label}`} cx={cx + rr * Math.cos(angle)} cy={cy + rr * Math.sin(angle)} r="2.5" fill="#059669" />;
+                          })}
+                        </svg>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2">
+                {[
+                  { label: "Absorption (Uptake)", value: gene.absorptionLevel ?? DASH, bar: gene.absorptionScore != null ? Math.round(gene.absorptionScore * 100) : undefined, color: "bg-emerald-400" },
+                  { label: "Distribution", value: gene.distributionLevel ?? DASH, bar: gene.distributionScore != null ? Math.round(gene.distributionScore * 100) : undefined, color: "bg-blue-400" },
+                  { label: "Metabolism (Nuclease)", value: gene.metabolismLevel ?? DASH, bar: gene.metabolismScore != null ? Math.round(gene.metabolismScore * 100) : undefined, color: "bg-violet-400" },
+                  { label: "Excretion", value: gene.excretionLevel ?? DASH, bar: gene.excretionScore != null ? Math.round(gene.excretionScore * 100) : undefined, color: "bg-violet-400" },
+                  { label: "Toxicity (Safety)", value: gene.toxicityLevel ?? DASH, bar: gene.toxicityScore != null ? Math.round((1 - gene.toxicityScore) * 100) : undefined, color: "bg-amber-400" },
+                ].map((item) => {
+                  const pct = typeof item.bar === "number" ? Math.min(100, Math.max(0, item.bar)) : null;
+                  return (
+                    <div key={item.label} className="space-y-0.5">
+                      <div className="flex justify-between gap-2 text-[10px]">
+                        <span className="text-slate-500 shrink-0">{item.label}</span>
+                        <span className="font-medium text-slate-700 text-right">{item.value ?? "—"}</span>
+                      </div>
+                      {pct !== null && (
+                        <div className="flex items-center gap-1.5">
+                          <div className="h-1 flex-1 overflow-hidden rounded-full bg-slate-100">
+                            <div className={`h-full rounded-full ${item.color}`} style={{ width: `${pct}%` }} />
+                          </div>
+                          <span className="text-[9px] font-semibold text-slate-500 w-6 text-right">{pct}</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              {gene.admetWarnings?.length > 0 || gene.admetStrengths?.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {gene.admetWarnings?.length > 0 && (
+                    <div className="flex-1 min-w-[140px] rounded-lg bg-amber-50 border border-amber-100 px-2 py-1.5">
+                      <div className="text-[9px] font-bold uppercase tracking-wider text-amber-700 mb-0.5">Warnings</div>
+                      <ul className="space-y-0.5 text-[9px] text-amber-800 list-disc list-inside">
+                        {gene.admetWarnings.slice(0, 3).map((w, i) => (
+                          <li key={`warn-${i}`} className="truncate">{w}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {gene.admetStrengths?.length > 0 && (
+                    <div className="flex-1 min-w-[140px] rounded-lg bg-emerald-50 border border-emerald-100 px-2 py-1.5">
+                      <div className="text-[9px] font-bold uppercase tracking-wider text-emerald-700 mb-0.5">Strengths</div>
+                      <ul className="space-y-0.5 text-[9px] text-emerald-800 list-disc list-inside">
+                        {gene.admetStrengths.slice(0, 3).map((s, i) => (
+                          <li key={`str-${i}`} className="truncate">{s}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
-              )}
-              {gene.admetStrengths?.length > 0 && (
-                <div>
-                  <div className="font-medium text-emerald-700">Strengths</div>
-                  <ul className="mt-0.5 list-disc list-inside">
-                    {gene.admetStrengths.slice(0, 3).map((s, i) => (
-                      <li key={`str-${i}`} className="truncate">{s}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+              ) : null}
             </div>
           ) : null
         }

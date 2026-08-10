@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { FolderPlus, Loader2, Check, ArrowRight, ArrowLeft } from "lucide-react";
 import { Card, SectionHeader, FieldLabel } from "@/components/ui";
 import OrganismSelect from "@/components/OrganismSelect";
 import { createProject } from "@/lib/auth";
 import { THERAPEUTIC_GOALS } from "@/types/mechanism";
+import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
 
 const STEPS = [
   "Target Identification",
@@ -50,6 +51,13 @@ export default function NewProjectPage() {
     if (step === 1) return therapeuticGoal.trim().length > 0;
     return true;
   };
+
+  useKeyboardShortcut("arrowright", () => {
+    if (step < STEPS.length - 1 && canNext()) setStep((s) => s + 1);
+  }, { alt: true });
+  useKeyboardShortcut("arrowleft", () => {
+    if (step > 0) setStep((s) => s - 1);
+  }, { alt: true });
 
   const handleSubmit = async () => {
     if (!name.trim()) {

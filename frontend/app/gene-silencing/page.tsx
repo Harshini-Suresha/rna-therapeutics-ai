@@ -11,14 +11,17 @@ import AssoCandidateCard from "@/components/AssoCandidateCard";
 import AsoAnalysisDashboard from "@/components/AsoAnalysisDashboard";
 import { Card, SectionHeader } from "@/components/ui";
 import { GeneTargetObject } from "@/types/gene";
-import { TargetAnalysis, DesignOptions, GenerateResponse } from "@/types/geneSilencing";
+import { TargetAnalysis, DesignOptions, GenerateResponse, ClinVarVariant } from "@/types/geneSilencing";
 import {
   fetchTargetAnalysis,
   fetchDesignOptions,
   generateCandidates,
   emailAsoReport,
+  fetchClinVarVariants,
 } from "@/lib/geneSilencingApi";
 import { saveReport } from "@/lib/auth";
+import { parseHgvsC } from "@/lib/hgvsParser";
+import { HgvsParseResult } from "@/lib/hgvsParser";
 
 const CONFIRMED_TARGET_KEY = "aso:confirmedTarget";
 const SELECTED_MECHANISM_KEY = "aso:selectedMechanism";
@@ -65,6 +68,11 @@ export default function GeneSilencingPage() {
   const [selectedMods, setSelectedMods] = useState<string[]>(["phosphorothioate"]);
   const [deliveryContext, setDeliveryContext] = useState("");
   const [knownVariant, setKnownVariant] = useState("");
+  const [parsedVariant, setParsedVariant] = useState<HgvsParseResult | null>(null);
+  const [clinvarVariants, setClinvarVariants] = useState<ClinVarVariant[]>([]);
+  const [variantsLoading, setVariantsLoading] = useState(false);
+
+  const isAlleleSpecific = silencingScope === "allele_specific";
 
   const [results, setResults] = useState<GenerateResponse | null>(null);
   const [genLoading, setGenLoading] = useState(false);
@@ -142,7 +150,7 @@ export default function GeneSilencingPage() {
       `  ASO Length:    ${results.asoLength} nt`,
       `  Modifications: ${results.modifications.join(", ")}`,
       `  Candidates:    ${results.candidates.length}`,
-      `  Target scope:  ${results.targetExons?.length ? `Exons ${results.targetExons.join(", ")}` : "Total transcript"}`,
+      `  Target scope:  ${isAlleleSpecific ? `Allele-specific — variant ${knownVariant || "selected"}` : results.targetExons?.length ? `Exons ${results.targetExons.join(", ")}` : "Total transcript"}`,
       `  Ranked by:     Composite score (0.65×duplex ΔG + 0.35×Tm fit)`,
       "",
     ];
@@ -176,6 +184,15 @@ export default function GeneSilencingPage() {
         `    Immune stimulation (est.):  ${c.heuristicEstimates.immuneStimulation.value}/100`,
         `    Purine %:     ${c.realMetrics.purineContent}`,
         `    Complexity:   ${c.realMetrics.sequenceComplexity}`,
+        ...(c.alleleSpecific
+          ? [
+              `    Allele-specific: yes (spans ${c.knownVariant || "variant"})`,
+              c.alleleDiscriminationScore != null
+                ? `    Allele discrimination: ${(c.alleleDiscriminationScore * 100).toFixed(0)}/100 (mismatch proximity to RNase H gap center)`
+                : "",
+              c.alleleDiscriminationNote ? `    Allele note: ${c.alleleDiscriminationNote}` : "",
+            ].filter(Boolean)
+          : []),
         ""
       );
     });
@@ -198,11 +215,29 @@ export default function GeneSilencingPage() {
     setShowExport(false);
   }
 
+  function collectVisualizationSvg(): string {
+    const root = document.getElementById("aso-analysis-dashboard");
+    if (!root) return "";
+    const svgs = Array.from(root.querySelectorAll("svg"));
+    if (!svgs.length) return "";
+    const gallery = svgs
+      .map((svg) => {
+        const clone = svg.cloneNode(true) as SVGSVGElement;
+        clone.removeAttribute("class");
+        clone.setAttribute("width", "100%");
+        clone.setAttribute("height", "auto");
+        clone.setAttribute("style", "width:100%;height:auto;display:block");
+        return `<div style="margin:24px 0;border:1px solid #e2e8f0;border-radius:12px;padding:20px;background:#fff;overflow:hidden">${new XMLSerializer().serializeToString(clone)}</div>`;
+      })
+      .join("");
+    return `<h2 style="font-family:ui-monospace,monospace;font-size:16px;margin:32px 0 8px;color:#0f172a">VISUALIZATIONS</h2><p style="font-family:ui-monospace,monospace;font-size:12px;color:#64748b;margin:0">Charts captured from the analysis dashboard.</p>${gallery}`;
+  }
+
   function exportHtmlReport() {
     const content = buildReportContent();
     if (!content || !gene) return;
     const escaped = content.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    triggerDownload(`<!doctype html><html><head><meta charset="utf-8"><title>ASO Design Report</title></head><body style="font-family:ui-monospace,monospace;white-space:pre-wrap;line-height:1.5;padding:32px;color:#1e293b">${escaped}</body></html>`, `${gene.geneSymbol}-design-report.html`, "text/html");
+    triggerDownload(`<!doctype html><html><head><meta charset="utf-8"><title>ASO Design Report</title></head><body style="font-family:ui-monospace,monospace;white-space:pre-wrap;line-height:1.5;padding:32px;color:#1e293b">${escaped}<hr style="border:none;border-top:2px solid #e2e8f0;margin:32px 0">${collectVisualizationSvg()}</body></html>`, `${gene.geneSymbol}-design-report.html`, "text/html");
     setShowExport(false);
   }
 
@@ -236,6 +271,7 @@ export default function GeneSilencingPage() {
         setDefectType(parsed.defectType ?? null);
         setTherapeuticGoal(parsed.therapeuticGoal ?? null);
         setKnownVariant(parsed.knownVariant ?? "");
+        setParsedVariant(parsed.parsedVariant ?? null);
       } catch { setMechanism(null); }
     }
 
@@ -264,6 +300,16 @@ export default function GeneSilencingPage() {
   useEffect(() => {
     fetchDesignOptions().then(setOptions).catch(() => {});
   }, []);
+
+  // Fetch ClinVar variants for allele-specific targeting
+  useEffect(() => {
+    if (!gene?.geneId || !isAlleleSpecific) return;
+    setVariantsLoading(true);
+    fetchClinVarVariants(gene.geneId)
+      .then(setClinvarVariants)
+      .catch(() => setClinvarVariants([]))
+      .finally(() => setVariantsLoading(false));
+  }, [gene?.geneId, isAlleleSpecific]);
 
   function handleToggleMod(id: string) {
     setSelectedMods((prev) =>
@@ -306,7 +352,7 @@ export default function GeneSilencingPage() {
       const res = await generateCandidates({
         ensemblGeneId: gene.geneId,
         mechanismId: mechanism.id,
-        targetExonIndices: isTotalKnockdown ? null : selectedExons,
+        targetExonIndices: isTotalKnockdown || isAlleleSpecific ? null : selectedExons,
         asoLength,
         chemistry,
         modifications: selectedMods,
@@ -414,12 +460,12 @@ export default function GeneSilencingPage() {
               selectedExons={selectedExons}
               isTotalKnockdown={isTotalKnockdown}
               onToggleTotalKnockdown={handleToggleTotalKnockdown}
-              showTargetingMode={true}
+              showTargetingMode={!isAlleleSpecific}
             />
           ) : null}
 
           {/* Step 1a: Target Selection — Exon picker */}
-          {target && !targetLoading && !isTotalKnockdown && mechanism?.id !== "A2" && (
+          {target && !targetLoading && !isTotalKnockdown && !isAlleleSpecific && mechanism?.id !== "A2" && (
             <Card className="p-5">
               <SectionHeader step="1a" title="Target Selection" />
               <div className="px-5 pb-5">
@@ -458,9 +504,113 @@ export default function GeneSilencingPage() {
             </Card>
           )}
 
+          {/* Step 1a: Allele-Specific Targeting */}
+          {target && !targetLoading && isAlleleSpecific && mechanism?.id !== "A2" && (
+            <Card className="p-5">
+              <SectionHeader step="1a" title="Allele-Specific Targeting" />
+              <div className="px-5 pb-5">
+                <div className="rounded-lg border border-brand/20 bg-brand/5 px-4 py-3">
+                  <p className="text-[12.5px] font-medium text-brand">
+                    {knownVariant
+                      ? `Targeting variant: ${knownVariant}`
+                      : "Allele-specific silencing selected"}
+                  </p>
+                  <p className="mt-1 text-[11.5px] leading-relaxed text-slate-500">
+                    ASOs will be generated across the transcript and ranked to prioritise candidates whose binding window spans{" "}
+                    {knownVariant ? <strong>{knownVariant}</strong> : "the pathogenic variant"}, sparing the wild-type allele. No exon selection needed.
+                  </p>
+
+                  {/* Variant picker */}
+                  <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
+                    <div>
+                      <p className="text-[11px] font-medium text-slate-600">
+                        Choose a known variant (ClinVar)
+                      </p>
+                      <select
+                        value={clinvarVariants.some((v) => v.hgvsc === knownVariant) ? knownVariant : ""}
+                        onChange={(e) => {
+                          const hgvs = e.target.value;
+                          setKnownVariant(hgvs);
+                          setParsedVariant(hgvs ? parseHgvsC(hgvs) : null);
+                          setResults(null);
+                        }}
+                        disabled={variantsLoading}
+                        className="mt-1 w-full rounded-lg border border-brand/30 bg-white px-3 py-2 text-[12.5px] text-slate-700 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand disabled:opacity-50"
+                      >
+                        <option value="">
+                          {variantsLoading
+                            ? "Loading ClinVar variants…"
+                            : clinvarVariants.length
+                              ? "Select a variant…"
+                              : "No ClinVar variants available for this gene"}
+                        </option>
+                        {clinvarVariants.map((v, i) => (
+                          <option key={v.variantId ?? i} value={v.hgvsc || v.hgvsp}>
+                            {v.hgvsc || v.hgvsp}
+                            {v.clinicalSignificance ? ` — ${v.clinicalSignificance}` : ""}
+                            {v.rsid ? ` · ${v.rsid}` : ""}
+                            {v.goldStars ? ` · ★${v.goldStars}` : ""}
+                          </option>
+                        ))}
+                      </select>
+                      {clinvarVariants.length > 0 && !variantsLoading && (
+                        <p className="mt-1 text-[10.5px] text-slate-400">
+                          {clinvarVariants.length} pathogenic variant{clinvarVariants.length !== 1 ? "s" : ""} loaded from ClinVar.
+                        </p>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-medium text-slate-600">
+                        Or enter a variant manually
+                      </p>
+                      <input
+                        type="text"
+                        value={knownVariant}
+                        onChange={(e) => {
+                          setKnownVariant(e.target.value);
+                          setParsedVariant(parseHgvsC(e.target.value));
+                          setResults(null);
+                        }}
+                        placeholder="e.g. c.1521_1523delCTT"
+                        className="mt-1 w-full rounded-lg border border-brand/30 bg-white px-3 py-2 text-[12.5px] text-slate-700 placeholder-slate-400 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
+                      />
+                    </div>
+                  </div>
+
+                  {knownVariant.trim() && (() => {
+                    const p = parsedVariant ?? parseHgvsC(knownVariant);
+                    if (p && p.parsed) {
+                      return (
+                        <p className="mt-2 rounded-md bg-emerald-50 px-3 py-1.5 text-[11.5px] text-emerald-700">
+                          Parsed position: CDS index {p.cdsStart}
+                          {p.cdsStart !== p.cdsEnd ? `–${p.cdsEnd}` : ""} ({p.type})
+                          {p.length != null && p.length > 1 ? `, ${p.length} bp` : ""} — candidates will be
+                          ranked by mismatch proximity to the RNase H gap center.
+                        </p>
+                      );
+                    }
+                    return (
+                      <p className="mt-2 rounded-md bg-amber-50 px-3 py-1.5 text-[11.5px] text-amber-700">
+                        {p?.reason ??
+                          "Could not parse the variant to a CDS coordinate. Candidates will be generated, but none can be verified to discriminate mutant from wild-type."}
+                      </p>
+                    );
+                  })()}
+                  {!knownVariant.trim() && (
+                    <p className="mt-2 rounded-md bg-amber-50 px-3 py-1.5 text-[11.5px] text-amber-700">
+                      Allele-specific ranking without a variant position can only confirm a mechanism
+                      supports this approach in principle — it can't verify a specific candidate will
+                      discriminate mutant from wild-type.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </Card>
+          )}
+
           {/* Steps 2 + 3: Design Form + Results */}
-          <div className="grid grid-cols-1 gap-5 lg:grid-cols-5">
-             <div className="lg:col-span-2 space-y-4">
+          <div className="space-y-5">
+             <div className="space-y-4">
                 {/* ASO Design Parameters */}
                 <Card className="p-5">
                 <SectionHeader step="2" title="ASO Design Parameters" />
@@ -485,7 +635,7 @@ export default function GeneSilencingPage() {
                     onToggleMod={handleToggleMod}
                      onGenerate={handleGenerate}
                      loading={genLoading}
-                     disabled={!target || mechanism?.id === "A21" || (!isTotalKnockdown && selectedExons.length === 0)}
+                     disabled={!target || mechanism?.id === "A21" || (!isTotalKnockdown && !isAlleleSpecific && selectedExons.length === 0)}
                      hasResults={!!results}
                    />
                   {results && (
@@ -500,7 +650,7 @@ export default function GeneSilencingPage() {
               </Card>
             </div>
 
-            <div className="lg:col-span-3 space-y-3">
+            <div className="space-y-3">
               <SectionHeader
                 step="3"
                 title="Generated ASO Candidates"
@@ -518,11 +668,25 @@ export default function GeneSilencingPage() {
                 </div>
               )}
 
+              {results && results.isAlleleSpecific && results.variantParse && !results.variantParse.parsed && (
+                <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[12.5px] text-amber-800">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span>
+                    The variant "{results.candidates[0]?.knownVariant || knownVariant}" could not be parsed
+                    to a CDS coordinate ({results.variantParse.reason?.toLowerCase() ?? "unrecognized format"}).
+                    The candidates below are ranked by composite score only — none can be verified to
+                    discriminate mutant from wild-type.
+                  </span>
+                </div>
+              )}
+
               {!results && !genLoading && (
                 <Card className="flex flex-col items-center justify-center px-6 py-12 text-center">
                   <Beaker className="h-8 w-8 text-slate-300" />
                   <p className="mt-3 text-[13px] font-medium text-slate-500">
-                  {isTotalKnockdown
+                  {isAlleleSpecific
+                    ? `Click Generate to create allele-specific ASO candidates${knownVariant ? ` for ${knownVariant}` : ""}`
+                    : isTotalKnockdown
                     ? "Click Generate to create ASO candidates for total transcript knockdown"
                     : "Select exon(s) and click Generate to create ASO candidates"}
                   </p>
@@ -599,7 +763,9 @@ export default function GeneSilencingPage() {
 
                   <p className="text-[12.5px] text-slate-500">
                     {results.candidates.length} candidate{results.candidates.length !== 1 ? "s" : ""} for{" "}
-                    {results.targetExons && results.targetExons.length > 0
+                    {isAlleleSpecific
+                      ? `variant ${knownVariant || "allele-specific targeting"}`
+                      : results.targetExons && results.targetExons.length > 0
                       ? `Exons ${results.targetExons.join(", ")}`
                       : "all exons (total knockdown)"}{" "}
                     &middot; {results.mechanismId} &middot; {results.chemistry} &middot; {results.asoLength} nt

@@ -141,7 +141,7 @@ Only mechanisms present in all three selections are eligible.
 | scaffold | Yes | Structural scaffold (selex_refinement, hammerhead, three_way_junction) |
 | chemStabilization | Yes | Chemical base stabilization strategy |
 | kdGoal | Yes | Target binding affinity threshold |
-| deliveryContext | No | Optional delivery/tissue context |
+| deliveryContext | No | Optional tie-breaker: delivery precedent tier with citation, consulted only when evidence level is tied |
 
 ## Results / Metrics
 

@@ -248,6 +248,33 @@ export async function rankRnaEngineeringMechanisms(params: {
   return res.json();
 }
 
+export async function rankIsoformEngineeringMechanisms(params: {
+  geneSymbol: string;
+  isoformGoal: string;
+  targetExonLocus?: string | null;
+  spliceElementTarget?: string | null;
+  stericChemistry?: string | null;
+  deliveryContext?: string | null;
+}): Promise<MechanismRankingResponse> {
+  const res = await fetch(`${API_BASE}/api/mechanisms/isoform-engineering`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      gene_symbol: params.geneSymbol,
+      isoform_goal: params.isoformGoal,
+      target_exon_locus: params.targetExonLocus || null,
+      splice_element_target: params.spliceElementTarget || null,
+      steric_chemistry: params.stericChemistry || null,
+      delivery_context: params.deliveryContext || null,
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail || "Could not rank isoform engineering mechanisms.");
+  }
+  return res.json();
+}
+
 export function getGoalLabel(goalId: TherapeuticGoalId): string {
   const labels: Record<TherapeuticGoalId, string> = {
     TG01: "Gene Silencing",

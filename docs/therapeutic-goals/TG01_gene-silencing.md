@@ -144,6 +144,8 @@ Reduce target gene expression by sequence-specific degradation of mRNA through t
 | total_knockdown | A1, A2, A12, A15, A21 |
 | allele_specific | A1, A21 |
 
+> **Note:** The scope table reflects *biological* compatibility. A21 (RNAi) genuinely supports allele-specific silencing via SNP-based discrimination, but the platform's ASO designer only emits single-stranded candidates and cannot produce a double-stranded siRNA duplex — so A21 is surfaced in the mechanism ranking as **not designable** and cannot be selected for design (see Mechanism Constraints below).
+
 ### Mechanism Constraints
 
 - **A2:** Targets 5′ translation-initiation region only
@@ -170,7 +172,7 @@ Reduce target gene expression by sequence-specific degradation of mRNA through t
 |-----------|----------|-------------|
 | defectType | Yes | Molecular defect type (gain_of_function, overexpression, mirna_dysregulation, viral_toxic_rna) |
 | silencingScope | Yes | total_knockdown or allele_specific |
-| deliveryContext | No | Soft tie-breaker for tissue-specific scoring |
+| deliveryContext | No | Optional tie-breaker: delivery precedent tier (approved drug / clinical trial / unestablished) with citation, consulted only when evidence level is tied |
 | knownVariant | No | Optional variant identifier |
 | asoLength | No | 12–30 nt, default 18 |
 | chemistry | No | gapmer, pmo, lna_gapmer, 2ome, sirna |

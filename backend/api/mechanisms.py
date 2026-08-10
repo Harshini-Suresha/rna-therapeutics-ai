@@ -10,6 +10,8 @@ Supports multiple therapeutic goals:
 - TG04: RNA Processing Modulation (A7, A8, A9, A10, A11)
 - TG05: RNA Neutralization (A12, A14, A25)
 - TG06: Translational Regulation (A2, A5, A6, A27)
+- TG07: Isoform Engineering (A7, A8, A9, A10)
+- TG09: Protein Function Modulation (A23)
 """
 
 from fastapi import APIRouter, HTTPException, Query
@@ -24,6 +26,7 @@ from services.mechanism_service import (
     rank_rna_neutralization_mechanisms,
     rank_translational_regulation_mechanisms,
     rank_rna_engineering_mechanisms,
+    rank_isoform_engineering_mechanisms,
     generate_rna_engineering_candidates,
     DEFECT_TYPES,
     SILENCING_SCOPES,
@@ -122,6 +125,15 @@ class RnaEngineeringRequest(BaseModel):
     scaffold: str
     chem_stabilization: str
     kd_goal: str
+    delivery_context: Optional[str] = None
+
+
+class IsoformEngineeringRequest(BaseModel):
+    gene_symbol: str
+    isoform_goal: str
+    target_exon_locus: Optional[str] = None
+    splice_element_target: Optional[str] = None
+    steric_chemistry: Optional[str] = None
     delivery_context: Optional[str] = None
 
 
@@ -447,6 +459,36 @@ async def rna_engineering_mechanisms(payload: RnaEngineeringRequest):
         },
         "mechanisms": mechanisms,
         "candidates": candidates,
+    }
+
+
+@router.post("/api/mechanisms/isoform-engineering")
+async def isoform_engineering_mechanisms(payload: IsoformEngineeringRequest):
+    if payload.isoform_goal not in ISOFORM_GOAL_DEFECT_MAP:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown isoform_goal: {payload.isoform_goal}",
+        )
+
+    results = rank_isoform_engineering_mechanisms(
+        isoform_goal=payload.isoform_goal,
+        target_exon_locus=payload.target_exon_locus,
+        splice_element_target=payload.splice_element_target,
+        steric_chemistry=payload.steric_chemistry,
+        delivery_context=payload.delivery_context,
+    )
+
+    return {
+        "geneSymbol": payload.gene_symbol.strip().upper(),
+        "therapeuticGoal": "Isoform Engineering",
+        "inputs": {
+            "isoformGoal": payload.isoform_goal,
+            "targetExonLocus": payload.target_exon_locus,
+            "spliceElementTarget": payload.splice_element_target,
+            "stericChemistry": payload.steric_chemistry,
+            "deliveryContext": payload.delivery_context,
+        },
+        "results": results,
     }
 
 

@@ -3,7 +3,7 @@ import { AssoCandidate } from "./geneSilencing";
 export type { AssoCandidate };
 
 export interface UpregulationCandidate extends AssoCandidate {
-  // TANGO-specific fields (mechanism A5 only)
+  // TANGO-specific fields (mechanism A3 only)
   spliceMaskingScore?: number;
   predictedNmdSuppression?: number;
   estimatedFoldRestoration?: number;

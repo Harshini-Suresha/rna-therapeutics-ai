@@ -17,16 +17,16 @@ export default function FooterBar({
         <div className="flex shrink-0 items-center gap-2">
           <button
             onClick={onClear}
-            className="flex items-center gap-1.5 rounded border border-slate-300 px-3 py-1.5 text-[12px] font-medium text-slate-600 hover:bg-slate-50"
+            className="flex items-center gap-1.5 rounded border border-slate-300 px-3 py-1.5 text-[12px] font-medium text-slate-600 hover:bg-slate-50 transition-all duration-200 hover:border-slate-400 hover:shadow-sm active:translate-y-0"
           >
             <Trash2 className="h-3 w-3" />
             Clear All
           </button>
           <button
             onClick={onConfirm}
-            className="flex items-center gap-1.5 rounded bg-brand px-4 py-1.5 text-[12px] font-medium text-white hover:bg-brand-dark"
+            className="flex items-center gap-1.5 rounded bg-brand px-4 py-1.5 text-[12px] font-medium text-white hover:bg-brand-dark transition-all duration-200 hover:shadow-md hover:shadow-brand/20 hover:-translate-y-0.5 active:translate-y-0"
           >
-            Confirm & Proceed
+            Confirm &amp; Proceed
             <ArrowRight className="h-3 w-3" />
           </button>
         </div>

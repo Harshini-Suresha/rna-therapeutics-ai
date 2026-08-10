@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useClientSearchParams } from "@/utils/useClientSearchParams"
-import { AlertCircle, ArrowRight, BookOpen, ClipboardCheck, Cpu, Database, Dna, FileText, ChevronRight } from "lucide-react";
+import { AlertCircle, ArrowRight, BookOpen, ClipboardCheck, Cpu, Database, Dna, FileText, ChevronRight, UploadCloud, Search, FlaskConical } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import Topbar from "@/components/Topbar";
 import BasicInfoForm from "@/components/BasicInfoForm";
@@ -38,6 +39,7 @@ const ANALYSIS_MODULES = [
 const MECHANISM_CATEGORIES = [
   {
     category: "Gene Silencing",
+    href: "/gene-silencing",
     items: [
       "RNase H-mediated Gapmer Knockdown",
       "Steric-blocking Translation Inhibition",
@@ -48,6 +50,7 @@ const MECHANISM_CATEGORIES = [
   },
   {
     category: "Gene Upregulation",
+    href: "/gene-upregulation",
     items: [
       "Poison Exon Blocking",
       "AntagoNAT",
@@ -59,6 +62,7 @@ const MECHANISM_CATEGORIES = [
   },
   {
     category: "RNA Editing / Correction",
+    href: "/rna-editing",
     items: [
       "ADAR-mediated RNA Editing",
       "Endogenous ADAR Recruitment",
@@ -69,6 +73,7 @@ const MECHANISM_CATEGORIES = [
   },
   {
     category: "RNA Processing Modulation",
+    href: "/mechanisms",
     items: [
       "Exon Skipping",
       "Exon Inclusion",
@@ -79,10 +84,12 @@ const MECHANISM_CATEGORIES = [
   },
   {
     category: "RNA Neutralization",
+    href: "/rna-neutralization",
     items: ["Toxic RNA Neutralization"],
   },
   {
     category: "Protein Replacement",
+    href: "/protein-replacement",
     items: [
       "mRNA Replacement Therapy",
       "circRNA-mediated Protein Replacement",
@@ -90,6 +97,7 @@ const MECHANISM_CATEGORIES = [
   },
   {
     category: "Protein Function Modulation",
+    href: "/rna-engineering",
     items: ["RNA Aptamer Therapeutics"],
   },
 ];
@@ -426,7 +434,7 @@ export default function NewProjectPage() {
             />
           )}
           {error && (
-            <div className="flex items-center gap-2 border border-red-200 bg-red-50 px-4 py-2 text-[12px] text-red-600">
+            <div className="flex items-center gap-2 border border-red-200 bg-red-50 px-4 py-2 text-[12px] text-red-600 animate-pulse">
               <AlertCircle className="h-3.5 w-3.5 shrink-0" />
               {error}
             </div>
@@ -434,9 +442,15 @@ export default function NewProjectPage() {
           {!gene && !loading && (
             <>
               {/* Platform Overview */}
-              <section className="rounded-lg border border-[#E5E7EB] bg-white p-4">
-                <div className="flex flex-col gap-4 xl:flex-row xl:items-center">
-                  <div className="flex h-[119px] w-[110px] shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-slate-50 to-slate-100">
+              <section className="rounded-xl border border-[#E5E7EB] bg-white p-5 shadow-sm hover:shadow-md transition-all duration-300">
+                <div className="mb-3 flex items-center gap-2">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-md bg-slate-100">
+                    <Dna className="h-3.5 w-3.5 text-slate-600" strokeWidth={2} />
+                  </span>
+                  <h2 className="text-[11px] font-bold uppercase tracking-wider text-slate-600">Platform Overview</h2>
+                </div>
+                <div className="flex flex-col gap-5 xl:flex-row xl:items-center">
+                  <div className="flex h-[119px] w-[110px] shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 transition-transform duration-300 hover:scale-105">
                     <Dna className="h-16 w-16 text-[#0F172A]" strokeWidth={1.35} />
                   </div>
                   <div className="min-w-0 flex-1">
@@ -451,7 +465,7 @@ export default function NewProjectPage() {
                       ["7", "Therapeutic Goals"],
                       ["11", "Computational Modules"],
                     ].map(([value, label]) => (
-                      <div key={label} className="rounded-md border border-[#E5E7EB] px-3 py-3">
+                      <div key={label} className="rounded-lg border border-[#E5E7EB] bg-white px-3 py-3 transition-all duration-200 hover:border-brand/30 hover:shadow-sm hover:-translate-y-0.5">
                         <p className="text-[18px] font-bold text-[#0F172A]">{value}</p>
                         <p className="mt-1 text-[9.5px] font-medium text-slate-600">{label}</p>
                       </div>
@@ -487,8 +501,26 @@ export default function NewProjectPage() {
                 }}
               />
 
+              {/* Upload Sequence */}
+              <Link
+                href="/upload-sequence"
+                className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50/60 p-4 shadow-sm transition-all duration-200 hover:border-amber-300 hover:shadow-md hover:-translate-y-0.5 group"
+              >
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 border border-amber-200 transition-all duration-200 group-hover:border-amber-300 group-hover:bg-amber-50">
+                  <UploadCloud className="h-5 w-5 text-amber-700 group-hover:text-amber-800 transition-colors duration-200" strokeWidth={1.45} />
+                </span>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="text-[13px] font-bold text-amber-900 group-hover:text-amber-950 transition-colors duration-150">Upload Sequence</p>
+                    <span className="text-[9px] font-semibold uppercase tracking-wider text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded-full">Action</span>
+                  </div>
+                  <p className="text-[11px] text-amber-800/70 mt-0.5">Import custom ASO, siRNA, or RNA sequences for analysis and design.</p>
+                </div>
+                <ArrowRight className="h-4 w-4 text-amber-600 opacity-0 group-hover:opacity-100 transition-all duration-200 group-hover:text-amber-700" />
+              </Link>
+
               {/* Analysis Modules + Therapeutic Mechanisms */}
-              <section className="grid grid-cols-12 overflow-hidden rounded-lg border border-[#E5E7EB] bg-white">
+              <section className="grid grid-cols-12 overflow-hidden rounded-xl border border-[#E5E7EB] bg-white shadow-sm hover:shadow-md transition-all duration-300">
                 {/* Analysis Modules - navigation tree style */}
                 <div className="col-span-12 xl:col-span-3 border-b border-[#E5E7EB] bg-white px-4 py-4 xl:border-b-0 xl:border-r">
                   <div className="pb-2 mb-2 border-b border-slate-100">
@@ -498,12 +530,12 @@ export default function NewProjectPage() {
                   </div>
                   <ul className="space-y-0">
                     {ANALYSIS_MODULES.map((m, i) => (
-                      <li key={m} className="flex items-center gap-2 border-b border-slate-100 py-[5px] last:border-b-0">
-                        <span className="w-8 shrink-0 rounded bg-slate-100 py-0.5 text-center text-[10px] font-semibold text-[#64748B] tabular-nums">
+                      <li key={m} className="flex items-center gap-2 border-b border-slate-100 py-[5px] last:border-b-0 group hover:bg-slate-50/50 transition-colors duration-150 px-1 -mx-1 rounded cursor-default">
+                        <span className="w-8 shrink-0 rounded bg-slate-100 py-0.5 text-center text-[10px] font-semibold text-[#64748B] tabular-nums group-hover:bg-brand/10 group-hover:text-brand transition-colors duration-150">
                           {String(i + 1).padStart(2, "0")}
                         </span>
-                        <span className="flex-1 text-[10.5px] font-medium text-[#64748B]">{m}</span>
-                        <ChevronRight className="h-3.5 w-3.5 text-[#64748B]" />
+                        <span className="flex-1 text-[10.5px] font-medium text-[#64748B] group-hover:text-slate-700 transition-colors duration-150">{m}</span>
+                        <ChevronRight className="h-3.5 w-3.5 text-[#64748B] opacity-0 group-hover:opacity-100 transition-opacity duration-150" />
                       </li>
                     ))}
                   </ul>
@@ -518,25 +550,29 @@ export default function NewProjectPage() {
                   </div>
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
                     {MECHANISM_CATEGORIES.map((cat, catIdx) => (
-                      <div key={cat.category} className="rounded-md border border-[#E5E7EB] px-3 py-2.5">
-                        <p className="mb-1 text-[10.5px] font-bold text-[#0F172A]">
+                      <Link
+                        key={cat.category}
+                        href={cat.href}
+                        className="rounded-lg border border-[#E5E7EB] px-3 py-2.5 transition-all duration-200 hover:border-brand/30 hover:shadow-sm hover:-translate-y-0.5 group block"
+                      >
+                        <p className="mb-1 text-[10.5px] font-bold text-[#0F172A] group-hover:text-brand transition-colors duration-150">
                           {cat.category} <span className="ml-1 text-slate-400 font-normal">({cat.items.length})</span>
                         </p>
                         <ul className="space-y-0">
                           {cat.items.map((item) => (
-                            <li key={item} className="py-[2px] text-[10px] leading-snug text-[#64748B]">
+                            <li key={item} className="py-[2px] text-[10px] leading-snug text-[#64748B] group-hover:text-slate-600 transition-colors duration-150">
                               {item}
                             </li>
                           ))}
                         </ul>
-                      </div>
+                      </Link>
                     ))}
                   </div>
                 </div>
               </section>
 
               {/* Architecture Diagram */}
-              <section className="rounded-lg border border-[#E5E7EB] bg-white px-4 py-4">
+              <section className="rounded-xl border border-[#E5E7EB] bg-white p-5 shadow-sm hover:shadow-md transition-all duration-300">
                 <div className="pb-2 mb-3 border-b border-slate-100">
                     <h2 className="text-[11px] font-bold text-[#0F172A] uppercase tracking-wide">
                     Platform Architecture
@@ -544,15 +580,17 @@ export default function NewProjectPage() {
                 </div>
                 <div className="flex flex-col items-center justify-center gap-3 md:flex-row md:gap-5">
                   {ARCHITECTURE_STEPS.map((step, i) => (
-                    <div key={step.label} className="flex items-center gap-3 md:gap-5">
-                      <div className="flex min-w-[116px] flex-col items-center gap-2 text-center">
-                        <step.icon className="h-7 w-7 text-[#18366d]" strokeWidth={1.45} />
-                        <span className="text-[10px] font-medium text-[#64748B]">{step.label}</span>
+                    <div key={step.label} className="flex items-center gap-3 md:gap-5 group">
+                      <div className="flex min-w-[116px] flex-col items-center gap-2 text-center transition-all duration-200 group-hover:scale-105 cursor-default">
+                        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-50 border border-slate-200 transition-all duration-200 group-hover:border-brand/30 group-hover:bg-brand/5">
+                          <step.icon className="h-5 w-5 text-[#18366d] group-hover:text-brand transition-colors duration-200" strokeWidth={1.45} />
+                        </span>
+                        <span className="text-[10px] font-medium text-[#64748B] group-hover:text-slate-700 transition-colors duration-200">{step.label}</span>
                       </div>
                       {i < ARCHITECTURE_STEPS.length - 1 && (
-                        <svg width="72" height="18" viewBox="0 0 72 18" className="hidden text-[#64748B] md:block">
-                          <line x1="0" y1="9" x2="66" y2="9" stroke="currentColor" strokeWidth="1.2" />
-                          <polyline points="61,4 66,9 61,14" fill="none" stroke="currentColor" strokeWidth="1.2" />
+                        <svg width="72" height="18" viewBox="0 0 72 18" className="hidden text-[#64748B] md:block transition-all duration-200 group-hover:text-brand">
+                          <line x1="0" y1="9" x2="66" y2="9" stroke="currentColor" strokeWidth="1.2" className="transition-all duration-300" />
+                          <polyline points="61,4 66,9 61,14" fill="none" stroke="currentColor" strokeWidth="1.2" className="transition-all duration-300" />
                         </svg>
                       )}
                     </div>

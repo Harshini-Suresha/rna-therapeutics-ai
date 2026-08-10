@@ -46,7 +46,7 @@ export default function GeneUpregulationPage() {
   const [chemistry, setChemistry] = useState("gapmer");
   const [selectedMods, setSelectedMods] = useState<string[]>(["phosphorothioate"]);
   
-  // TANGO-specific fields (mechanism A5 only)
+  // TANGO-specific fields (mechanism A3 only)
   const [targetPoisonExon, setTargetPoisonExon] = useState<string>("");
   const [spliceElement, setSpliceElement] = useState<string>("");
 
@@ -99,7 +99,40 @@ export default function GeneUpregulationPage() {
   }
 
   function exportReport() {
-    if (!results || !gene) return;
+    const content = exportReportContent();
+    if (!content || !gene) return;
+    triggerDownload(content, `${gene.geneSymbol}-upregulation-report.txt`, "text/plain");
+    setShowExport(false);
+  }
+
+  function collectVisualizationSvg(): string {
+    const root = document.getElementById("aso-analysis-dashboard");
+    if (!root) return "";
+    const svgs = Array.from(root.querySelectorAll("svg"));
+    if (!svgs.length) return "";
+    const gallery = svgs
+      .map((svg) => {
+        const clone = svg.cloneNode(true) as SVGSVGElement;
+        clone.removeAttribute("class");
+        clone.setAttribute("width", "100%");
+        clone.setAttribute("height", "auto");
+        clone.setAttribute("style", "width:100%;height:auto;display:block");
+        return `<div style="margin:24px 0;border:1px solid #e2e8f0;border-radius:12px;padding:20px;background:#fff;overflow:hidden">${new XMLSerializer().serializeToString(clone)}</div>`;
+      })
+      .join("");
+    return `<h2 style="font-family:ui-monospace,monospace;font-size:16px;margin:32px 0 8px;color:#0f172a">VISUALIZATIONS</h2><p style="font-family:ui-monospace,monospace;font-size:12px;color:#64748b;margin:0">Charts captured from the analysis dashboard.</p>${gallery}`;
+  }
+
+  function exportHtmlReport() {
+    const content = exportReportContent();
+    if (!content || !gene) return;
+    const escaped = content.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    triggerDownload(`<!doctype html><html><head><meta charset="utf-8"><title>Gene Upregulation Design Report</title></head><body style="font-family:ui-monospace,monospace;white-space:pre-wrap;line-height:1.5;padding:32px;color:#1e293b">${escaped}<hr style="border:none;border-top:2px solid #e2e8f0;margin:32px 0">${collectVisualizationSvg()}</body></html>`, `${gene.geneSymbol}-upregulation-report.html`, "text/html");
+    setShowExport(false);
+  }
+
+  function exportReportContent(): string | null {
+    if (!results || !gene) return null;
     const lines = [
       "═══════════════════════════════════════════════════",
       "  GENE UPREGULATION DESIGN REPORT",
@@ -113,12 +146,19 @@ export default function GeneUpregulationPage() {
       `  ASO Length:    ${results.asoLength} nt`,
       `  Modifications: ${(results.modifications || []).join(", ")}`,
       `  Candidates:    ${results.candidates.length}`,
-      "",
-      "───────────────────────────────────────────────────",
-      "  CANDIDATES",
-      "───────────────────────────────────────────────────",
+      `  Ranked by:     Composite score (0.65×duplex ΔG + 0.35×Tm fit)`,
       "",
     ];
+    if (results.mechanismNotes) lines.push(`  Mechanism note: ${results.mechanismNotes}`, "");
+    lines.push(
+      "───────────────────────────────────────────────────",
+      "  RESULTS",
+      "───────────────────────────────────────────────────",
+      "  Lower (more negative) target duplex ΔG indicates stronger predicted",
+      "  binding of the antisense ASO to its target window. Candidates are ranked",
+      "  by a composite design score built exclusively from real metrics.",
+      ""
+    );
     results.candidates.forEach((c: any, i: number) => {
       lines.push(
         `  #${i + 1}  ${c.targetRegion}`,
@@ -128,20 +168,23 @@ export default function GeneUpregulationPage() {
         `    Melting Temp: ${c.realMetrics.meltingTempC} C`,
         `    MFE:          ${c.realMetrics.selfStructureMfe} kcal/mol`,
         `    Duplex Energy:${c.realMetrics.targetDuplexEnergy} kcal/mol`,
+        `    Composite:    ${c.compositeScore}/100`,
+        `    Chemistry:    ${c.chemistry}`,
+        `    Modifications:${(c.modifications || []).join(", ") || "None selected"}`,
         ""
       );
     });
     lines.push("═══════════════════════════════════════════════════");
-    triggerDownload(lines.join("\n"), `${gene.geneSymbol}-upregulation-report.txt`, "text/plain");
-    setShowExport(false);
+    return lines.join("\n");
   }
   const [genError, setGenError] = useState<string | null>(null);
 
   const MECHANISM_NOTES: Record<string, string> = {
-    A3: "saRNA: Uses siRNA duplex chemistry to target promoter regions for transcriptional activation. CDS-derived candidates approximate target complement.",
-    A4: "uORF Blocking: Blocks inhibitory upstream ORFs to enhance translation of the main coding sequence. Focused on 5' translation-initiation region.",
-    A5: "Poison Exon Skipping: Masks poison exon splice sites to prevent inclusion of PTC-containing exons, reducing nonsense-mediated decay. Targets exon-exon junctions.",
-    A6: "NAT Silencing: Degrades inhibitory antisense lncRNAs that repress the sense gene using RNase H1 gapmers. Full transcript scanning.",
+    A3: "TANGO (Poison Exon Skipping): Masks poison exon splice sites to prevent inclusion of PTC-containing exons, reducing nonsense-mediated decay. Targets exon-exon junctions.",
+    A4: "NAT Silencing: Degrades inhibitory antisense lncRNAs that repress the sense gene using RNase H1 gapmers. Full transcript scanning.",
+    A5: "uORF Blocking: Blocks inhibitory upstream ORFs to enhance translation of the main coding sequence. Focused on 5' translation-initiation region.",
+    A6: "miRNA Site Blocking (Target Protector): Masks the miRNA seed binding site on the target mRNA so the repressive miRNA cannot dock. Steric-blocking chemistries only.",
+    A23: "saRNA: Uses siRNA duplex chemistry to target promoter regions for transcriptional activation. CDS-derived candidates approximate target complement.",
   };
 
   useEffect(() => {
@@ -218,8 +261,8 @@ export default function GeneUpregulationPage() {
         knownRegulatoryElement: knownRegulatoryElement || undefined,
         geneSymbol: gene.geneSymbol ?? undefined,
         organism: gene.organism ?? undefined,
-        targetPoisonExon: mechanism.id === "A5" ? targetPoisonExon || undefined : undefined,
-        spliceElement: mechanism.id === "A5" ? spliceElement || undefined : undefined,
+        targetPoisonExon: mechanism.id === "A3" ? targetPoisonExon || undefined : undefined,
+        spliceElement: mechanism.id === "A3" ? spliceElement || undefined : undefined,
       });
       setResults(res);
       saveReport({
@@ -305,14 +348,16 @@ export default function GeneUpregulationPage() {
             <SectionHeader step="4" title="Gene Upregulation — ASO Design" />
             <p className="px-6 pb-3 text-[12.5px] text-slate-500">
               {mechanism?.id === "A3"
-                ? "saRNA candidates target promoter-proximal regions for transcriptional activation via siRNA duplexes."
+                ? "TANGO candidates mask poison exon splice sites at exon-exon junctions to restore functional mRNA."
                 : mechanism?.id === "A4"
-                  ? "uORF-blocking candidates target the 5' translation-initiation region to enhance protein production."
+                  ? "NAT silencing candidates degrade inhibitory antisense lncRNAs using RNase H1 gapmers."
                   : mechanism?.id === "A5"
-                    ? "Poison exon candidates mask splice sites at exon-exon junctions to restore functional mRNA."
+                    ? "uORF-blocking candidates target the 5' translation-initiation region to enhance protein production."
                     : mechanism?.id === "A6"
-                      ? "NAT silencing candidates degrade antisense lncRNAs using RNase H1 gapmers."
-                      : "Design ASOs for gene upregulation. The service scans the transcript for candidates compatible with the selected mechanism."}
+                      ? "miRNA site-blocking candidates mask the miRNA seed site on the target mRNA to relieve repression."
+                      : mechanism?.id === "A23"
+                        ? "saRNA candidates target promoter-proximal regions for transcriptional activation via siRNA duplexes."
+                        : "Design ASOs for gene upregulation. The service scans the transcript for candidates compatible with the selected mechanism."}
             </p>
           </Card>
 
@@ -332,8 +377,8 @@ export default function GeneUpregulationPage() {
                     modifications: selectedMods,
                     defectType: defectType || null,
                     knownRegulatoryElement: knownRegulatoryElement || null,
-                    targetPoisonExon: mechanism?.id === "A5" ? targetPoisonExon || null : null,
-                    spliceElement: mechanism?.id === "A5" ? spliceElement || null : null,
+                    targetPoisonExon: mechanism?.id === "A3" ? targetPoisonExon || null : null,
+                    spliceElement: mechanism?.id === "A3" ? spliceElement || null : null,
                   },
                   results,
                   reportTitle: "Gene Upregulation — ASO Design",
@@ -380,8 +425,8 @@ export default function GeneUpregulationPage() {
           )}
 
           {/* Step 2 + 3: Design Form + Results */}
-          <div className="grid grid-cols-1 gap-5 lg:grid-cols-5">
-             <div className="lg:col-span-2 space-y-4">
+          <div className="space-y-5">
+             <div className="space-y-4">
                {/* Upregulation Design Parameters */}
                  <div className="flex justify-end">
                    <div ref={exportRef} className="relative inline-block">
@@ -399,6 +444,7 @@ export default function GeneUpregulationPage() {
                          <button onClick={exportJson} className="w-full px-3 py-2 text-left text-[12.5px] text-slate-600 hover:bg-slate-50">Raw JSON</button>
                          <button onClick={exportFasta} className="w-full px-3 py-2 text-left text-[12.5px] text-slate-600 hover:bg-slate-50">FASTA file</button>
                          <button onClick={exportReport} className="w-full px-3 py-2 text-left text-[12.5px] text-slate-600 hover:bg-slate-50">Text report</button>
+                         <button onClick={exportHtmlReport} className="w-full px-3 py-2 text-left text-[12.5px] text-slate-600 hover:bg-slate-50">HTML report</button>
                        </div>
                      )}
                    </div>
@@ -451,8 +497,8 @@ export default function GeneUpregulationPage() {
                     </p>
                   </div>
 
-                  {/* TANGO-specific fields (mechanism A5 only) */}
-                  {mechanism?.id === "A5" && (
+                  {/* TANGO-specific fields (mechanism A3 only) */}
+                  {mechanism?.id === "A3" && (
                     <div className="space-y-4 rounded-lg border border-teal-200 bg-teal-50 p-4">
                       <div className="flex items-center gap-2">
                         <Dna className="h-4 w-4 text-brand" />
@@ -544,7 +590,7 @@ export default function GeneUpregulationPage() {
               </Card>
             </div>
 
-            <div className="lg:col-span-3 space-y-3">
+            <div className="space-y-3">
               <SectionHeader step="3" title="Generated ASO Candidates" />
 
               {genError && (

@@ -31,8 +31,8 @@ const FAQS = [
     a: "No — it's a simplified estimate based on GC/AU composition, not an actual folding algorithm like RNAfold. It's meant as a rough proxy, not a substitute for real structure prediction.",
   },
   {
-    q: "Does \"Ask the Platform AI\" know things outside this platform?",
-    a: "It's a general-purpose AI assistant with added context about how this platform works, so it can explain ASO biology broadly, not just answer questions about your specific loaded gene. It's a research aid, not a source of clinical/medical advice.",
+    q: "Does \"Ask the Platform Assistant\" know things outside this platform?",
+    a: "It's a general-purpose research assistant with added context about how this platform works, so it can explain ASO biology broadly, not just answer questions about your specific loaded gene. It's a research aid, not a source of clinical/medical advice.",
   },
 ];
 

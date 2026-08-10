@@ -47,13 +47,23 @@ export interface MechanismReference {
   usedFor: string | null;
 }
 
+export type DeliveryTier =
+  | "approved"
+  | "trial"
+  | "unestablished"
+  | "contraindicated";
+
 export interface RankedMechanism {
   id: string;
   name: string;
   category: string | null;
   eligible: boolean;
+  designable: boolean;
   score: number;
   rationale: string[];
+  deliveryTier: DeliveryTier | null;
+  deliveryCitation: string | null;
+  keywordMatch: boolean;
   evidenceLevel: { rating: string | null; note: string | null } | null;
   fdaApprovedDrugs: string | null;
   clinicalTrialExamples: string | null;

@@ -98,72 +98,12 @@ const DESIGN_PARAMS = [
       },
     ],
   },
-  {
-    id: "tissue",
-    title: "Target Tissue (Optional)",
-    description: "Select a target tissue to apply tissue-specific scoring adjustments. The scoring considers cellular uptake efficiency, blood-brain barrier (BBB) crossing potential, and immune response characteristics of the target organ.",
-    fields: [
-      {
-        name: "Liver",
-        detail: "Uptake: +15 | BBB: 0 | Immune: -5. High hepatic uptake via PNPLA3 and ASGR-mediated endocytosis. Gapmer chemistry receives an additional +5 bonus. Most validated tissue for ASO delivery.",
-      },
-      {
-        name: "Kidney",
-        detail: "Uptake: +10 | BBB: 0 | Immune: 0. Good renal tubular uptake but subject to rapid glomerular filtration clearance.",
-      },
-      {
-        name: "CNS / Brain",
-        detail: "Uptake: -10 | BBB: +20 | Immune: -10. Requires BBB crossing; intrathecal delivery common. PMO or LNA gapmer receives +8 bonus; standard gapmer receives -3 penalty. ASOs longer than 20 nt receive a -5 length penalty due to reduced BBB permeability.",
-      },
-      {
-        name: "Skeletal Muscle",
-        detail: "Uptake: +5 | BBB: 0 | Immune: 0. Moderate uptake; large tissue mass dilutes dose. DMD exon-skipping validated.",
-      },
-      {
-        name: "Heart",
-        detail: "Uptake: +3 | BBB: 0 | Immune: -3. Limited cardiac uptake; systemic delivery reaches myocardium at high doses.",
-      },
-      {
-        name: "Lung",
-        detail: "Uptake: +8 | BBB: 0 | Immune: +5. Accessible via inhalation; mucus barrier for systemic delivery. Good for local delivery.",
-      },
-      {
-        name: "Eye / Retina",
-        detail: "Uptake: +12 | BBB: 0 | Immune: +15. Immune-privileged site; intravitreal delivery. PMO chemistry receives +5 bonus. Local exposure with minimal systemic effects.",
-      },
-      {
-        name: "Spinal Cord",
-        detail: "Uptake: -5 | BBB: +15 | Immune: -5. Intrathecal delivery required; limited diffusion from CSF. ASOs longer than 20 nt receive a -5 length penalty.",
-      },
-      {
-        name: "Tumor",
-        detail: "Uptake: +5 | BBB: 0 | Immune: +10. Tumor microenvironment may enhance uptake; immune stimulation can be beneficial.",
-      },
-      {
-        name: "Blood / Bone Marrow",
-        detail: "Uptake: +8 | BBB: 0 | Immune: +8. Hematopoietic cells readily take up ASOs; immune stimulation risk.",
-      },
-      {
-        name: "Skin",
-        detail: "Uptake: +10 | BBB: 0 | Immune: +5. Topical or intradermal delivery; good local exposure.",
-      },
-      {
-        name: "Pancreas",
-        detail: "Uptake: +5 | BBB: 0 | Immune: 0. Limited pancreatic uptake; systemic delivery required.",
-      },
-      {
-        name: "Gut / Intestine",
-        detail: "Uptake: +8 | BBB: 0 | Immune: +10. Oral delivery challenging; enema or local delivery preferred.",
-      },
-    ],
-  },
 ];
 
 const DESIGN_TONE_MAP: Record<string, { bg: string; text: string; pill: string }> = {
   chemistry: { bg: "bg-violet-50/60", text: "text-violet-500", pill: "bg-violet-100 text-violet-700" },
   length: { bg: "bg-blue-50/60", text: "text-blue-500", pill: "bg-blue-100 text-blue-700" },
   modifications: { bg: "bg-emerald-50/60", text: "text-emerald-500", pill: "bg-emerald-100 text-emerald-700" },
-  tissue: { bg: "bg-amber-50/60", text: "text-amber-500", pill: "bg-amber-100 text-amber-700" },
 };
 
 function DesignParamSection({ param }: { param: typeof DESIGN_PARAMS[number] }) {
@@ -894,52 +834,6 @@ export default function DocumentationPage() {
                         <p className="mt-0.5 text-[11px] text-slate-500">{ctx.desc}</p>
                       </div>
                     ))}
-                  </div>
-                </div>
-
-                {/* Tissue Scoring Matrix */}
-                <div>
-                  <h3 className="mb-2 text-[13px] font-semibold text-slate-800">Tissue Delivery Scoring Matrix</h3>
-                   <p className="mb-2 text-[11px] text-slate-500">
-                    Each tissue receives scoring modifiers that adjust ASO candidate drug-like estimates (nuclease resistance, cellular uptake, BBB crossing, immune stimulation). These are reported alongside the primary ranking metric — target duplex energy.
-                  </p>
-                  <div className="overflow-x-auto rounded-lg border border-[#E5E7EB]">
-                    <table className="w-full text-left text-[11px]">
-                      <thead className="bg-slate-100 text-slate-600">
-                        <tr>
-                          <th className="px-3 py-2 font-semibold">Tissue</th>
-                          <th className="px-3 py-2 font-semibold text-center">Uptake</th>
-                          <th className="px-3 py-2 font-semibold text-center">BBB</th>
-                          <th className="px-3 py-2 font-semibold text-center">Immune</th>
-                          <th className="px-3 py-2 font-semibold">Key Notes</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 text-slate-700">
-                        {[
-                          { t: "Liver", u: "+15", b: "0", i: "-5", n: "Highest hepatic uptake via PNPLA3 and ASGR. Gapmer +5 bonus." },
-                          { t: "Kidney", u: "+10", b: "0", i: "0", n: "Good renal tubular uptake; rapid glomerular filtration clearance." },
-                          { t: "CNS / Brain", u: "-10", b: "+20", i: "-10", n: "Requires BBB crossing. PMO/LNA +8; gapmer -3; ASO >20nt -5." },
-                          { t: "Skeletal Muscle", u: "+5", b: "0", i: "0", n: "Moderate uptake; large tissue mass dilutes dose. DMD validated." },
-                          { t: "Heart", u: "+3", b: "0", i: "-3", n: "Limited cardiac uptake; systemic delivery at high doses." },
-                          { t: "Lung", u: "+8", b: "0", i: "+5", n: "Accessible via inhalation; mucus barrier for systemic delivery." },
-                          { t: "Eye / Retina", u: "+12", b: "0", i: "+15", n: "Immune-privileged; intravitreal. PMO +5 bonus." },
-                          { t: "Spinal Cord", u: "-5", b: "+15", i: "-5", n: "Intrathecal required; limited CSF diffusion. ASO >20nt -5." },
-                          { t: "Tumor", u: "+5", b: "0", i: "+10", n: "TME enhances uptake; immune stimulation beneficial." },
-                          { t: "Blood / Bone Marrow", u: "+8", b: "0", i: "+8", n: "Hematopoietic cells readily take up ASOs." },
-                          { t: "Skin", u: "+10", b: "0", i: "+5", n: "Topical or intradermal; good local exposure." },
-                          { t: "Pancreas", u: "+5", b: "0", i: "0", n: "Limited pancreatic uptake; systemic delivery required." },
-                          { t: "Gut / Intestine", u: "+8", b: "0", i: "+10", n: "Oral delivery challenging; enema or local preferred." },
-                        ].map((row) => (
-                          <tr key={row.t}>
-                            <td className="px-3 py-2 font-medium">{row.t}</td>
-                            <td className={`px-3 py-2 text-center font-semibold ${row.u.startsWith("+") && parseInt(row.u) > 8 ? "text-emerald-600" : row.u.startsWith("-") ? "text-rose-500" : "text-slate-600"}`}>{row.u}</td>
-                            <td className={`px-3 py-2 text-center font-semibold ${parseInt(row.b) > 10 ? "text-indigo-600" : "text-slate-600"}`}>{row.b}</td>
-                            <td className={`px-3 py-2 text-center font-semibold ${parseInt(row.i) > 5 ? "text-amber-600" : parseInt(row.i) < 0 ? "text-rose-500" : "text-slate-600"}`}>{row.i}</td>
-                            <td className="px-3 py-2 text-slate-500">{row.n}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
                   </div>
                 </div>
 

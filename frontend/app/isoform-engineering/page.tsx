@@ -17,6 +17,7 @@ import {
 import Sidebar from "@/components/Sidebar";
 import Topbar from "@/components/Topbar";
 import { Card, SectionHeader, FieldLabel, InfoField, Pill } from "@/components/ui";
+import IsoformAnalysisDashboard from "@/components/IsoformAnalysisDashboard";
 import { GeneTargetObject } from "@/types/gene";
 import { saveReport } from "@/lib/auth";
 import {
@@ -445,10 +446,17 @@ export default function IsoformEngineeringPage() {
                 </div>
               </Card>
 
+              <Card className="p-5">
+                <SectionHeader step="3a" title="Candidate Analysis & Visualizations" />
+                <div className="px-5 pb-5">
+                  <IsoformAnalysisDashboard candidates={results.candidates} />
+                </div>
+              </Card>
+
               {selectedCandidate && (
                 <Card className="overflow-hidden">
                   <div className="flex items-center justify-between px-6 pt-4 pb-3 border-b border-slate-100">
-                    <SectionHeader step="3a" title={`Inspection: ${selectedCandidate.constructId}`} />
+                    <SectionHeader step="3b" title={`Inspection: ${selectedCandidate.constructId}`} />
                     <button onClick={() => setSelectedCandidate(null)} className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 text-slate-400 hover:text-slate-600">
                       <X className="h-3.5 w-3.5" />
                     </button>

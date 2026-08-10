@@ -25,10 +25,12 @@ import {
   rankRnaNeutralizationMechanisms,
   rankTranslationalRegulationMechanisms,
   rankRnaEngineeringMechanisms,
+  rankIsoformEngineeringMechanisms,
   getGoalLabel,
 } from "@/lib/mechanismApi";
 import { saveReport } from "@/lib/auth";
 import { MechanismFeature } from "@/types/mechanism";
+import { parseHgvsC } from "@/lib/hgvsParser";
 import {
   ProteinReplacementInputs,
   ProteinReplacementResponse,
@@ -43,6 +45,7 @@ import {
   IsoformCandidate,
 } from "@/types/isoformEngineering";
 import { fetchDesignOptions as fetchIeDesignOptions, generateConstructs as generateIeConstructs } from "@/lib/isoformEngineeringApi";
+import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
 
 const CONFIRMED_TARGET_KEY = "aso:confirmedTarget";
 const SELECTED_MECHANISM_KEY = "aso:selectedMechanism";
@@ -451,6 +454,30 @@ export default function MechanismSelectionPage() {
       .catch((e) => setIeOptionsError(e instanceof Error ? e.message : "Failed to load options."));
   }, [selectedGoal]);
 
+  // Pre-fill TG07 target gene symbol from confirmed target when empty
+  useEffect(() => {
+    if (selectedGoal === "TG07" && gene?.geneSymbol && !ieTargetSymbol) {
+      setIeTargetSymbol(gene.geneSymbol);
+    }
+  }, [selectedGoal, gene, ieTargetSymbol]);
+
+  useKeyboardShortcut("enter", handleRank, { ctrl: true, meta: true });
+
+  const goalIds = THERAPEUTIC_GOALS.map((g) => g.id);
+  const inInput = () => {
+    const el = document.activeElement;
+    return el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT");
+  };
+  useKeyboardShortcut("1", () => { if (!inInput()) goalIds[0] && handleSelectGoal(goalIds[0]); });
+  useKeyboardShortcut("2", () => { if (!inInput()) goalIds[1] && handleSelectGoal(goalIds[1]); });
+  useKeyboardShortcut("3", () => { if (!inInput()) goalIds[2] && handleSelectGoal(goalIds[2]); });
+  useKeyboardShortcut("4", () => { if (!inInput()) goalIds[3] && handleSelectGoal(goalIds[3]); });
+  useKeyboardShortcut("5", () => { if (!inInput()) goalIds[4] && handleSelectGoal(goalIds[4]); });
+  useKeyboardShortcut("6", () => { if (!inInput()) goalIds[5] && handleSelectGoal(goalIds[5]); });
+  useKeyboardShortcut("7", () => { if (!inInput()) goalIds[6] && handleSelectGoal(goalIds[6]); });
+  useKeyboardShortcut("8", () => { if (!inInput()) goalIds[7] && handleSelectGoal(goalIds[7]); });
+  useKeyboardShortcut("9", () => { if (!inInput()) goalIds[8] && handleSelectGoal(goalIds[8]); });
+
   function handleSelectGoal(goalId: TherapeuticGoalId) {
     setSelectedGoal(goalId);
     sessionStorage.setItem(SELECTED_GOAL_KEY, goalId);
@@ -484,7 +511,6 @@ export default function MechanismSelectionPage() {
     setTranslationStericChemistry("");
     setTranslationTargetRbp("");
     setTranslationOligoLength(null);
-    setIeTargetSymbol("");
     setIeIsoformGoal("");
     setIeTargetExonLocus("");
     setIeSpliceElementTarget("");
@@ -606,6 +632,16 @@ export default function MechanismSelectionPage() {
           kdGoal: tg09KdGoal,
           deliveryContext: deliveryContext || undefined,
         });
+      } else if (selectedGoal === "TG07") {
+        if (!ieIsoformGoal) return;
+        result = await rankIsoformEngineeringMechanisms({
+          geneSymbol: gene.geneSymbol,
+          isoformGoal: ieIsoformGoal,
+          targetExonLocus: ieTargetExonLocus || undefined,
+          spliceElementTarget: ieSpliceElementTarget || undefined,
+          stericChemistry: ieStericChemistry || undefined,
+          deliveryContext: deliveryContext || undefined,
+        });
       } else {
         return;
       }
@@ -630,6 +666,10 @@ export default function MechanismSelectionPage() {
     setSelectedId(id);
     const mechanism = ranking?.results.find((r) => r.id === id);
     if (mechanism) {
+      const parsedVariant =
+        selectedGoal === "TG01" && knownVariant.trim()
+          ? parseHgvsC(knownVariant)
+          : null;
       sessionStorage.setItem(
         SELECTED_MECHANISM_KEY,
         JSON.stringify({
@@ -639,6 +679,14 @@ export default function MechanismSelectionPage() {
           defectType: selectedGoal === "TG01" ? defectType : null,
           therapeuticGoal: selectedGoal,
           knownVariant,
+          ...(selectedGoal === "TG01" ? { parsedVariant } : {}),
+          ...(selectedGoal === "TG02"
+            ? {
+                upregDefectType,
+                knownRegulatoryElement,
+                deliveryContext,
+              }
+            : {}),
           ...(selectedGoal === "TG03"
             ? {
                 editType,
@@ -676,17 +724,28 @@ export default function MechanismSelectionPage() {
                 deliveryContext,
               }
             : {}),
-          ...(selectedGoal === "TG09"
-            ? {
-                tg09StructuralClass,
-                tg09TargetType,
-                tg09Scaffold,
-                tg09ChemStabilization,
-                tg09KdGoal,
-                deliveryContext,
-              }
-            : {}),
-        })
+           ...(selectedGoal === "TG09"
+             ? {
+                 tg09StructuralClass,
+                 tg09TargetType,
+                 tg09Scaffold,
+                 tg09ChemStabilization,
+                 tg09KdGoal,
+                 deliveryContext,
+               }
+             : {}),
+           ...(selectedGoal === "TG07"
+             ? {
+                 ieTargetSymbol,
+                 ieIsoformGoal,
+                 ieTargetExonLocus,
+                 ieSpliceElementTarget,
+                 ieStericChemistry,
+                 ieEnforceInFrame,
+                 deliveryContext,
+               }
+             : {}),
+         })
       );
     }
   }
@@ -768,10 +827,10 @@ export default function MechanismSelectionPage() {
                 <button
                   key={goal.id}
                   onClick={() => handleSelectGoal(goal.id)}
-                  className={`rounded-lg border p-4 text-left transition-colors ${
+                  className={`rounded-lg border p-4 text-left transition-all duration-200 ${
                     selectedGoal === goal.id
-                      ? "border-brand bg-brand/5 ring-1 ring-brand"
-                      : "border-[#E5E7EB] bg-white hover:border-slate-300 hover:bg-slate-50"
+                      ? "border-brand bg-brand/5 ring-1 ring-brand shadow-sm"
+                      : "border-[#E5E7EB] bg-white hover:border-slate-300 hover:bg-slate-50 hover:shadow-sm hover:-translate-y-0.5"
                   }`}
                 >
                   <div className="flex items-center gap-2">
@@ -870,6 +929,30 @@ export default function MechanismSelectionPage() {
                       placeholder="e.g. c.1521_1523delCTT / p.Phe508del"
                       className="w-full rounded-lg border border-slate-300 bg-white py-2.5 px-3 text-[13.5px] text-slate-700 placeholder:text-slate-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
                     />
+                    {knownVariant.trim() && (() => {
+                      const parsed = parseHgvsC(knownVariant);
+                      if (parsed.parsed) {
+                        return (
+                          <p className="mt-1.5 rounded-md bg-emerald-50 px-3 py-1.5 text-[11.5px] text-emerald-700">
+                            Parsed position: CDS index {parsed.cdsStart}
+                            {parsed.cdsStart !== parsed.cdsEnd ? `–${parsed.cdsEnd}` : ""} ({parsed.type})
+                            {parsed.length != null && parsed.length > 1 ? `, ${parsed.length} bp` : ""}
+                          </p>
+                        );
+                      }
+                      return (
+                        <p className="mt-1.5 rounded-md bg-amber-50 px-3 py-1.5 text-[11.5px] text-amber-700">
+                          {parsed.reason}
+                        </p>
+                      );
+                    })()}
+                    {silencingScope === "allele_specific" && !knownVariant.trim() && (
+                      <p className="mt-1.5 rounded-md bg-amber-50 px-3 py-1.5 text-[11.5px] text-amber-700">
+                        Allele-specific ranking without a variant position can only confirm a mechanism
+                        supports this approach in principle — it can't verify a specific candidate will
+                        discriminate mutant from wild-type.
+                      </p>
+                    )}
                   </div>
                 </div>
               )}
@@ -2350,17 +2433,23 @@ export default function MechanismSelectionPage() {
 
           {selectedId && (
             <div className="flex justify-end pt-2">
-              {selectedGoal === "TG02" || selectedGoal === "TG03" ? (
+              {selectedGoal === "TG03" ? (
                 <div className="flex items-center gap-3">
                   <p className="text-[12px] text-slate-500">
-                    {selectedGoal === "TG03"
-                      ? "The ASO design pipeline for RNA editing mechanisms (guide RNA / PTM design) is under development."
-                      : "The ASO design pipeline for gene upregulation mechanisms is under development."}
+                    The ASO design pipeline for RNA editing mechanisms (guide RNA / PTM design) is under development.
                   </p>
                   <span className="flex items-center gap-2 rounded-lg border border-[#E5E7EB] bg-slate-50 px-5 py-3 text-[13px] font-medium text-slate-400">
                     Design pipeline coming soon
                   </span>
                 </div>
+              ) : selectedGoal === "TG02" ? (
+                <button
+                  onClick={() => router.push("/gene-upregulation")}
+                  className="flex items-center gap-2 rounded-lg bg-brand px-6 py-3 text-[14px] font-medium text-white shadow-sm transition-colors hover:bg-brand-dark"
+                >
+                  <Beaker className="h-4 w-4" />
+                  Proceed to Gene Upregulation Design
+                </button>
               ) : selectedGoal === "TG05" ? (
                 <button
                   onClick={() => router.push("/rna-neutralization")}
@@ -2368,14 +2457,22 @@ export default function MechanismSelectionPage() {
                 >
                   Proceed to RNA Neutralization
                 </button>
-              ) : selectedGoal === "TG06" ? (
-                <button
-                  onClick={() => router.push("/translational-regulation")}
-                  className="flex items-center gap-2 rounded-lg bg-brand px-6 py-3 text-[14px] font-medium text-white shadow-sm transition-colors hover:bg-brand-dark"
-                >
-                  Proceed to Translational Regulation
-                </button>
-              ) : selectedGoal === "TG08" ? (
+               ) : selectedGoal === "TG06" ? (
+                 <button
+                   onClick={() => router.push("/translational-regulation")}
+                   className="flex items-center gap-2 rounded-lg bg-brand px-6 py-3 text-[14px] font-medium text-white shadow-sm transition-colors hover:bg-brand-dark"
+                 >
+                   Proceed to Translational Regulation
+                 </button>
+               ) : selectedGoal === "TG07" ? (
+                 <button
+                   onClick={() => router.push("/isoform-engineering")}
+                   className="flex items-center gap-2 rounded-lg bg-brand px-6 py-3 text-[14px] font-medium text-white shadow-sm transition-colors hover:bg-brand-dark"
+                 >
+                   <Beaker className="h-4 w-4" />
+                   Proceed to Isoform Engineering Design
+                 </button>
+               ) : selectedGoal === "TG08" ? (
                 <button
                   onClick={() => router.push("/protein-replacement")}
                   className="flex items-center gap-2 rounded-lg bg-brand px-6 py-3 text-[14px] font-medium text-white shadow-sm transition-colors hover:bg-brand-dark"

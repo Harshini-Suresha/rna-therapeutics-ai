@@ -258,12 +258,38 @@ export default function AssoCandidateCard({
                 </>
               )}
 
-              {/* ALLELE-SPECIFIC */}
-              {candidate.knownVariant && (
+              {/* MIRNA SEED-SITE VERIFICATION (A6 upregulation) */}
+              {candidate.seedSiteNote && (
                 <>
+                  <TableSection title="miRNA Seed Site Verification" colSpan={2} />
+                  <tr className="border-b border-slate-100 last:border-0">
+                    <td className="py-1.5 pr-4 text-[11px] text-slate-500 whitespace-nowrap">Status</td>
+                    <td className="py-1.5 text-right">
+                      <span className="text-[11.5px] font-semibold text-amber-600">
+                        {candidate.seedSiteStatus === "unverified" ? "Unverified — not a validated binding site" : candidate.seedSiteStatus}
+                      </span>
+                      <div className="mt-0.5 text-[9.5px] text-slate-400 italic">{candidate.seedSiteNote}</div>
+                    </td>
+                  </tr>
+                </>
+              )}
+
+              {/* ALLELE-SPECIFIC */}
+              {candidate.knownVariant && (                <>
                   <TableSection title="Allele-Specific Design" />
                   <Td label="Known Variant" value={candidate.knownVariant} highlight />
                   <Td label="Allele-Specific Targeting" value={candidate.alleleSpecific ? "Yes" : "No"} highlight={candidate.alleleSpecific} />
+                  {candidate.alleleDiscriminationScore != null && (
+                    <>
+                      <Td label="Allele Discrimination" bar={candidate.alleleDiscriminationScore * 100} note="Mismatch proximity to the RNase H gap center (100 = at center, where discrimination is strongest)." />
+                      {candidate.alleleDiscriminationNote && (
+                        <tr className="border-b border-slate-100">
+                          <td className="py-1.5 pr-4 text-[11px] text-slate-500">Discrimination Note</td>
+                          <td className="py-1.5 text-right text-[10.5px] text-slate-500 italic max-w-[250px]">{candidate.alleleDiscriminationNote}</td>
+                        </tr>
+                      )}
+                    </>
+                  )}
 
                   <tr className="border-b border-slate-100">
                     <td className="py-1.5 pr-4 text-[11px] text-slate-500">Allele Notes</td>

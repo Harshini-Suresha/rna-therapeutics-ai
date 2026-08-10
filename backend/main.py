@@ -35,6 +35,8 @@ try:  # ``uvicorn backend.main:app`` from the repository root
     from .services.admet_service import get_admet_prediction
     from .api.mechanisms import router as mechanisms_router
     from .api.gene_silencing import router as gene_silencing_router
+    from .api.gene_upregulation import router as gene_upregulation_router
+    from .api.isoform_engineering import router as isoform_engineering_router
     from .api.upload import router as upload_router
     from .api.assistant import router as assistant_router
     from .api.notifications import router as notifications_router
@@ -43,6 +45,7 @@ try:  # ``uvicorn backend.main:app`` from the repository root
     from .api.profile import router as profile_router
     from .api.reports import router as reports_router
     from .api.projects import router as projects_router
+    from .api.bug_reports import router as bug_reports_router
 except ImportError:
     from services.notification_service import add_notification as _add_notification
     from services.gene_service import EnsemblLookupUnavailable, clean_synonyms, get_gene_metadata, get_gene_phenotypes, ensembl_gene_url, build_gene_fallback_payload
@@ -62,6 +65,8 @@ except ImportError:
     from services.admet_service import get_admet_prediction
     from api.mechanisms import router as mechanisms_router
     from api.gene_silencing import router as gene_silencing_router
+    from api.gene_upregulation import router as gene_upregulation_router
+    from api.isoform_engineering import router as isoform_engineering_router
     from api.upload import router as upload_router
     from api.assistant import router as assistant_router
     from api.notifications import router as notifications_router
@@ -70,6 +75,7 @@ except ImportError:
     from api.profile import router as profile_router
     from api.reports import router as reports_router
     from api.projects import router as projects_router
+    from api.bug_reports import router as bug_reports_router
 
 
 logging.basicConfig(level=logging.INFO)
@@ -98,6 +104,8 @@ app.add_middleware(
 
 app.include_router(mechanisms_router)
 app.include_router(gene_silencing_router)
+app.include_router(gene_upregulation_router)
+app.include_router(isoform_engineering_router)
 app.include_router(upload_router)
 app.include_router(assistant_router)
 app.include_router(notifications_router)
@@ -106,6 +114,7 @@ app.include_router(auth_router)
 app.include_router(profile_router)
 app.include_router(reports_router)
 app.include_router(projects_router)
+app.include_router(bug_reports_router)
 
 
 @app.on_event("startup")
@@ -553,7 +562,7 @@ async def initialize_target(payload: TargetRequest):
                 logger.warning("%s failed for %s: %s", label, official_symbol, e)
                 return default
 
-        enrichment_data, constraint_data, aso_data, rna_halflife_data, dependency_data, variant_details, single_cell, clinical_details, fda_therapies, orphanet_data, mutation_data, admet_data = await asyncio.gather(
+        enrichment_data, constraint_data, aso_data, rna_halflife_data, dependency_data, variant_details, single_cell, clinical_details, fda_therapies, orphanet_data, mutation_data = await asyncio.gather(
             _run_sync(lambda: get_gene_enrichment(gene_id, taxon_id, official_symbol), "Enrichment lookup", {}),
             _run_sync(lambda: get_human_constraint_metrics(official_symbol) if is_human else {}, "Constraint lookup", {}),
             _run_sync(lambda: get_aso_analysis(gene_id, taxon_id), "ASO analysis", {}),
@@ -565,13 +574,14 @@ async def initialize_target(payload: TargetRequest):
             _run_sync(lambda: get_fda_therapies(official_symbol, disease_resolved) if is_human else {}, "FDA therapies lookup", {}, timeout_seconds=18.0),
             _run_sync(lambda: get_orphanet_data(official_symbol, ensembl_id=gene_id, disease_name=disease_resolved, phenotypes=disease_info.get("diseases")) if is_human else {}, "Orphanet lookup", {}),
             _run_sync(lambda: get_mutation_breakdown(official_symbol) if is_human else {}, "Mutation breakdown lookup", {}, timeout_seconds=60.0),
-            _run_sync(lambda: get_admet_prediction(gene_context={
-                "vitalOrganTpm": expr_details.get("vital_organ_tpm"),
-                "vitalOrganTissues": expr_details.get("vital_organ_tissues", []),
-                "essentialGene": dependency_data.get("essentialGene"),
-                "loeufDecile": constraint_data.get("loeufDecile"),
-            }), "ADMET lookup", {}),
         )
+
+        admet_data = await _run_sync(lambda: get_admet_prediction(gene_context={
+            "vitalOrganTpm": expr_details.get("vital_organ_tpm"),
+            "vitalOrganTissues": expr_details.get("vital_organ_tissues", []),
+            "essentialGene": dependency_data.get("essentialGene"),
+            "loeufDecile": constraint_data.get("loeufDecile"),
+        }), "ADMET lookup", {})
 
         # Protein chain — depends on protein_db_ids → protein_properties
         protein_props = {}

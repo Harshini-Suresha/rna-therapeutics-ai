@@ -8,6 +8,7 @@ import Topbar from "@/components/Topbar";
 import { Card, SectionHeader } from "@/components/ui";
 import { useAuth } from "@/contexts/AuthContext";
 import { getProfile, updateProfile } from "@/lib/auth";
+import { useKeyboardShortcut } from "@/hooks/useKeyboardShortcut";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -38,8 +39,27 @@ export default function SettingsPage() {
     }).finally(() => setLoading(false));
   }, [user, router]);
 
+  useKeyboardShortcut("s", handleKeyboardSave, { ctrl: true, meta: true });
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    setSaving(true);
+    setError("");
+    setSaved(false);
+    try {
+      const res = await updateProfile({ name, email, role, institution, department, bio });
+      if (user) setUser({ ...user, name, email, role, institution, department, bio, initials: res.initials });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (err: any) {
+      setError(err.message || "Failed to save");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleKeyboardSave() {
+    if (saving) return;
     setSaving(true);
     setError("");
     setSaved(false);

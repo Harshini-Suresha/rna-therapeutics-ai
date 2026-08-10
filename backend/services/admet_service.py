@@ -353,9 +353,13 @@ def get_admet_prediction(
         "admetStrengths": [],
     }
 
+    baseline_seq = "GCUUACCGGAUUCGGAUUCG"  # 20-mer, ~45% GC, no problematic motifs
+
+    baseline_note = None
+
     if not aso_sequence or len(aso_sequence) < 8:
-        result["admetAnalysis"] = "Insufficient sequence data for ADMET prediction. Provide an ASO sequence (≥8 nt) for full analysis."
-        return result
+        aso_sequence = baseline_seq
+        baseline_note = "Baseline ADMET profile shown (no ASO sequence provided). Design a candidate for sequence-specific predictions."
 
     seq = aso_sequence.upper().replace("T", "U")
     gc = _compute_gc_content(seq)
@@ -402,7 +406,11 @@ def get_admet_prediction(
     result["admetAvailable"] = True
 
     # Generate analysis
-    result["admetAnalysis"] = _generate_admet_analysis(result, gene_context)
+    generated_analysis = _generate_admet_analysis(result, gene_context)
+    if baseline_note:
+        result["admetAnalysis"] = baseline_note + "\n\n" + generated_analysis
+    else:
+        result["admetAnalysis"] = generated_analysis
 
     # Warnings and strengths
     if immuno["score"] > 0.3:

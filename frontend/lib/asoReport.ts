@@ -204,6 +204,9 @@ function formatAsoCandidate(lines: string[], c: FlatOrNestedCandidate, rank: num
     header(lines, "Allele-Specific Design");
     if (c.knownVariant) lines.push(pad("Known Variant", c.knownVariant));
     if (c.alleleSpecific != null) lines.push(pad("Allele-Specific Targeting", c.alleleSpecific ? "Yes" : "No"));
+    if (c.alleleDiscriminationScore != null)
+      lines.push(pad("Allele Discrimination", `${(c.alleleDiscriminationScore * 100).toFixed(0)}/100 (mismatch proximity to RNase H gap center)`));
+    if (c.alleleDiscriminationNote) lines.push(pad("Discrimination Note", c.alleleDiscriminationNote));
     if (c.alleleNotes) lines.push(pad("Allele Notes", c.alleleNotes));
     lines.push("");
   }
@@ -325,7 +328,7 @@ export function buildAsoReport(ctx: AsoReportContext): string {
   const lines: string[] = [];
   lines.push(RULE);
   lines.push("  ASO DESIGN REPORT");
-  lines.push("  RNA Therapeutics AI Platform");
+  lines.push("  RNA Therapeutics Platform");
   lines.push(`  ${reportTitle ?? "Candidate Design & Mechanism Report"}`);
   lines.push(RULE);
   lines.push(`  Generated: ${date}`);

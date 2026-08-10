@@ -1,311 +1,5 @@
 [
   {
-    "id": "n1785326002762",
-    "category": "analysis",
-    "title": "Gene lookup completed for DMD",
-    "detail": "Retrieved data for DMD in homo sapiens.",
-    "timestamp": 1785326002.762919,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785326067311",
-    "category": "analysis",
-    "title": "Gene lookup completed for CFTR",
-    "detail": "Retrieved data for CFTR in homo sapiens.",
-    "timestamp": 1785326067.311983,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785326070777",
-    "category": "analysis",
-    "title": "Gene lookup completed for SOD1",
-    "detail": "Retrieved data for SOD1 in homo sapiens.",
-    "timestamp": 1785326070.777884,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785326077655",
-    "category": "analysis",
-    "title": "Gene lookup completed for HTT",
-    "detail": "Retrieved data for HTT in homo sapiens.",
-    "timestamp": 1785326077.6551821,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785326108285",
-    "category": "analysis",
-    "title": "Gene lookup completed for CFTR",
-    "detail": "Retrieved data for CFTR in homo sapiens.",
-    "timestamp": 1785326108.285704,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785326172699",
-    "category": "analysis",
-    "title": "Gene lookup completed for HTT",
-    "detail": "Retrieved data for HTT in homo sapiens.",
-    "timestamp": 1785326172.6997728,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785326195624",
-    "category": "analysis",
-    "title": "Gene lookup completed for SOD1",
-    "detail": "Retrieved data for SOD1 in homo sapiens.",
-    "timestamp": 1785326195.624992,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785326340925",
-    "category": "analysis",
-    "title": "Gene lookup completed for il2r",
-    "detail": "Retrieved data for il2r in homo sapiens.",
-    "timestamp": 1785326340.92523,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785326343605",
-    "category": "analysis",
-    "title": "Gene lookup completed for IL2RA",
-    "detail": "Retrieved data for IL2RA in homo sapiens.",
-    "timestamp": 1785326343.6059918,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785326349359",
-    "category": "analysis",
-    "title": "Gene lookup completed for GAPDH",
-    "detail": "Retrieved data for GAPDH in homo sapiens.",
-    "timestamp": 1785326349.3592582,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785326596564",
-    "category": "analysis",
-    "title": "Gene lookup completed for DMD",
-    "detail": "Retrieved data for DMD in homo sapiens.",
-    "timestamp": 1785326596.564838,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785326632778",
-    "category": "analysis",
-    "title": "Gene lookup completed for DMD",
-    "detail": "Retrieved data for DMD in homo sapiens.",
-    "timestamp": 1785326632.778374,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785326678595",
-    "category": "analysis",
-    "title": "Gene lookup completed for CFTR",
-    "detail": "Retrieved data for CFTR in homo sapiens.",
-    "timestamp": 1785326678.5954618,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785326708575",
-    "category": "analysis",
-    "title": "Gene lookup completed for HTT",
-    "detail": "Retrieved data for HTT in homo sapiens.",
-    "timestamp": 1785326708.5754828,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785326744001",
-    "category": "analysis",
-    "title": "Gene lookup completed for SOD1",
-    "detail": "Retrieved data for SOD1 in homo sapiens.",
-    "timestamp": 1785326744.001285,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785326785461",
-    "category": "analysis",
-    "title": "Gene lookup completed for BRCA1",
-    "detail": "Retrieved data for BRCA1 in homo sapiens.",
-    "timestamp": 1785326785.461408,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785326819155",
-    "category": "analysis",
-    "title": "Gene lookup completed for TSC2",
-    "detail": "Retrieved data for TSC2 in homo sapiens.",
-    "timestamp": 1785326819.155225,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785335644695",
-    "category": "analysis",
-    "title": "Gene lookup completed for dmd",
-    "detail": "Retrieved data for dmd in homo sapiens.",
-    "timestamp": 1785335644.695912,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785335649495",
-    "category": "analysis",
-    "title": "Gene lookup completed for il2ra",
-    "detail": "Retrieved data for il2ra in homo sapiens.",
-    "timestamp": 1785335649.495403,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785336059210",
-    "category": "analysis",
-    "title": "Gene lookup completed for DMD",
-    "detail": "Retrieved data for DMD in homo sapiens.",
-    "timestamp": 1785336059.2105238,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785336221160",
-    "category": "analysis",
-    "title": "Gene lookup completed for DMD",
-    "detail": "Retrieved data for DMD in homo sapiens.",
-    "timestamp": 1785336221.160956,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785336976107",
-    "category": "analysis",
-    "title": "Gene lookup completed for gapdh",
-    "detail": "Retrieved data for gapdh in homo sapiens.",
-    "timestamp": 1785336976.107108,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785337001165",
-    "category": "analysis",
-    "title": "Gene lookup completed for foxp3",
-    "detail": "Retrieved data for foxp3 in homo sapiens.",
-    "timestamp": 1785337001.165531,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785337005657",
-    "category": "analysis",
-    "title": "Gene lookup completed for nkg7",
-    "detail": "Retrieved data for nkg7 in homo sapiens.",
-    "timestamp": 1785337005.657321,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785337012329",
-    "category": "analysis",
-    "title": "Gene lookup completed for dmd",
-    "detail": "Retrieved data for dmd in homo sapiens.",
-    "timestamp": 1785337012.329605,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785338710538",
-    "category": "analysis",
-    "title": "Gene lookup completed for il2ra",
-    "detail": "Retrieved data for il2ra in homo sapiens.",
-    "timestamp": 1785338710.538432,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785338715826",
-    "category": "analysis",
-    "title": "Gene lookup completed for dmd",
-    "detail": "Retrieved data for dmd in homo sapiens.",
-    "timestamp": 1785338715.826159,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785338721961",
-    "category": "analysis",
-    "title": "Gene lookup completed for col1a1",
-    "detail": "Retrieved data for col1a1 in homo sapiens.",
-    "timestamp": 1785338721.9614751,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785345141602",
-    "category": "analysis",
-    "title": "Gene lookup completed for dmd",
-    "detail": "Retrieved data for dmd in homo sapiens.",
-    "timestamp": 1785345141.602196,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785345191305",
-    "category": "analysis",
-    "title": "Gene lookup completed for col1a1",
-    "detail": "Retrieved data for col1a1 in homo sapiens.",
-    "timestamp": 1785345191.3055282,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785345196360",
-    "category": "analysis",
-    "title": "Gene lookup completed for spon2",
-    "detail": "Retrieved data for spon2 in homo sapiens.",
-    "timestamp": 1785345196.360289,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785347196832",
-    "category": "analysis",
-    "title": "Gene lookup completed for col1a1",
-    "detail": "Retrieved data for col1a1 in homo sapiens.",
-    "timestamp": 1785347196.832279,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785347211803",
-    "category": "analysis",
-    "title": "Gene lookup completed for foxp3",
-    "detail": "Retrieved data for foxp3 in homo sapiens.",
-    "timestamp": 1785347211.803582,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785383309708",
-    "category": "analysis",
-    "title": "Gene lookup completed for dmd",
-    "detail": "Retrieved data for dmd in homo sapiens.",
-    "timestamp": 1785383309.708767,
-    "read": false,
-    "meta": {}
-  },
-  {
     "id": "n1785383370091",
     "category": "analysis",
     "title": "Gene lookup completed for DMD",
@@ -1796,6 +1490,312 @@
     "title": "Generated 10 ASO candidates",
     "detail": "Candidate design completed for ENSG00000198947.",
     "timestamp": 1786323906.5072,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1786325186346",
+    "category": "analysis",
+    "title": "Gene lookup completed for dmd",
+    "detail": "Retrieved data for dmd in homo sapiens.",
+    "timestamp": 1786325186.3469281,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1786325254170",
+    "category": "analysis",
+    "title": "Generated 10 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000198947.",
+    "timestamp": 1786325254.17086,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1786325297090",
+    "category": "analysis",
+    "title": "Generated 10 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000198947.",
+    "timestamp": 1786325297.090347,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1786331242341",
+    "category": "analysis",
+    "title": "Gene lookup completed for dmd",
+    "detail": "Retrieved data for dmd in homo sapiens.",
+    "timestamp": 1786331242.341364,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1786331283700",
+    "category": "analysis",
+    "title": "Generated 10 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000198947.",
+    "timestamp": 1786331283.700592,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1786341141769",
+    "category": "analysis",
+    "title": "Gene lookup completed for dmd",
+    "detail": "Retrieved data for dmd in homo sapiens.",
+    "timestamp": 1786341141.7692769,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1786341163066",
+    "category": "analysis",
+    "title": "Gene lookup completed for dmd",
+    "detail": "Retrieved data for dmd in homo sapiens.",
+    "timestamp": 1786341163.066598,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1786341871270",
+    "category": "analysis",
+    "title": "Gene lookup completed for dmd",
+    "detail": "Retrieved data for dmd in homo sapiens.",
+    "timestamp": 1786341871.270439,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1786341914161",
+    "category": "analysis",
+    "title": "Gene lookup completed for foxp3",
+    "detail": "Retrieved data for foxp3 in homo sapiens.",
+    "timestamp": 1786341914.161178,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1786342025241",
+    "category": "analysis",
+    "title": "Generated 5 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000049768.",
+    "timestamp": 1786342025.2411551,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1786342061203",
+    "category": "analysis",
+    "title": "Generated 10 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000049768.",
+    "timestamp": 1786342061.203414,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1786342485382",
+    "category": "analysis",
+    "title": "Gene lookup completed for TP53",
+    "detail": "Retrieved data for TP53 in homo sapiens.",
+    "timestamp": 1786342485.382754,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1786342522619",
+    "category": "analysis",
+    "title": "Gene lookup completed for TP53",
+    "detail": "Retrieved data for TP53 in homo sapiens.",
+    "timestamp": 1786342522.619607,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1786342573392",
+    "category": "analysis",
+    "title": "Gene lookup completed for TP53",
+    "detail": "Retrieved data for TP53 in homo sapiens.",
+    "timestamp": 1786342573.392431,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1786342618828",
+    "category": "analysis",
+    "title": "Gene lookup completed for TP53",
+    "detail": "Retrieved data for TP53 in homo sapiens.",
+    "timestamp": 1786342618.828096,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1786342767106",
+    "category": "analysis",
+    "title": "Gene lookup completed for TP53",
+    "detail": "Retrieved data for TP53 in homo sapiens.",
+    "timestamp": 1786342767.106099,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1786343163399",
+    "category": "analysis",
+    "title": "Generated 509 upregulation candidates",
+    "detail": "Candidate design completed for ENSG00000001626 (A4).",
+    "timestamp": 1786343163.3991559,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1786343169567",
+    "category": "analysis",
+    "title": "Generated 13 upregulation candidates",
+    "detail": "Candidate design completed for ENSG00000001626 (A5).",
+    "timestamp": 1786343169.567925,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1786343176434",
+    "category": "analysis",
+    "title": "Generated 509 upregulation candidates",
+    "detail": "Candidate design completed for ENSG00000001626 (A6).",
+    "timestamp": 1786343176.434316,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1786343179721",
+    "category": "analysis",
+    "title": "Generated 13 upregulation candidates",
+    "detail": "Candidate design completed for ENSG00000001626 (A23).",
+    "timestamp": 1786343179.7213628,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1786343277641",
+    "category": "analysis",
+    "title": "Generated 509 upregulation candidates",
+    "detail": "Candidate design completed for ENSG00000001626 (A3).",
+    "timestamp": 1786343277.6412401,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1786343280890",
+    "category": "analysis",
+    "title": "Generated 52 upregulation candidates",
+    "detail": "Candidate design completed for ENSG00000001626 (A6).",
+    "timestamp": 1786343280.890252,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1786343379307",
+    "category": "analysis",
+    "title": "Gene lookup completed for dmd",
+    "detail": "Retrieved data for dmd in homo sapiens.",
+    "timestamp": 1786343379.307094,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1786343422119",
+    "category": "analysis",
+    "title": "Gene lookup completed for dmd",
+    "detail": "Retrieved data for dmd in homo sapiens.",
+    "timestamp": 1786343422.1191528,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1786343680178",
+    "category": "analysis",
+    "title": "Gene lookup completed for dmd",
+    "detail": "Retrieved data for dmd in homo sapiens.",
+    "timestamp": 1786343680.178656,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1786344341079",
+    "category": "analysis",
+    "title": "Gene lookup completed for dmd",
+    "detail": "Retrieved data for dmd in homo sapiens.",
+    "timestamp": 1786344341.079394,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1786348829438",
+    "category": "analysis",
+    "title": "Gene lookup completed for dmd",
+    "detail": "Retrieved data for dmd in homo sapiens.",
+    "timestamp": 1786348829.4386828,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1786349105506",
+    "category": "analysis",
+    "title": "Generated 509 upregulation candidates",
+    "detail": "Candidate design completed for ENSG00000001626 (A3).",
+    "timestamp": 1786349105.506599,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1786349115568",
+    "category": "analysis",
+    "title": "Generated 509 upregulation candidates",
+    "detail": "Candidate design completed for ENSG00000001626 (A4).",
+    "timestamp": 1786349115.5684228,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1786349124038",
+    "category": "analysis",
+    "title": "Generated 3 upregulation candidates",
+    "detail": "Candidate design completed for ENSG00000001626 (A5).",
+    "timestamp": 1786349124.038833,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1786349135431",
+    "category": "analysis",
+    "title": "Generated 164 upregulation candidates",
+    "detail": "Candidate design completed for ENSG00000001626 (A6).",
+    "timestamp": 1786349135.4313831,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1786349149596",
+    "category": "analysis",
+    "title": "Generated 102 upregulation candidates",
+    "detail": "Candidate design completed for ENSG00000001626 (A23).",
+    "timestamp": 1786349149.5966778,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1786349306262",
+    "category": "analysis",
+    "title": "Generated 10 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000001626.",
+    "timestamp": 1786349306.2623591,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1786349747254",
+    "category": "analysis",
+    "title": "Gene lookup completed for dmd",
+    "detail": "Retrieved data for dmd in homo sapiens.",
+    "timestamp": 1786349747.254169,
     "read": false,
     "meta": {}
   }

@@ -4,6 +4,7 @@ import {
   DesignOptions,
   IsoformCandidate,
 } from "@/types/isoformEngineering";
+import { getToken } from "@/lib/auth";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
@@ -203,4 +204,20 @@ function getDefaultDesignOptions(): DesignOptions {
       { id: "pna", label: "Peptide Nucleic Acid (PNA)" },
     ],
   };
+}
+
+export async function emailIsoformReport(reportContent: string, filename: string): Promise<{ message: string }> {
+  const token = getToken();
+  if (!token) throw new Error("Sign in to email a report to your registered address.");
+  const res = await fetch(`${API_BASE}/api/isoform-engineering/email-report`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ report_content: reportContent, filename }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.detail || "Could not email the report.");
+  return body;
 }

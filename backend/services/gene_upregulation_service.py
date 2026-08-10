@@ -2,12 +2,13 @@
 Gene Upregulation design pipeline backend service.
 
 Generates ASO candidates for TG02 mechanisms (Gene Activation /
-Upregulation):
+Upregulation). Mechanism IDs follow the rulebooks (backend/rulebooks/A*/rule.json):
 
-- A3   saRNA         — promoter-targeted 21-mer dsRNA duplexes
-- A4   uORF_block    — steric-blocking ASOs at 5' UTR / start codon
-- A5   poison_exon   — splice-junction ASOs for NMD suppression
-- A6   NAT_silencing — RNase H1 gapmers targeting antisense transcripts
+- A3   TANGO (poison exon skipping) — splice-junction ASOs for NMD suppression
+- A4   NAT silencing               — RNase H1 gapmers targeting antisense transcripts
+- A5   uORF blocking               — steric-blocking ASOs at 5' UTR / start codon
+- A6   miRNA site blocking         — steric-blocking ASOs masking the seed site
+- A23  saRNA                       — promoter-targeted 21-mer dsRNA duplexes
 
 Reuses biophysical scoring helpers from ``gene_silencing_service``.
 """
@@ -20,6 +21,8 @@ from collections import Counter
 
 from services.gene_silencing_service import (
     get_target_analysis,
+    _ensembl_get,
+    ENSEMBL_REST,
     _calc_gc,
     _calc_tm,
     _self_complement_mfe,
@@ -52,15 +55,15 @@ from services.gene_silencing_service import (
 logger = logging.getLogger(__name__)
 
 UPREGULATION_CHEMISTRY_OPTIONS = [
-    {"id": "gapmer", "label": "DNA Gapmer (2-10-2)", "description": "RNase H1-recruiting; suitable for NAT silencing (A6).",
+    {"id": "gapmer", "label": "DNA Gapmer (2-10-2)", "description": "RNase H1-recruiting; suitable for NAT silencing (A4).",
      "detail": "Central DNA gap recruits RNase H1. For NAT silencing, the ASO targets the antisense transcript. Validated in AON-based upregulation (e.g., Ataluren-class precedents)."},
-    {"id": "lna_gapmer", "label": "LNA-enhanced Gapmer", "description": "High-affinity RNase H1 recruitment; NAT silencing.",
+    {"id": "lna_gapmer", "label": "LNA-enhanced Gapmer", "description": "High-affinity RNase H1 recruitment; NAT silencing (A4).",
      "detail": "LNA wings boost binding affinity (~2-8 C per substitution). Best for high-specificity NAT targeting where allele discrimination matters."},
-    {"id": "pmo", "label": "PMO (Phosphorodiamidate Morpholino)", "description": "Steric blocker; ideal for uORF blocking (A4) and splice modulation (A5).",
+    {"id": "pmo", "label": "PMO (Phosphorodiamidate Morpholino)", "description": "Steric blocker; ideal for uORF blocking (A5), splice modulation (A3), and miRNA site masking (A6).",
      "detail": "Non-ionic backbone blocks RNA interactions without degradation. Gold standard for uORF steric blocking and exon skipping."},
-    {"id": "2ome", "label": "2'-O-Methoxyethyl (2'-OMe)", "description": "Steric blocker; uORF and splice modulation.",
+    {"id": "2ome", "label": "2'-O-Methoxyethyl (2'-OMe)", "description": "Steric blocker; uORF (A5), splice (A3), and miRNA site masking (A6).",
      "detail": "2'-O-Me modifications increase nuclease resistance and reduce immunostimulation. Compatible with steric-blocking and splice-switching."},
-    {"id": "sirna", "label": "siRNA duplex (21-mer)", "description": "For saRNA (A3) activation — double-stranded 21-mer duplex.",
+    {"id": "sirna", "label": "siRNA duplex (21-mer)", "description": "For saRNA (A23) activation — double-stranded 21-mer duplex.",
      "detail": "Small activating RNAs are 21-mer dsRNA duplexes that target promoter-associated RNAs. Delivered as a duplex guide/passenger pair."},
 ]
 
@@ -68,19 +71,6 @@ UPREGULATION_LENGTH_RANGE = {"min": 18, "max": 25, "default": 21, "step": 1}
 
 UPREGULATION_MECHANISM_DESIGN = {
     "A3": {
-        "label": "saRNA (Small Activating RNA)",
-        "target_region": "Promoter (-100 to -1000 bp from TSS)",
-        "preferred_chemistry": ["sirna", "lna_gapmer", "gapmer"],
-        "forced_length": 21,
-        "notes": "saRNA targets promoter-associated RNAs to activate transcription. Requires 5' flanking promoter sequence. CDS-derived candidates are approximate; verify with promoter-specific design.",
-    },
-    "A4": {
-        "label": "uORF-blocking ASO",
-        "target_region": "5' UTR (uAUG / uORF start site)",
-        "preferred_chemistry": ["pmo", "2ome", "lna_gapmer"],
-        "notes": "Targets uORF start sites in the 5' UTR to relieve translational repression. Steric-blocking chemistries (PMO/2'-OMe) are preferred — they block ribosome stalling at uORFs without cleaving the transcript.",
-    },
-    "A5": {
         "label": "TANGO: Poison Exon Skipping / NMD Suppression",
         "target_region": "Exon-exon junctions (poison exon splice sites)",
         "preferred_chemistry": ["pmo", "2ome", "lna_gapmer"],
@@ -90,13 +80,81 @@ UPREGULATION_MECHANISM_DESIGN = {
             {"id": "splice_element", "label": "Splice Element", "type": "dropdown", "description": "Select the splice element to mask (5'SS, 3'SS, BPS, or ISS-ISE)"},
         ],
     },
-    "A6": {
+    "A4": {
         "label": "NAT Silencing (RNase H1 Gapmer)",
         "target_region": "Natural antisense transcript (overlapping lncRNA)",
         "preferred_chemistry": ["gapmer", "lna_gapmer"],
         "notes": "Degrades inhibitory antisense lncRNAs that repress the sense gene. Gapmer/LNA chemistry recruits RNase H1 to cleave the NAT transcript. CDS-derived candidates approximate the target complement.",
     },
+    "A5": {
+        "label": "uORF-blocking ASO",
+        "target_region": "5' UTR (uAUG / uORF start site)",
+        "preferred_chemistry": ["pmo", "2ome", "lna_gapmer"],
+        "notes": "Targets uORF start sites in the 5' UTR to relieve translational repression. Steric-blocking chemistries (PMO/2'-OMe) are preferred — they block ribosome stalling at uORFs without cleaving the transcript. Candidates are windows across the 5' UTR and must be verified against a functionally validated inhibitory uORF.",
+    },
+    "A6": {
+        "label": "miRNA Binding Site Blocking (Target Protector / BlockmiR)",
+        "target_region": "3' UTR (miRNA seed binding site)",
+        "preferred_chemistry": ["2ome", "pmo", "lna_gapmer"],
+        "notes": "Masks the miRNA seed binding site on the target mRNA so the repressive miRNA cannot dock (target protection / blockmiR). miRNA sites are predominantly 3' UTR. Candidates are windows across the real 3' UTR and must be verified against a validated miRNA binding site — no miRNA-target database is integrated in this build.",
+    },
+    "A23": {
+        "label": "saRNA (Small Activating RNA)",
+        "target_region": "Promoter (-100 to -1000 bp from TSS)",
+        "preferred_chemistry": ["sirna", "lna_gapmer", "gapmer"],
+        "forced_length": 21,
+        "notes": "saRNA targets promoter-associated RNAs to activate transcription. Requires a functional endogenous promoter. Candidates are windows in the real promoter upstream of the TSS and must be verified against validated promoter elements.",
+    },
 }
+
+
+# A6 (target protection / blockmiR) fundamentally requires a validated
+# miRNA binding site. As of this build no reliable machine API exists for
+# the standard miRNA-target databases — tested at implementation time:
+# ENCORI returns 404 on its documented endpoint, and miRDB's search CGI
+# returns an empty JS-rendered template. Rather than scrape fragile HTML,
+# candidates are labeled "unverified" and the requirement is stated plainly.
+A6_SEED_SITE_NOTE = (
+    "No validated miRNA-target database is integrated in this build "
+    "(TargetScan/miRDB/ENCORI expose no reliable machine API). Each window "
+    "is a putative 3' UTR seed region and must be checked against a "
+    "validated miRNA binding site before use."
+)
+
+
+def _fetch_promoter_sequence(target: dict, organism: str) -> str | None:
+    """Fetch ~1 kb of genomic sequence upstream of the transcript TSS.
+
+    Uses the canonical transcript coordinates from get_target_analysis. For
+    strand +1 the promoter is [start-1000, start-1]; for strand -1 it is
+    [end+1, end+1000] requested with strand=-1 so the returned sequence is
+    in 5'->3' orientation. Returns None when coordinates are unavailable.
+    """
+    ct = target.get("canonicalTranscript") or {}
+    chromosome = ct.get("chromosome")
+    start = ct.get("start")
+    end = ct.get("end")
+    strand = ct.get("strand", 1)
+    if not chromosome or not start or not end:
+        return None
+    species = (organism or "homo_sapiens").lower().replace(" ", "_")
+    if strand == 1:
+        a, b = max(1, start - 1000), start - 1
+        region_strand = 1
+    else:
+        a, b = end + 1, end + 1000
+        region_strand = -1
+    if b < a:
+        return None
+    try:
+        resp = _ensembl_get(
+            f"{ENSEMBL_REST}/sequence/region/{species}/{chromosome}:{a}-{b}:{region_strand}"
+        )
+        if resp.ok:
+            return resp.json().get("seq", "").upper()
+    except Exception as exc:
+        logger.warning("Promoter sequence fetch failed for %s: %s", chromosome, exc)
+    return None
 
 
 def _mechanism_scoring_adjustments(
@@ -111,34 +169,40 @@ def _mechanism_scoring_adjustments(
     mech_notes = ""
 
     if mechanism_id == "A3":
-        if chemistry == "sirna":
-            mech_notes = "A3 (saRNA): siRNA duplex chemistry is the native modality for transcriptional activation via promoter targeting."
-        elif chemistry in ("gapmer", "lna_gapmer"):
-            mech_notes = "A3 (saRNA): Gapmer/LNA can activate via RNA-mediated transcriptional activation (RNAa) with promoter proximity."
-        elif chemistry in ("pmo", "2ome"):
-            mech_notes = "A3 (saRNA): Steric-blocking chemistries are less suitable for promoter activation which requires RNA duplex formation."
+        if chemistry in ("pmo", "2ome"):
+            mech_notes = "A3 (TANGO): PMO/2'-OMe sterically block splice sites at exon junctions without transcript cleavage — optimal for poison exon skipping."
+        elif chemistry == "lna_gapmer":
+            mech_notes = "A3 (TANGO): LNA gapmer offers high affinity for precise splice-junction targeting."
+        elif chemistry == "gapmer":
+            mech_notes = "A3 (TANGO): Gapmers cleave mRNA — not recommended for TANGO which requires steric blocking for precise splice control."
 
     elif mechanism_id == "A4":
-        if chemistry in ("pmo", "2ome"):
-            mech_notes = "A4 (uORF block): PMO/2'-OMe sterically block ribosome stalling at uORFs — ideal for translational upregulation."
-        elif chemistry == "lna_gapmer":
-            mech_notes = "A4 (uORF block): LNA gapmer can block with high affinity, though RNase H activity is secondary."
-        elif chemistry == "gapmer":
-            mech_notes = "A4 (uORF block): Gapmers cleave mRNA — less ideal for steric uORF blocking, but may work if the NAT is the target."
+        if chemistry in ("gapmer", "lna_gapmer"):
+            mech_notes = "A4 (NAT silencing): Gapmer/LNA recruits RNase H1 to degrade the antisense lncRNA transcript."
+        elif chemistry in ("pmo", "2ome"):
+            mech_notes = "A4 (NAT silencing): Steric-blocking chemistries don't recruit RNase H — not optimal for NAT transcript degradation."
 
     elif mechanism_id == "A5":
         if chemistry in ("pmo", "2ome"):
-            mech_notes = "A5 (TANGO): PMO/2'-OMe sterically block splice sites at exon junctions without transcript cleavage — optimal for poison exon skipping."
+            mech_notes = "A5 (uORF block): PMO/2'-OMe sterically block ribosome stalling at uORFs — ideal for translational upregulation."
         elif chemistry == "lna_gapmer":
-            mech_notes = "A5 (TANGO): LNA gapmer offers high affinity for precise splice-junction targeting."
+            mech_notes = "A5 (uORF block): LNA gapmer can block with high affinity, though RNase H activity is secondary."
         elif chemistry == "gapmer":
-            mech_notes = "A5 (TANGO): Gapmers cleave mRNA — not recommended for TANGO which requires steric blocking for precise splice control."
+            mech_notes = "A5 (uORF block): Gapmers cleave mRNA — less ideal for steric uORF blocking."
 
     elif mechanism_id == "A6":
-        if chemistry in ("gapmer", "lna_gapmer"):
-            mech_notes = "A6 (NAT silencing): Gapmer/LNA recruits RNase H1 to degrade the antisense lncRNA transcript."
+        if chemistry in ("2ome", "pmo", "lna_gapmer"):
+            mech_notes = "A6 (miRNA site block): Steric-blocking chemistry masks the miRNA seed site on the target mRNA without cleaving it — correct modality for target protection / blockmiR. " + A6_SEED_SITE_NOTE
+        elif chemistry == "gapmer":
+            mech_notes = "A6 (miRNA site block): Gapmers cleave the transcript — not appropriate for miRNA target protection."
+
+    elif mechanism_id == "A23":
+        if chemistry == "sirna":
+            mech_notes = "A23 (saRNA): siRNA duplex chemistry is the native modality for transcriptional activation via promoter targeting."
+        elif chemistry in ("gapmer", "lna_gapmer"):
+            mech_notes = "A23 (saRNA): Gapmer/LNA can activate via RNA-mediated transcriptional activation (RNAa) with promoter proximity."
         elif chemistry in ("pmo", "2ome"):
-            mech_notes = "A6 (NAT silencing): Steric-blocking chemistries don't recruit RNase H — not optimal for NAT transcript degradation."
+            mech_notes = "A23 (saRNA): Steric-blocking chemistries are less suitable for promoter activation which requires RNA duplex formation."
 
     else:
         mech_notes = "No mechanism-specific adjustments."
@@ -184,25 +248,54 @@ def generate_upregulation_candidates(
 
     flank = min(10, effective_length // 2)
     step = max(1, effective_length // 3)
-    search_start = 0
-    search_end = max(0, seq_len - effective_length)
-
-    # Mechanism-specific search region
+    # Mechanism-specific search region. A5/A6/A23 scan real sequence context
+    # (5' UTR / 3' UTR / promoter upstream of TSS) when Ensembl provides it;
+    # otherwise they fall back to a bounded CDS approximation with an honest
+    # label so the positions are not mistaken for true UTR/promoter sites.
+    scan_seq = seq
+    is_utr_scan = False
+    is_promoter_scan = False
     target_label = "Full transcript"
-    if mechanism_id == "A4":
-        # uORF blocking: focus on 5' region near start codon
-        search_end = min(search_end, 90)
-        target_label = "5' UTR / Start region"
-    elif mechanism_id == "A5":
-        # Poison exon: focus on exon junctions
+    if mechanism_id == "A3":
+        # TANGO: focus on exon junctions
         target_label = "Exon junctions"
-    elif mechanism_id == "A3":
-        # saRNA: focus on 5' promoter-proximal region of the transcript
-        search_end = min(search_end, 90)
-        target_label = "Promoter-proximal 5' region"
-    elif mechanism_id == "A6":
+    elif mechanism_id == "A4":
         # NAT silencing: scan full transcript
         target_label = "Full transcript (NAT complement)"
+    elif mechanism_id == "A5":
+        utr5 = target.get("utr5Sequence")
+        if utr5:
+            scan_seq = utr5.upper()
+            is_utr_scan = True
+            target_label = "5' UTR (putative uORF windows)"
+        else:
+            target_label = "5' CDS region (5' UTR unavailable)"
+    elif mechanism_id == "A6":
+        utr3 = target.get("utr3Sequence")
+        if utr3:
+            scan_seq = utr3.upper()
+            is_utr_scan = True
+            target_label = "3' UTR (putative miRNA seed windows)"
+        else:
+            target_label = "3' CDS region (3' UTR unavailable)"
+    elif mechanism_id == "A23":
+        promoter_seq = _fetch_promoter_sequence(target, organism)
+        if promoter_seq:
+            scan_seq = promoter_seq
+            is_promoter_scan = True
+            target_label = "Promoter (upstream of TSS)"
+        else:
+            target_label = "5' CDS region (promoter unavailable)"
+
+    search_start = 0
+    search_end = max(0, len(scan_seq) - effective_length)
+    # The 90/400 base bounds below are fallback-only heuristics applied when
+    # Ensembl UTR/promoter data is unavailable. They are arbitrary and are
+    # labelled as approximations; they are never claimed as sourced values.
+    if mechanism_id in ("A5", "A23") and not is_utr_scan and not is_promoter_scan:
+        search_end = min(search_end, 90)
+    elif mechanism_id == "A6" and not is_utr_scan:
+        search_start = max(0, len(scan_seq) - effective_length - 400)
 
     seen = set()
 
@@ -221,19 +314,10 @@ def generate_upregulation_candidates(
         last_start, _ = exon_cds_map[-1]
         exon_cds_map[-1] = (last_start, seq_len)
 
-    is_poison_exon = mechanism_id == "A5"
-    
-    # TANGO-specific: Parse target poison exon index
-    target_exon_idx = None
-    if is_poison_exon and target_poison_exon:
-        try:
-            # Format: "exon_1", "exon_2", etc.
-            target_exon_idx = int(target_poison_exon.replace("exon_", "")) - 1
-        except (ValueError, AttributeError):
-            pass
+    is_poison_exon = mechanism_id == "A3"
 
     for offset in range(search_start, search_end + 1, step):
-        candidate_seq = seq[offset : offset + effective_length]
+        candidate_seq = scan_seq[offset : offset + effective_length]
         if len(candidate_seq) < effective_length or candidate_seq in seen:
             continue
         seen.add(candidate_seq)
@@ -251,9 +335,12 @@ def generate_upregulation_candidates(
             mechanism_id, chemistry, modifications, gc, tm, candidate_seq
         )
 
-        # Target duplex energy — primary ranking metric
-        target_region_seq = seq[offset : offset + effective_length]
-        duplex_energy = _target_duplex_energy(candidate_seq, target_region_seq)
+        # Target duplex energy — fold the antisense ASO against its RNA target
+        # window, mirroring the TG01 pipeline. The stored ASO is the reverse
+        # complement of the scanned window; for A4 the RNA target is the
+        # antisense transcript, so the sense window itself is the ASO.
+        aso_seq = candidate_seq if mechanism_id == "A4" else _reverse_complement(candidate_seq)
+        duplex_energy = _target_duplex_energy(aso_seq, _reverse_complement(aso_seq))
 
         # Upregulation-specific defect notes
         defect_notes = "No defect-specific adjustments applied."
@@ -263,14 +350,15 @@ def generate_upregulation_candidates(
         elif "dominant" in upreg_defect:
             defect_notes = "Dominant-negative: consider allele-specific upregulation of the wild-type copy."
 
-        # Determine exon number
+        # Determine exon number (CDS scans only; UTR/promoter scans have none)
         exon_number = None
         exon_length = None
-        for ei, (es, ee) in enumerate(exon_cds_map):
-            if es <= offset < ee:
-                exon_number = ei + 1
-                exon_length = exons[ei].get("length") if ei < len(exons) else None
-                break
+        if not is_utr_scan and not is_promoter_scan:
+            for ei, (es, ee) in enumerate(exon_cds_map):
+                if es <= offset < ee:
+                    exon_number = ei + 1
+                    exon_length = exons[ei].get("length") if ei < len(exons) else None
+                    break
 
         region_label = f"{target_label} offset +{offset}"
         if is_poison_exon and exon_number:
@@ -289,41 +377,14 @@ def generate_upregulation_candidates(
         ec = _extinction_coefficient(candidate_seq)
         ds = _duplex_stability(gc, tm, effective_length)
 
-        # TANGO-specific scoring and fields
+        # TANGO-specific: echo the user's design inputs only. Earlier versions
+        # fabricated spliceMaskingScore / predictedNmdSuppression /
+        # estimatedFoldRestoration / canonicalOffSpliceHits from invented
+        # constants (0.85/0.80/0.75/0.70 element bases, x0.9 NMD, x0.8 fold)
+        # with no measured basis — those are removed.
         tango_fields = {}
         if is_poison_exon:
-            # Splice masking score (higher for splice elements)
-            splice_masking_score = 0.0
-            if splice_element:
-                if splice_element == "5ss":
-                    splice_masking_score = 0.85 + (0.1 * (1 - abs(gc - 0.5)))
-                elif splice_element == "3ss":
-                    splice_masking_score = 0.80 + (0.1 * (1 - abs(gc - 0.5)))
-                elif splice_element == "bps":
-                    splice_masking_score = 0.75 + (0.1 * (1 - abs(gc - 0.5)))
-                elif splice_element == "iss_ise":
-                    splice_masking_score = 0.70 + (0.1 * (1 - abs(gc - 0.5)))
-            
-            # NMD suppression prediction (based on splice masking score)
-            predicted_nmd_suppression = min(0.95, splice_masking_score * 0.9)
-            
-            # Fold restoration estimate (based on NMD suppression)
-            estimated_fold_restoration = predicted_nmd_suppression * 0.8
-            
-            # Canonical off-splice risk (lower is better)
-            canonical_off_splice_hits = 0
-            if target_exon_idx is not None and exon_number:
-                # Check if candidate is near the target exon
-                if abs(exon_number - (target_exon_idx + 1)) <= 1:
-                    canonical_off_splice_hits = 0
-                else:
-                    canonical_off_splice_hits = 1
-            
             tango_fields = {
-                "spliceMaskingScore": round(splice_masking_score, 3),
-                "predictedNmdSuppression": round(predicted_nmd_suppression, 3),
-                "estimatedFoldRestoration": round(estimated_fold_restoration, 3),
-                "canonicalOffSpliceHits": canonical_off_splice_hits,
                 "targetPoisonExon": target_poison_exon or "",
                 "spliceElement": splice_element or "",
             }
@@ -333,7 +394,7 @@ def generate_upregulation_candidates(
         composite_score = _composite_score(duplex_energy, tm_fit)
 
         candidates.append({
-            "sequence": candidate_seq,
+            "sequence": aso_seq,
             "length": effective_length,
             "compositeScore": composite_score,  # 0-100 ranking score
             "learnedEfficacy": {
@@ -398,6 +459,10 @@ def generate_upregulation_candidates(
             "defectNotes": defect_notes,
             "mechanismNotes": mech_adj["mechNotes"],
             "knownRegulatoryElement": known_regulatory_element or "",
+            # A6 candidates cannot claim to mask validated miRNA binding sites
+            # (no reliable target database is integrated) — state that plainly.
+            "seedSiteStatus": "unverified" if mechanism_id == "A6" else None,
+            "seedSiteNote": A6_SEED_SITE_NOTE if mechanism_id == "A6" else None,
             **tango_fields,
         })
 

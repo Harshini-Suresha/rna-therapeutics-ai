@@ -16,7 +16,7 @@ export default function GeneOverviewCard({ gene, onRefresh }: GeneOverviewCardPr
   const isViral = gene.geneType === "viral_gene";
 
   return (
-    <Card>
+    <Card className="transition-shadow duration-300 hover:shadow-md">
       <SectionHeader
         step="2"
         title="Gene Information Verification"

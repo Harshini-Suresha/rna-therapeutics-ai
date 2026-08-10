@@ -89,6 +89,30 @@ def _parse_exons_from_transcript(transcript: dict) -> list[dict]:
     ]
 
 
+def _fetch_transcript_utrs(tid: str, cds_seq: str) -> tuple[str | None, str | None]:
+    """Fetch the full spliced transcript (cdna) and derive 5'/3' UTR sequences.
+
+    Ensembl's REST API exposes ``type=cdna`` (5'UTR + CDS + 3'UTR) and
+    ``type=cds`` but no direct UTR type, so the UTRs are derived by locating
+    the CDS substring within the cdna. Returns (utr5, utr3), or (None, None)
+    when the cdna fetch fails or the CDS cannot be located within it.
+    """
+    try:
+        resp = _ensembl_get(f"{ENSEMBL_REST}/sequence/id/{tid}?type=cdna")
+        if not resp.ok:
+            return None, None
+        cdna = resp.json().get("seq", "")
+        if not cdna or not cds_seq:
+            return None, None
+        cds_at = cdna.find(cds_seq)
+        if cds_at < 0:
+            return None, None
+        return cdna[:cds_at], cdna[cds_at + len(cds_seq):]
+    except Exception as exc:
+        logger.warning("cDNA sequence fetch failed for %s: %s", tid, exc)
+        return None, None
+
+
 # ---------------------------------------------------------------------------
 # 1. Target Analysis — transcript / exon structure for the confirmed gene
 # ---------------------------------------------------------------------------
@@ -107,6 +131,8 @@ def get_target_analysis(ensembl_gene_id: str, gene_symbol: str = "", organism: s
         "exons": [],
         "cdsLength": None,
         "mrnaSequence": None,
+        "utr5Sequence": None,
+        "utr3Sequence": None,
     }
 
     # --- Primary: lookup by Ensembl gene ID ---
@@ -131,6 +157,10 @@ def get_target_analysis(ensembl_gene_id: str, gene_symbol: str = "", organism: s
                 result["canonicalTranscript"] = {
                     "id": canonical.get("id"),
                     "biotype": canonical.get("biotype"),
+                    "chromosome": canonical.get("seq_region_name"),
+                    "start": canonical.get("start"),
+                    "end": canonical.get("end"),
+                    "strand": canonical.get("strand", 1),
                 }
                 result["exons"] = _parse_exons_from_transcript(canonical)
 
@@ -144,6 +174,15 @@ def get_target_analysis(ensembl_gene_id: str, gene_symbol: str = "", organism: s
                         result["mrnaSequence"] = seq
                 except Exception as exc:
                     logger.warning("CDS sequence fetch failed for %s: %s", tid, exc)
+
+                # Full spliced transcript (5'UTR + CDS + 3'UTR) so
+                # upregulation mechanisms can target real UTR context
+                # instead of CDS approximations.
+                if result.get("mrnaSequence"):
+                    utr5, utr3 = _fetch_transcript_utrs(tid, result["mrnaSequence"])
+                    if utr5 is not None:
+                        result["utr5Sequence"] = utr5
+                        result["utr3Sequence"] = utr3
         else:
             logger.warning("Ensembl ID lookup returned HTTP %d for %s", resp.status_code, ensembl_gene_id)
     except Exception as exc:
@@ -168,6 +207,10 @@ def get_target_analysis(ensembl_gene_id: str, gene_symbol: str = "", organism: s
                     result["canonicalTranscript"] = {
                         "id": canonical.get("id"),
                         "biotype": canonical.get("biotype"),
+                        "chromosome": canonical.get("seq_region_name"),
+                        "start": canonical.get("start"),
+                        "end": canonical.get("end"),
+                        "strand": canonical.get("strand", 1),
                     }
                     result["exons"] = _parse_exons_from_transcript(canonical)
 
@@ -181,6 +224,13 @@ def get_target_analysis(ensembl_gene_id: str, gene_symbol: str = "", organism: s
                                 result["mrnaSequence"] = seq
                         except Exception as exc:
                             logger.warning("CDS sequence fetch failed (symbol fallback) for %s: %s", tid, exc)
+
+                    if result.get("mrnaSequence"):
+                        tid = canonical.get("id", "").split(".")[0]
+                        utr5, utr3 = _fetch_transcript_utrs(tid, result["mrnaSequence"])
+                        if utr5 is not None:
+                            result["utr5Sequence"] = utr5
+                            result["utr3Sequence"] = utr3
             else:
                 logger.warning("Ensembl symbol lookup returned HTTP %d for %s", sym_resp.status_code, gene_symbol)
         except Exception as exc:
@@ -702,94 +752,220 @@ def _mechanism_note(mechanism_id: str, chemistry: str) -> str:
     return f"{name} ({mechanism_id})"
 
 
-def _parse_variant_position(known_variant: str) -> dict | None:
-    """Extract a CDS coordinate from a simple HGVS variant string.
+# ---------------------------------------------------------------------------
+# HGVS coding-DNA (c.) parsing — used for allele-specific candidate design
+# ---------------------------------------------------------------------------
 
-    Handles substitutions (c.1521C>T), deletions (c.1521_1523del,
-    c.1521delC), insertions (c.1521insT), and delins (c.10594_10595delins...),
-    with optional g./n. prefixes. Returns ``{"position", "ref", "alt", "kind", "coordinate"}``
-    where position is the 0-based CDS offset of the variant, or None.
+# Regex-based subset of HGVS c. notation. This is a *simplified* parser that
+# extracts a CDS position and variant type for the design pipeline; it is not a
+# full HGVS-grammar implementation (no transcript/reference validation).
+HGVS_C_PATTERN = re.compile(
+    r"^c\.(?P<start>\d+)"
+    r"(?:_(?P<end>\d+))?"
+    r"(?:"
+    r"(?P<ref>[ACGT]+)>(?P<alt>[ACGT]+)"                              # substitution
+    r"|del(?P<del_seq>[ACGT]*)"                                       # deletion
+    r"|dup(?P<dup_seq>[ACGT]*)"                                       # duplication
+    r"|ins(?P<ins_seq>[ACGT]+)"                                       # insertion
+    r"|del(?P<delins_del>[ACGT]*)ins(?P<delins_ins>[ACGT]+)"          # delins
+    r")$",
+    re.IGNORECASE,
+)
+
+HGVS_REJECT_PATTERNS = {
+    "intronic_offset": re.compile(r"^c\.\d+[+-]\d+", re.IGNORECASE),
+    "five_prime_utr": re.compile(r"^c\.-\d+", re.IGNORECASE),
+    "three_prime_utr": re.compile(r"^c\.\*\d+", re.IGNORECASE),
+}
+
+HGVS_REJECT_REASONS = {
+    "intronic_offset": "Deep intronic position — not expressible against the fetched CDS-only sequence.",
+    "five_prime_utr": "5' UTR position — outside the fetched CDS.",
+    "three_prime_utr": "3' UTR position — outside the fetched CDS.",
+}
+
+
+def parse_hgvs_c(raw: str) -> dict:
+    """Parse a simplified HGVS coding-DNA (c.) variant into a CDS coordinate.
+
+    HGVS defines c.1 as the A of the ATG start codon, which maps directly to
+    index 0 of the CDS sequence fetched by ``get_target_analysis()`` — no
+    separate UTR-length lookup is needed.
+
+    Returns ``{"parsed": True, "type", "cdsStart", "cdsEnd", "length"}`` for
+    recognized c. notation, or ``{"parsed": False, "reason"}`` otherwise.
+    Intronic offsets, 5' UTR (c.-N), and 3' UTR (c.*N) positions cannot be
+    expressed against a CDS-only sequence and are rejected with a specific
+    reason. Protein (p.) notation is out of scope: it does not map to a CDS
+    index without a codon-table lookup.
     """
-    variant = known_variant.strip().upper()
+    variant = raw.strip()
+    if not variant:
+        return {"parsed": False, "reason": "No variant provided."}
 
-    m = re.search(r"[cgn]\.(\d+)([ATGC]+)>([ATGC]+)", variant, re.IGNORECASE)
-    if m:
-        coord = m.group(0)
+    lowered = variant.lower()
+    for key, pattern in HGVS_REJECT_PATTERNS.items():
+        if pattern.match(lowered):
+            return {"parsed": False, "reason": HGVS_REJECT_REASONS[key]}
+
+    if lowered.startswith("p."):
         return {
-            "position": int(m.group(1)) - 1,
-            "ref": m.group(2),
-            "alt": m.group(3),
-            "kind": "snp",
-            "coordinate": coord[0].lower() + coord[1:],
+            "parsed": False,
+            "reason": (
+                "Protein-level (p.) notation is out of scope — provide the "
+                "coding-DNA c. equivalent (e.g. c.1521_1523del) for CDS-based "
+                "allele-specific design."
+            ),
         }
 
-    m = re.search(r"[cgn]\.(\d+)(?:_(\d+))?DEL([ATGC]+)?", variant, re.IGNORECASE)
-    if m:
-        coord = (m.group(0)[0].lower() + m.group(0)[1:]).replace("DEL", "del")
+    m = HGVS_C_PATTERN.match(variant)
+    if not m:
         return {
-            "position": int(m.group(1)) - 1,
-            "ref": m.group(3) or None,
-            "alt": None,
-            "kind": "del",
-            "coordinate": coord,
+            "parsed": False,
+            "reason": "Not a recognized c. notation pattern. Expected e.g. c.1521C>T or c.1521_1523del.",
         }
 
-    m = re.search(r"[cgn]\.(\d+)(?:_(\d+))?INS([ATGC]+)?", variant, re.IGNORECASE)
-    if m:
-        coord = (m.group(0)[0].lower() + m.group(0)[1:]).replace("INS", "ins")
+    start = int(m.group("start")) - 1  # HGVS is 1-based; convert to 0-based index
+    end = int(m.group("end")) - 1 if m.group("end") else start
+
+    if m.group("ref"):
+        return {"parsed": True, "type": "substitution", "cdsStart": start, "cdsEnd": start, "length": 1}
+    if m.group("del_seq") is not None and not m.group("delins_ins"):
+        return {"parsed": True, "type": "deletion", "cdsStart": start, "cdsEnd": end, "length": end - start + 1}
+    if m.group("dup_seq") is not None:
+        return {"parsed": True, "type": "duplication", "cdsStart": start, "cdsEnd": end, "length": end - start + 1}
+    if m.group("ins_seq"):
+        return {"parsed": True, "type": "insertion", "cdsStart": start, "cdsEnd": start, "length": 0}
+    if m.group("delins_ins"):
+        return {"parsed": True, "type": "delins", "cdsStart": start, "cdsEnd": end, "length": end - start + 1}
+
+    return {"parsed": False, "reason": "Unhandled variant type."}
+
+
+# Wing length for gap-mer chemistries. "gapmer" = 2 from this file's own
+# "DNA Gapmer (2-10-2)" label. For lna_gapmer the full wing convention is not
+# separately stated; MODIFICATION_OPTIONS "lna_wings" says LNA wings are
+# "typically used in gapmer wings (2-3 LNA at each end)", so the lower bound of
+# that stated range is used. The resulting gap boundary for lna_gapmer is still
+# an estimate and is surfaced as such in the candidate note.
+GAP_WING_LENGTH = {
+    "gapmer": 2,
+    "lna_gapmer": 2,
+}
+
+
+def allele_discrimination_score(variant_relative_pos: int, aso_length: int, chemistry: str) -> dict:
+    """Score allele discrimination from *where the mismatch falls relative to the
+    RNase H-competent gap*, not a flat per-chemistry bonus.
+
+    For gapmer-class chemistries only the central DNA gap recruits RNase H — the
+    chemically-modified wings do not — so a mismatch in the wing contributes no
+    discrimination. Within the gap, discrimination is strongest when the mismatch
+    sits at the gap center (where RNase H cleaves) and drops off toward the gap
+    edges.
+
+    Steric-block chemistries (PMO, 2'-OMe) have no enzymatic cleavage, so a
+    single mismatch does not block binding sharply; their discrimination signal
+    is capped low rather than merely slightly penalized.
+    """
+    wing = GAP_WING_LENGTH.get(chemistry)
+
+    if wing is not None:  # gapmer-class chemistry — RNase H cleavage-competent
+        gap_start, gap_end = wing, aso_length - wing
+        gap_len = gap_end - gap_start
+
+        if not (gap_start <= variant_relative_pos < gap_end):
+            return {
+                "eligibleForAlleleSpecificity": False,
+                "discriminationScore": 0.0,
+                "note": (
+                    "Variant falls in the chemically-modified wing, not the RNase "
+                    "H-competent DNA gap — a mismatch here won't meaningfully "
+                    "discriminate mutant from wild-type."
+                ),
+            }
+
+        gap_center = gap_start + gap_len / 2
+        dist = abs(variant_relative_pos - gap_center)
+        proximity = 1 - (dist / (gap_len / 2))  # 1.0 at center, 0.0 at gap edge
+
         return {
-            "position": int(m.group(1)),
-            "ref": None,
-            "alt": m.group(3) or None,
-            "kind": "ins",
-            "coordinate": coord,
+            "eligibleForAlleleSpecificity": True,
+            "discriminationScore": round(proximity, 3),
+            "note": (
+                f"Mismatch is {dist:.1f} nt from gap center (RNase H discrimination "
+                "is strongest at the center, weakest at the edges)."
+            ),
         }
 
-    m = re.search(r"[cgn]\.(\d+)(?:_(\d+))?DELINS([ATGC]+)?", variant, re.IGNORECASE)
-    if m:
-        coord = (m.group(0)[0].lower() + m.group(0)[1:]).replace("DELINS", "delins")
-        return {
-            "position": int(m.group(1)) - 1,
-            "ref": None,
-            "alt": m.group(3) or None,
-            "kind": "delins",
-            "coordinate": coord,
-        }
-
-    return None
+    # Steric-block chemistry — no enzymatic cleavage, discrimination is inherently
+    # weaker regardless of position. Capped low, not just "penalized a bit".
+    centered = 1 - abs(variant_relative_pos - aso_length / 2) / (aso_length / 2)
+    proximity = centered * 0.3
+    return {
+        "eligibleForAlleleSpecificity": True,
+        "discriminationScore": round(proximity, 3),
+        "note": (
+            "Steric-block chemistries discriminate single mismatches far less "
+            "reliably than gapmer/RNase H cleavage — treat as a weak signal, "
+            "not a strong one."
+        ),
+    }
 
 
 def _allele_specific_scoring(
     known_variant: str | None,
-    spans_variant: bool = False,
+    spans_variant: bool,
+    variant_relative_pos: int | None,
+    aso_length: int,
+    chemistry: str,
 ) -> dict:
     """Flag allele-specific candidates based on the variant's CDS coordinate.
 
     An ASO can only discriminate the mutant from the wild-type allele when its
-    binding window actually spans the variant's CDS coordinate. That overlap is
-    computed by the caller (``offset <= variant_pos < offset + aso_length``)
-    and passed in — no positional guessing happens here. Candidates spanning
-    the variant are flagged ``alleleSpecific`` and rank first (as a structural
-    tiebreaker); all others stay unranked on this axis. No numeric bonuses are
-    invented for SNP-vs-indel formats or gapmer chemistry.
+    binding window actually spans the variant's CDS coordinate (computed by the
+    caller). Within a spanning window, the discriminating variable is where the
+    mismatch falls relative to the RNase H gap center
+    (``allele_discrimination_score``). No flat per-chemistry bonuses are
+    invented. The caller applies the ``spans_variant`` and wing-eligibility hard
+    gates when the user has selected allele-specific scope.
     """
-    result = {"alleleSpecific": False, "alleleNotes": ""}
+    result = {
+        "alleleSpecific": False,
+        "alleleNotes": "",
+        "alleleDiscriminationScore": None,
+        "alleleDiscriminationNote": None,
+    }
 
     if not known_variant:
         return result
 
-    if not spans_variant:
+    if not spans_variant or variant_relative_pos is None:
         result["alleleNotes"] = (
             f"Does not span {known_variant} at the candidate binding window; "
             "reposition the ASO over the variant for allele discrimination."
         )
         return result
 
+    discrimination = allele_discrimination_score(variant_relative_pos, aso_length, chemistry)
+
+    if not discrimination["eligibleForAlleleSpecificity"]:
+        result["alleleNotes"] = (
+            f"Binding window spans {known_variant}, but {discrimination['note']}"
+        )
+        return result
+
+    note = discrimination["note"]
+    if chemistry == "lna_gapmer":
+        note += (
+            " (LNA wing convention estimated from the 2-3 LNA/wing guidance; "
+            "not separately verified.)"
+        )
+
     result["alleleSpecific"] = True
-    result["alleleNotes"] = (
-        f"Candidate binding window spans {known_variant} at its CDS coordinate — "
-        "the positional prerequisite for allele discrimination."
-    )
+    result["alleleDiscriminationScore"] = discrimination["discriminationScore"]
+    result["alleleDiscriminationNote"] = note
+    result["alleleNotes"] = f"Binding window spans {known_variant} at its CDS coordinate."
     return result
 
 
@@ -820,6 +996,8 @@ def generate_candidates(
     aso_length, chemistry, targeting_mode = _mechanism_design_constraints(
         mechanism_id, aso_length, chemistry
     )
+
+    is_allele_specific = (silencing_scope or "").lower().strip() == "allele_specific"
 
     # Hard gate: reject chemistry/mechanism combinations that contradict the
     # mechanism's own rulebook (e.g. a steric-blocking PMO for an RNase H
@@ -888,14 +1066,22 @@ def generate_candidates(
 
     # Parse the known variant's CDS coordinate once so allele-specific
     # candidates are always generated around it, even when the chosen exons
-    # do not contain the variant.
+    # do not contain the variant. When the variant cannot be parsed to a CDS
+    # coordinate, no positional discrimination scoring is possible; the parse
+    # failure is carried into the response so the UI can surface it instead of
+    # silently producing non-discriminating results.
+    variant_parse = parse_hgvs_c(known_variant) if known_variant else None
     variant_pos = None
     variant_coordinate = ""
-    if known_variant and targeting_mode != "translation_start":
-        parsed_variant = _parse_variant_position(known_variant)
-        if parsed_variant and parsed_variant["position"] < seq_len - aso_length + 1:
-            variant_pos = parsed_variant["position"]
-            variant_coordinate = parsed_variant["coordinate"]
+    if (
+        known_variant
+        and targeting_mode != "translation_start"
+        and variant_parse
+        and variant_parse["parsed"]
+        and variant_parse["cdsStart"] < seq_len
+    ):
+        variant_pos = variant_parse["cdsStart"]
+        variant_coordinate = f"c.{variant_parse['cdsStart'] + 1}"
 
     seen = set()
     # Search only windows fully contained within each selected exon. Do not
@@ -936,7 +1122,13 @@ def generate_candidates(
             ei = int(target_label.removeprefix("Exon "))
             exon_start, exon_end = exon_cds_map[ei - 1]
 
-        for offset in range(search_start, search_end + 1, step):
+        # In allele-specific mode the variant-centered window is scanned at
+        # single-base resolution so a candidate can land the mismatch exactly
+        # at the RNase H gap center. The window is at most aso_length bases
+        # wide, so the fine step is cheap.
+        range_step = 1 if (is_allele_specific and target_label.startswith("Variant ")) else step
+
+        for offset in range(search_start, search_end + 1, range_step):
             candidate_seq = seq[offset : offset + aso_length]
             if len(candidate_seq) < aso_length or candidate_seq in seen:
                 continue
@@ -946,6 +1138,13 @@ def generate_candidates(
                 variant_pos is not None
                 and offset <= variant_pos < offset + aso_length
             )
+
+            # Hard gate for allele-specific scope: a candidate whose binding
+            # window does not cover the variant's CDS coordinate cannot
+            # discriminate mutant from wild-type at all — exclude it rather
+            # than merely ranking it lower.
+            if is_allele_specific and variant_pos is not None and not spans_variant:
+                continue
 
             gc = _calc_gc(candidate_seq)
             if (gc < MIN_GC or gc > MAX_GC) and not spans_variant:
@@ -1016,9 +1215,25 @@ def generate_candidates(
             mw = _molecular_weight(candidate_seq)
             ext_coeff = _extinction_coefficient(candidate_seq)
 
-            # Allele-specific flagging — only candidates whose binding window
-            # actually spans the variant's CDS coordinate are flagged
-            allele = _allele_specific_scoring(known_variant, spans_variant=spans_variant)
+            # Allele-specific scoring — only candidates whose binding window
+            # actually spans the variant's CDS coordinate are scored, and the
+            # score reflects *where* the mismatch falls relative to the RNase H
+            # gap center (not a flat chemistry bonus).
+            allele = _allele_specific_scoring(
+                known_variant=known_variant,
+                spans_variant=spans_variant,
+                variant_relative_pos=(variant_pos - offset) if variant_pos is not None else None,
+                aso_length=aso_length,
+                chemistry=chemistry,
+            )
+
+            # Second hard gate for allele-specific scope: even a spanning window
+            # contributes no discrimination when the mismatch falls in the
+            # chemically-modified wing (which does not recruit RNase H). Such
+            # candidates are excluded from allele-specific results rather than
+            # softly penalized.
+            if is_allele_specific and variant_pos is not None and not allele["alleleSpecific"]:
+                continue
 
             # Composite ranking score — real metrics only: the ViennaRNA
             # target-duplex ΔG plus the chemistry-adjusted Tm fit.
@@ -1094,12 +1309,24 @@ def generate_candidates(
                 "knownVariant": known_variant or "",
                 "alleleSpecific": allele["alleleSpecific"],
                 "alleleNotes": allele["alleleNotes"],
+                "alleleDiscriminationScore": allele["alleleDiscriminationScore"],
+                "alleleDiscriminationNote": allele["alleleDiscriminationNote"],
             })
 
-    # Rank by the composite design score (higher = better). When a known
-    # variant is supplied, candidates whose binding window spans the variant
-    # position are ranked first, with the composite score as the tiebreaker.
-    if variant_pos is not None:
+    # Rank by the composite design score (higher = better). In allele-specific
+    # scope with a parsed variant, all surviving candidates span the variant, so
+    # the primary axis is allele discrimination (mismatch proximity to the RNase
+    # H gap center), with the composite score as the tiebreaker. Otherwise a
+    # supplied variant ranks spanning candidates first.
+    if is_allele_specific and variant_pos is not None:
+        candidates.sort(
+            key=lambda c: (
+                -(c["alleleDiscriminationScore"] or 0),
+                -c["compositeScore"],
+                c["realMetrics"]["targetDuplexEnergy"],
+            )
+        )
+    elif variant_pos is not None:
         candidates.sort(
             key=lambda c: (
                 not c["alleleSpecific"],

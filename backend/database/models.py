@@ -33,6 +33,7 @@ class User(Base):
     verification_tokens = relationship("VerificationToken", back_populates="user", cascade="all, delete-orphan")
     reports = relationship("Report", back_populates="user", cascade="all, delete-orphan")
     projects = relationship("Project", back_populates="user", cascade="all, delete-orphan")
+    bug_reports = relationship("BugReport", back_populates="user", cascade="all, delete-orphan")
 
 
 class ResearchInterest(Base):
@@ -135,6 +136,23 @@ class Project(Base):
     updated_at = Column(Float, nullable=False, default=time.time)
 
     user = relationship("User", back_populates="projects")
+
+
+class BugReport(Base):
+    __tablename__ = "bug_reports"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    area = Column(String(100), nullable=False)
+    summary = Column(String(255), nullable=False)
+    steps = Column(Text, nullable=False, default="")
+    expected = Column(Text, nullable=False, default="")
+    actual = Column(Text, nullable=False, default="")
+    page_url = Column(String(500), nullable=False, default="")
+    status = Column(String(50), nullable=False, default="open")
+    created_at = Column(Float, nullable=False, default=time.time)
+
+    user = relationship("User", back_populates="bug_reports")
 
 
 class GeneFeatureBackup(Base):
