@@ -1,68 +1,5 @@
 [
   {
-    "id": "n1785325412984",
-    "category": "analysis",
-    "title": "Gene lookup completed for DMD",
-    "detail": "Retrieved data for DMD in homo sapiens.",
-    "timestamp": 1785325412.984821,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785325462433",
-    "category": "analysis",
-    "title": "Gene lookup completed for CFTR",
-    "detail": "Retrieved data for CFTR in homo sapiens.",
-    "timestamp": 1785325462.4336011,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785325498885",
-    "category": "analysis",
-    "title": "Gene lookup completed for HTT",
-    "detail": "Retrieved data for HTT in homo sapiens.",
-    "timestamp": 1785325498.885352,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785325543024",
-    "category": "analysis",
-    "title": "Gene lookup completed for SOD1",
-    "detail": "Retrieved data for SOD1 in homo sapiens.",
-    "timestamp": 1785325543.024229,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785325624979",
-    "category": "analysis",
-    "title": "Gene lookup completed for DMD",
-    "detail": "Retrieved data for DMD in homo sapiens.",
-    "timestamp": 1785325624.979826,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785325719260",
-    "category": "analysis",
-    "title": "Gene lookup completed for DMD",
-    "detail": "Retrieved data for DMD in homo sapiens.",
-    "timestamp": 1785325719.2607172,
-    "read": false,
-    "meta": {}
-  },
-  {
-    "id": "n1785325813567",
-    "category": "analysis",
-    "title": "Gene lookup completed for DMD",
-    "detail": "Retrieved data for DMD in homo sapiens.",
-    "timestamp": 1785325813.5676422,
-    "read": false,
-    "meta": {}
-  },
-  {
     "id": "n1785325871991",
     "category": "analysis",
     "title": "Gene lookup completed for DMD",
@@ -1796,6 +1733,69 @@
     "title": "Generated 6 ASO candidates",
     "detail": "Candidate design completed for ENSG00000141510.",
     "timestamp": 1786099386.8066518,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1786116849847",
+    "category": "analysis",
+    "title": "Gene lookup completed for dmd",
+    "detail": "Retrieved data for dmd in homo sapiens.",
+    "timestamp": 1786116849.8479822,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1786117187234",
+    "category": "analysis",
+    "title": "Generated 10 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000198947.",
+    "timestamp": 1786117187.234787,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1786289349852",
+    "category": "analysis",
+    "title": "Gene lookup completed for dmd",
+    "detail": "Retrieved data for dmd in homo sapiens.",
+    "timestamp": 1786289349.852145,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1786294252018",
+    "category": "analysis",
+    "title": "Generated 4 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000198947.",
+    "timestamp": 1786294252.018168,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1786294317773",
+    "category": "analysis",
+    "title": "Generated 10 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000198947.",
+    "timestamp": 1786294317.7732239,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1786323213557",
+    "category": "analysis",
+    "title": "Gene lookup completed for dmd",
+    "detail": "Retrieved data for dmd in homo sapiens.",
+    "timestamp": 1786323213.557138,
+    "read": false,
+    "meta": {}
+  },
+  {
+    "id": "n1786323290746",
+    "category": "analysis",
+    "title": "Generated 10 ASO candidates",
+    "detail": "Candidate design completed for ENSG00000198947.",
+    "timestamp": 1786323290.746908,
     "read": false,
     "meta": {}
   }

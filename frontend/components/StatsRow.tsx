@@ -12,6 +12,7 @@ import {
   Pill,
   AlertTriangle,
   Building2,
+  FlaskConical,
 } from "lucide-react";
 import { GeneTargetObject } from "@/types/gene";
 import { Card } from "./ui";
@@ -473,6 +474,58 @@ export default function StatsRow({ gene }: { gene: GeneTargetObject }) {
           links.pubmed ? { label: "Source: PubMed", url: links.pubmed } : null,
           links.clinicaltrials ? { label: "Source: ClinicalTrials.gov", url: links.clinicaltrials } : null,
         ].filter(Boolean) as { label: string; url: string }[]}
+      />
+
+      {/* 13. ADMET Prediction */}
+      <StatCard
+        icon={FlaskConical}
+        iconBg="#ECFDF5"
+        iconColor="#059669"
+        title="ADMET Prediction"
+        notConnected={!gene.admetAvailable}
+        rows={
+          gene.admetAvailable
+            ? [
+                { label: "Absorption", value: gene.absorptionLevel ? `${gene.absorptionLevel} (${gene.absorptionScore})` : DASH },
+                { label: "Distribution", value: gene.distributionLevel ? `${gene.distributionLevel} (${gene.distributionScore})` : DASH },
+                { label: "Metabolism", value: gene.metabolismLevel ? `${gene.metabolismLevel} (${gene.metabolismScore})` : DASH },
+                { label: "Excretion", value: gene.excretionLevel ? `${gene.excretionLevel} (${gene.excretionScore})` : DASH },
+                { label: "Toxicity", value: gene.toxicityLevel ? `${gene.toxicityLevel} (${gene.toxicityScore})` : DASH },
+                { label: "Immunogenicity", value: gene.immunogenicity?.level ?? DASH },
+                { label: "Off-target Risk", value: gene.offTargetRisk?.level ?? DASH },
+                { label: "Nuclease Stability", value: gene.nucleaseSensitivity?.level ?? DASH },
+              ]
+            : [{ label: "Status", value: "Provide ASO sequence for prediction" }]
+        }
+        extra={
+          gene.admetAvailable && gene.admetAnalysis ? (
+            <div className="mt-2 space-y-1.5 text-[11px] leading-4 text-slate-600">
+              {gene.admetWarnings?.length > 0 && (
+                <div>
+                  <div className="font-medium text-amber-700">Warnings</div>
+                  <ul className="mt-0.5 list-disc list-inside">
+                    {gene.admetWarnings.slice(0, 3).map((w, i) => (
+                      <li key={`warn-${i}`} className="truncate">{w}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {gene.admetStrengths?.length > 0 && (
+                <div>
+                  <div className="font-medium text-emerald-700">Strengths</div>
+                  <ul className="mt-0.5 list-disc list-inside">
+                    {gene.admetStrengths.slice(0, 3).map((s, i) => (
+                      <li key={`str-${i}`} className="truncate">{s}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          ) : null
+        }
+        sources={gene.admetAvailable ? [
+          { label: "ADMET Analysis", url: "#" },
+        ] : []}
       />
     </div>
   );

@@ -28,41 +28,55 @@ export interface DesignOptions {
   lengthRange: { min: number; max: number; default: number; step: number };
 }
 
+export interface RealMetrics {
+  targetDuplexEnergy: number;
+  meltingTempC: number;
+  selfStructureMfe: number;
+  gcContent: number;
+  cpgCount: number;
+  longestHomopolymer: number;
+  purineContent: number;
+  gcSkew: number;
+  sequenceComplexity: number;
+  polyGPass: boolean;
+  molecularWeight: number;
+  extinctionCoefficient: number;
+  duplexStability: string;
+}
+
+export interface HeuristicEstimate {
+  value: number;
+  note: string;
+}
+
+export interface HeuristicEstimates {
+  nucleaseResistance: HeuristicEstimate;
+  cellularUptake: HeuristicEstimate;
+  bbbCrossing: HeuristicEstimate;
+  synthesisDifficulty: HeuristicEstimate;
+  offTargetRisk: HeuristicEstimate;
+  immuneStimulation: HeuristicEstimate;
+}
+
 export interface AssoCandidate {
   sequence: string;
   length: number;
-  gcContent: number;
-  polygTracts?: number;
-  meltingTempC: number;
-  selfStructureMfe: number;
-  targetDuplexEnergy: number;
+  compositeScore: number;
+  learnedEfficacy: {
+    available: boolean;
+    value: number | null;
+    modelInfo: string;
+    scopeCaveat: string | null;
+  };
+  realMetrics: RealMetrics;
+  heuristicEstimates: HeuristicEstimates;
   targetRegion: string;
   mechanismId: string;
   chemistry: string;
   modifications: string[];
   exonNumber: number | null;
   exonLength: number | null;
-  cpgCount: number;
-  longestHomopolymer: number;
-  purineContent: number;
-  sequenceComplexity: number;
-  gcSkew: number;
-  molecularWeight: number;
-  extinctionCoefficient: number;
-  nucleaseResistance: number;
-  cellularUptake: number;
-  bbbCrossing: number;
-  synthesisDifficulty: number;
-  offTargetRisk: number;
-  immuneStimulation: number;
-  duplexStability: string;
-  deliveryContext?: string;
-  tissueUptakeModifier?: number;
-  tissueBbbModifier?: number;
-  tissueImmuneModifier?: number;
-  tissueChemBonus?: number;
-  tissueLengthModifier?: number;
-  tissueNotes?: string;
+  deliveryContext: string;
   defectType: string;
   defectNotes: string;
   mechanismNotes?: string;
@@ -70,7 +84,29 @@ export interface AssoCandidate {
   knownVariant?: string;
   alleleSpecific?: boolean;
   alleleNotes?: string;
-  knownRegulatoryElement?: string;
+  admet?: {
+    admetAvailable: boolean;
+    absorptionScore: number | null;
+    absorptionLevel: string | null;
+    distributionScore: number | null;
+    distributionLevel: string | null;
+    metabolismScore: number | null;
+    metabolismLevel: string | null;
+    excretionScore: number | null;
+    excretionLevel: string | null;
+    toxicityScore: number | null;
+    toxicityLevel: string | null;
+    cellUptake: { score: number; level: string; notes?: string[] } | null;
+    proteinBinding: { score: number; level: string } | null;
+    nucleaseSensitivity: { score: number; level: string; halfLifeHours?: number } | null;
+    renalClearance: { score: number; level: string; mechanism: string } | null;
+    immunogenicity: { score: number; level: string; motifs: string[] } | null;
+    offTargetRisk: { score: number; level: string } | null;
+    hemolysisRisk: { score: number; level: string } | null;
+    admetAnalysis: string | null;
+    admetWarnings: string[];
+    admetStrengths: string[];
+  };
 }
 
 export interface GenerateResponse {
@@ -83,6 +119,29 @@ export interface GenerateResponse {
   totalExons: number;
   cdsLength: number | null;
   mechanismNotes: string;
+  admet?: {
+    admetAvailable: boolean;
+    absorptionScore: number | null;
+    absorptionLevel: string | null;
+    distributionScore: number | null;
+    distributionLevel: string | null;
+    metabolismScore: number | null;
+    metabolismLevel: string | null;
+    excretionScore: number | null;
+    excretionLevel: string | null;
+    toxicityScore: number | null;
+    toxicityLevel: string | null;
+    cellUptake: { score: number; level: string; notes?: string[] } | null;
+    proteinBinding: { score: number; level: string } | null;
+    nucleaseSensitivity: { score: number; level: string; halfLifeHours?: number } | null;
+    renalClearance: { score: number; level: string; mechanism: string } | null;
+    immunogenicity: { score: number; level: string; motifs: string[] } | null;
+    offTargetRisk: { score: number; level: string } | null;
+    hemolysisRisk: { score: number; level: string } | null;
+    admetAnalysis: string | null;
+    admetWarnings: string[];
+    admetStrengths: string[];
+  };
   candidates: AssoCandidate[];
 }
 

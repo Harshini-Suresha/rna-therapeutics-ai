@@ -103,6 +103,7 @@ export default function AssoDesignForm({
   loading,
   disabled,
   hasResults,
+  mechanismId,
 }: {
   options: DesignOptions | null;
   asoLength: number;
@@ -115,9 +116,16 @@ export default function AssoDesignForm({
   loading: boolean;
   disabled: boolean;
   hasResults?: boolean;
+  mechanismId?: string;
 }) {
   return (
     <div className="space-y-4">
+      {mechanismId && (
+        <div className="flex items-center gap-1.5 rounded-lg border border-brand/15 bg-brand/5 px-3 py-2 text-[11px] text-slate-600">
+          <span className="font-semibold text-slate-700">Mechanism</span>
+          <span className="rounded bg-white px-1.5 py-0.5 font-medium text-brand">{mechanismId}</span>
+        </div>
+      )}
       {/* Chemistry */}
       <div>
         <label className="mb-1.5 block text-[12.5px] font-medium text-slate-600">

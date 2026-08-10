@@ -1,41 +1,53 @@
 "use client";
 
 import PagePlaceholder from "@/components/PagePlaceholder";
-import { BarChart3 } from "lucide-react";
+import { BarChart3, FlaskConical, Network, BookMarked, Shield } from "lucide-react";
 
 export default function AnalysisPage() {
   return (
     <PagePlaceholder
       title="Computational Analysis"
-      description="In-depth computational analyses of your sequences"
+      description="In-depth computational analyses of your sequences and target"
       icon={BarChart3}
       sections={[
         {
-          label: "Structure & Folding",
+          label: "Pathway & Function",
           items: [
-            "Off-target prediction",
-            "Secondary structure",
-            "RNA folding",
-            "Accessibility mapping",
-            "Thermodynamics",
+            "KEGG pathway mapping",
+            "Reactome reaction networks",
+            "Pathway Commons integration",
+            "GO term enrichment (BP / MF / CC)",
+            "STRING PPI network analysis",
           ],
         },
         {
-          label: "Sequence Analysis",
+          label: "Expression & Tissue",
           items: [
-            "Conservation analysis",
-            "SNP overlap",
-            "Binding energy",
-            "RNA-RNA interaction",
-            "K-mer frequency",
+            "GTEx tissue expression (v8)",
+            "Human Protein Atlas tissue map",
+            "Single-cell prevalence (HPA)",
+            "Expression stability (CV)",
+            "Vital organ expression safety",
+          ],
+        },
+        {
+          label: "Target Vulnerability",
+          items: [
+            "gnomAD constraint metrics (pLI, LOEUF)",
+            "ClinGen haploinsufficiency",
+            "DepMap essentiality score",
+            "RNA half-life prediction",
+            "Preclinical conservation score",
           ],
         },
         {
           label: "Safety & Delivery",
           items: [
-            "Toxicity prediction",
-            "Delivery compatibility",
-            "Immunogenicity screening",
+            "ADMET prediction",
+            "Nuclease sensitivity & half-life",
+            "Immunogenicity risk (TLR7/8/9)",
+            "Off-target hybridization risk",
+            "Hemolysis potential",
           ],
         },
         {

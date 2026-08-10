@@ -7,6 +7,9 @@ import logging
 # Add backend/ to sys.path so services resolve correctly
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from dotenv import load_dotenv
+load_dotenv()
+
 import aiohttp
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -29,6 +32,7 @@ try:  # ``uvicorn backend.main:app`` from the repository root
     from .services.fda_therapies_service import get_fda_therapies
     from .services.orphanet_service import get_orphanet_data
     from .services.mutation_breakdown_service import get_mutation_breakdown
+    from .services.admet_service import get_admet_prediction
     from .api.mechanisms import router as mechanisms_router
     from .api.gene_silencing import router as gene_silencing_router
     from .api.upload import router as upload_router
@@ -39,7 +43,7 @@ try:  # ``uvicorn backend.main:app`` from the repository root
     from .api.profile import router as profile_router
     from .api.reports import router as reports_router
     from .api.projects import router as projects_router
-except ImportError:  # ``uvicorn main:app`` while working in backend/
+except ImportError:
     from services.notification_service import add_notification as _add_notification
     from services.gene_service import EnsemblLookupUnavailable, clean_synonyms, get_gene_metadata, get_gene_phenotypes, ensembl_gene_url, build_gene_fallback_payload
     from services.enrichment_service import get_gene_enrichment, get_aso_analysis
@@ -55,6 +59,7 @@ except ImportError:  # ``uvicorn main:app`` while working in backend/
     from services.fda_therapies_service import get_fda_therapies
     from services.orphanet_service import get_orphanet_data
     from services.mutation_breakdown_service import get_mutation_breakdown
+    from services.admet_service import get_admet_prediction
     from api.mechanisms import router as mechanisms_router
     from api.gene_silencing import router as gene_silencing_router
     from api.upload import router as upload_router
@@ -548,7 +553,7 @@ async def initialize_target(payload: TargetRequest):
                 logger.warning("%s failed for %s: %s", label, official_symbol, e)
                 return default
 
-        enrichment_data, constraint_data, aso_data, rna_halflife_data, dependency_data, variant_details, single_cell, clinical_details, fda_therapies, orphanet_data, mutation_data = await asyncio.gather(
+        enrichment_data, constraint_data, aso_data, rna_halflife_data, dependency_data, variant_details, single_cell, clinical_details, fda_therapies, orphanet_data, mutation_data, admet_data = await asyncio.gather(
             _run_sync(lambda: get_gene_enrichment(gene_id, taxon_id, official_symbol), "Enrichment lookup", {}),
             _run_sync(lambda: get_human_constraint_metrics(official_symbol) if is_human else {}, "Constraint lookup", {}),
             _run_sync(lambda: get_aso_analysis(gene_id, taxon_id), "ASO analysis", {}),
@@ -560,6 +565,12 @@ async def initialize_target(payload: TargetRequest):
             _run_sync(lambda: get_fda_therapies(official_symbol, disease_resolved) if is_human else {}, "FDA therapies lookup", {}, timeout_seconds=18.0),
             _run_sync(lambda: get_orphanet_data(official_symbol, ensembl_id=gene_id, disease_name=disease_resolved, phenotypes=disease_info.get("diseases")) if is_human else {}, "Orphanet lookup", {}),
             _run_sync(lambda: get_mutation_breakdown(official_symbol) if is_human else {}, "Mutation breakdown lookup", {}, timeout_seconds=60.0),
+            _run_sync(lambda: get_admet_prediction(gene_context={
+                "vitalOrganTpm": expr_details.get("vital_organ_tpm"),
+                "vitalOrganTissues": expr_details.get("vital_organ_tissues", []),
+                "essentialGene": dependency_data.get("essentialGene"),
+                "loeufDecile": constraint_data.get("loeufDecile"),
+            }), "ADMET lookup", {}),
         )
 
         # Protein chain — depends on protein_db_ids → protein_properties
@@ -896,6 +907,29 @@ async def initialize_target(payload: TargetRequest):
                 }
                 for p in (disease_info.get("diseases", []) or [])
             ],
+
+            # ADMET prediction for target assessment
+            "admetAvailable": admet_data.get("admetAvailable"),
+            "absorptionScore": admet_data.get("absorptionScore"),
+            "absorptionLevel": admet_data.get("absorptionLevel"),
+            "distributionScore": admet_data.get("distributionScore"),
+            "distributionLevel": admet_data.get("distributionLevel"),
+            "metabolismScore": admet_data.get("metabolismScore"),
+            "metabolismLevel": admet_data.get("metabolismLevel"),
+            "excretionScore": admet_data.get("excretionScore"),
+            "excretionLevel": admet_data.get("excretionLevel"),
+            "toxicityScore": admet_data.get("toxicityScore"),
+            "toxicityLevel": admet_data.get("toxicityLevel"),
+            "cellUptake": admet_data.get("cellUptake"),
+            "proteinBinding": admet_data.get("proteinBinding"),
+            "nucleaseSensitivity": admet_data.get("nucleaseSensitivity"),
+            "renalClearance": admet_data.get("renalClearance"),
+            "immunogenicity": admet_data.get("immunogenicity"),
+            "offTargetRisk": admet_data.get("offTargetRisk"),
+            "hemolysisRisk": admet_data.get("hemolysisRisk"),
+            "admetAnalysis": admet_data.get("admetAnalysis"),
+            "admetWarnings": admet_data.get("admetWarnings", []),
+            "admetStrengths": admet_data.get("admetStrengths", []),
         }
 
         fallback_payload = build_gene_fallback_payload(
@@ -922,6 +956,50 @@ async def initialize_target(payload: TargetRequest):
     except Exception as e:
         logger.error(f"Error in initialize_target route: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+class AdmetRequest(BaseModel):
+    aso_sequence: str
+    gene_symbol: Optional[str] = None
+    transcript_count: int = 5
+
+
+@app.post("/api/pipeline/admet-prediction")
+async def admet_prediction(payload: AdmetRequest):
+    """Predict ADMET properties for an ASO/siRNA candidate sequence."""
+    try:
+        gene_context = {}
+        if payload.gene_symbol:
+            try:
+                meta = get_gene_metadata(payload.gene_symbol.strip(), "homo_sapiens")
+                if meta and meta.get("id"):
+                    constraint_data = get_human_constraint_metrics(payload.gene_symbol.strip())
+                    expr_data = get_tissue_expression(
+                        symbol=payload.gene_symbol.strip(),
+                        ensembl_id=meta.get("id"),
+                        species="homo_sapiens",
+                    )
+                    dep_data = get_gene_dependency(payload.gene_symbol.strip())
+                    gene_context = {
+                        "vitalOrganTpm": expr_data.get("vital_organ_tpm"),
+                        "vitalOrganTissues": expr_data.get("vital_organ_tissues", []),
+                        "essentialGene": dep_data.get("essentialGene"),
+                        "loeufDecile": constraint_data.get("loeufDecile"),
+                    }
+            except Exception:
+                pass
+
+        result = get_admet_prediction(
+            aso_sequence=payload.aso_sequence,
+            gene_context=gene_context,
+            transcript_count=payload.transcript_count,
+        )
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in admet_prediction route: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.get("/health")
 def health():

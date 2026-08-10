@@ -369,6 +369,285 @@ const GOALS: TherapeuticGoalSection[] = [
       },
     ],
   },
+  {
+    id: "tg03",
+    title: "TG03 — RNA Editing / Correction",
+    subtitle: "Repair pathogenic RNA sequences or correct disease-causing RNA alterations without modifying genomic DNA.",
+    badge: "TG03",
+    badgeTone: "bg-purple-100 text-purple-700",
+    mechanisms: [
+      {
+        code: "A13",
+        name: "ADAR-Mediated Site-Directed RNA Editing (SDRE)",
+        description:
+          "Correct pathogenic RNA sequences by recruiting endogenous ADAR enzymes to catalyze adenosine-to-inosine (A→I) editing. A chemically modified antisense guide RNA hybridizes with the target transcript, forming a duplex that recruits endogenous ADAR to deaminate a specific adenosine to inosine.",
+        targetRegion: "Target adenosine within pre-mRNA or mature mRNA",
+        modality: "ADAR-recruiting antisense oligonucleotide (20–30 nt)",
+        tone: "violet",
+      },
+      {
+        code: "A16",
+        name: "C-to-U RNA Editing (APOBEC / RESCUE)",
+        description:
+          "Correct pathogenic RNA sequences by recruiting or engineering cytidine deaminases (APOBEC) to catalyze cytidine-to-uridine (C→U) editing. A guide RNA targets a specific cytidine and recruits a deaminase, converting C→U and restoring protein function.",
+        targetRegion: "Target cytidine within pre-mRNA or mature mRNA",
+        modality: "Guide RNA (30–120 nt) + deaminase effector",
+        tone: "fuchsia",
+      },
+      {
+        code: "A17",
+        name: "LEAPER (Leveraging Endogenous ADAR for Programmable Editing of RNA)",
+        description:
+          "Correct pathogenic RNA mutations through endogenous ADAR-mediated A→I (G) editing without introducing exogenous editing proteins. An engineered ADAR-recruiting RNA hybridizes to the target transcript, forming a dsRNA structure that recruits endogenous ADAR enzymes.",
+        targetRegion: "Exonic or splice-site regions containing an editable adenosine",
+        modality: "Engineered ADAR-recruiting RNA (70–200 nt)",
+        tone: "purple",
+      },
+      {
+        code: "A18",
+        name: "CIRTS (CRISPR–Cas-Inspired RNA Targeting System)",
+        description:
+          "Recruit programmable RNA effectors to specific transcripts for RNA editing, degradation, translation control, or imaging. A guide RNA directs the CIRTS effector complex to the target RNA, where an effector domain performs site-specific modifications.",
+        targetRegion: "Exonic or splice-site regions complementary to the guide RNA",
+        modality: "Guide RNA + programmable effector",
+        tone: "indigo",
+      },
+      {
+        code: "A19",
+        name: "REPAIR (RNA Editing for Programmable A-to-I Replacement)",
+        description:
+          "Correct pathogenic RNA mutations by programmable adenosine-to-inosine (A→I) editing using a catalytically inactive Cas13b fused to ADAR2. A guide RNA directs the fusion protein to the target RNA for site-specific editing.",
+        targetRegion: "Exonic or splice-site regions complementary to the guide RNA",
+        modality: "Guide RNA (~30–80 nt) + dCas13b–ADAR2 fusion",
+        tone: "blue",
+      },
+      {
+        code: "A20",
+        name: "Spliceosome-Mediated RNA Trans-splicing (SMaRT)",
+        description:
+          "Replace the mutant portion of a pre-mRNA with a corrected RNA sequence through spliceosome-mediated trans-splicing. An engineered RNA trans-splicing molecule binds the target pre-mRNA and recruits the endogenous spliceosome to perform trans-splicing.",
+        targetRegion: "Intronic sequences adjacent to the intended trans-splicing site",
+        modality: "Engineered RNA trans-splicing molecule (>1 kb)",
+        tone: "cyan",
+      },
+    ],
+  },
+  {
+    id: "tg05",
+    title: "TG05 — RNA Neutralization",
+    subtitle: "Neutralize toxic RNA molecules or block pathogenic RNA–protein interactions without necessarily degrading the RNA.",
+    badge: "TG05",
+    badgeTone: "bg-slate-100 text-slate-700",
+    mechanisms: [
+      {
+        code: "A12",
+        name: "microRNA Inhibition (Anti-miR / AntagomiR)",
+        description:
+          "Inhibit a pathogenic microRNA to restore expression of its downstream target genes. Fully modified oligonucleotides bind the mature miRNA, preventing it from loading into RISC and silencing its downstream target mRNAs.",
+        targetRegion: "Mature microRNA sequence (seed region)",
+        modality: "LNA / 2'-O-Me / 2'-MOE anti-miR (15–23 nt)",
+        clinicalExample: "Miravirsen (anti-miR-122, Hep C); Cobomarsen (anti-miR-155, oncology)",
+        tone: "pink",
+      },
+      {
+        code: "A14",
+        name: "RNA Toxicity Neutralization (RNA Foci Disruption)",
+        description:
+          "Restore normal RNA-binding protein function by disrupting pathogenic RNA-protein complexes. RNase H-independent steric blockers bind the repeat tract, displace sequestered proteins like MBNL, and restore splicing homeostasis without degrading the transcript.",
+        targetRegion: "Expanded repeat tract within pre-mRNA/mRNA (e.g. CUG, CCUG, GGGGCC)",
+        modality: "PMO / 2'-MOE / LNA-DNA mixmer steric blocker (15–30 nt)",
+        tone: "slate",
+      },
+      {
+        code: "A25",
+        name: "RNA Aptamer Therapeutics",
+        description:
+          "Modulate disease by specifically binding and inhibiting target molecules without altering gene expression. RNA aptamers fold into defined 3D structures that bind target proteins with high affinity and specificity, preventing ligand binding or protein function.",
+        targetRegion: "Extracellular or intracellular target protein",
+        modality: "RNA aptamer (20–100 nt)",
+        clinicalExample: "Pegaptanib (AMD)",
+        tone: "amber",
+      },
+    ],
+  },
+  {
+    id: "tg06",
+    title: "TG06 — Translational Regulation",
+    subtitle: "Increase or decrease protein synthesis by regulating mRNA translation without altering RNA abundance.",
+    badge: "TG06",
+    badgeTone: "bg-yellow-100 text-yellow-700",
+    mechanisms: [
+      {
+        code: "A2",
+        name: "Steric-Blocking Translation Inhibition",
+        description:
+          "Reduce protein synthesis by sterically blocking ribosome initiation or progression. Fully modified RNase H-inactive ASOs bind the 5' UTR or translation initiation codon, physically blocking ribosome access without degrading the target RNA.",
+        targetRegion: "5' UTR / AUG start codon",
+        modality: "Steric-block ASO (15–25 nt, RNase H-inactive)",
+        tone: "red",
+      },
+      {
+        code: "A5",
+        name: "Upstream Open Reading Frame (uORF) Blocking",
+        description:
+          "Increase translation of the primary open reading frame by preventing translation initiation at inhibitory upstream open reading frames. Steric-blocking ASOs mask the uORF start site to favor translation of the primary coding region.",
+        targetRegion: "5' UTR, specifically inhibitory uORFs and their AUG initiation codons",
+        modality: "RNase H-inactive steric-blocking ASO (~16–20 nt)",
+        tone: "amber",
+      },
+      {
+        code: "A6",
+        name: "miRNA Binding Site Blocking (Target Protector / BlockmiR)",
+        description:
+          "Increase expression of a specific target gene by preventing binding of a regulatory miRNA to its binding site on the target mRNA. Blocking only that interaction restores expression of the specific gene without inhibiting the miRNA globally.",
+        targetRegion: "miRNA recognition element (MRE) within the 3' UTR",
+        modality: "Morpholino / LNA / 2'-O-Me steric-block ASO (15–25 nt)",
+        tone: "yellow",
+      },
+      {
+        code: "A27",
+        name: "Riboswitch / RNA Structure Targeting",
+        description:
+          "Modulate translation by stabilizing or destabilizing structured RNA elements (IRES, G-quadruplexes, riboswitches) that control ribosomal entry or scanning. ASOs bind structured elements to alter their fold, redirecting ribosome access and restoring normal translation levels.",
+        targetRegion: "Structured RNA elements: IRES, G-quadruplexes, riboswitch aptamer domains",
+        modality: "PMO / 2'-O-MOE / LNA steric-block ASO (18–25 nt)",
+        tone: "orange",
+      },
+    ],
+  },
+  {
+    id: "tg07",
+    title: "TG07 — Isoform Engineering",
+    subtitle: "Generate therapeutically beneficial transcript or protein isoforms by modifying RNA processing or transcript architecture.",
+    badge: "TG07",
+    badgeTone: "bg-green-100 text-green-700",
+    mechanisms: [
+      {
+        code: "A7",
+        name: "Exon Skipping",
+        description:
+          "Restore production of a functional protein by preventing inclusion of a disease-associated exon. Steric-blocking ASOs mask splice-regulatory sequences, promoting exon exclusion from mature mRNA and restoring reading frame.",
+        targetRegion: "ESEs / Splice donor / Splice acceptor",
+        modality: "PMO or 2'-OMe PS steric-block ASO (20–30 nt)",
+        clinicalExample: "Eteplirsen (Exondys 51); Golodirsen; Casimersen; Viltolarsen — all for DMD",
+        tone: "emerald",
+      },
+      {
+        code: "A8",
+        name: "Exon Inclusion (Splice Correction)",
+        description:
+          "Restore production of a functional protein by promoting inclusion of a therapeutically important exon. Steric-blocking ASOs bind splice-silencing elements, preventing negative splicing factors and promoting exon recognition by the spliceosome.",
+        targetRegion: "Intronic Splicing Silencers (ISS) / ESS",
+        modality: "2'-MOE PS or PMO steric-block ASO (18–25 nt)",
+        clinicalExample: "Spinraza (nusinersen) — SMN2 exon 7 inclusion for SMA",
+        tone: "green",
+      },
+      {
+        code: "A9",
+        name: "Pseudoexon Suppression (Pseudoexon Skipping)",
+        description:
+          "Restore normal mRNA splicing by preventing inclusion of a pathogenic pseudoexon generated by a cryptic splice site. ASOs mask activated pseudoexons or cryptic splice sites, preventing their inclusion in mature mRNA.",
+        targetRegion: "Activated Pseudoexon / Cryptic Splice Sites",
+        modality: "2'-OMe PS or PMO steric-block ASO (18–25 nt)",
+        clinicalExample: "QR-1011 (ABCA4, Stargardt disease); Sepofarsen (CEP290, LCA10)",
+        tone: "teal",
+      },
+      {
+        code: "A10",
+        name: "Cryptic Splice Site Blocking",
+        description:
+          "Restore normal pre-mRNA splicing by masking a pathogenic cryptic splice donor or acceptor site and promoting use of the authentic splice site. Highly mutation-specific approach for splice correction.",
+        targetRegion: "Cryptic Splice Donor / Acceptor Site",
+        modality: "2'-OMe PS or PMO steric-block ASO (18–25 nt)",
+        tone: "cyan",
+      },
+      {
+        code: "A11",
+        name: "Alternative Polyadenylation (APA) Modulation",
+        description:
+          "Modify polyadenylation site selection to restore normal transcript processing or alter mRNA stability, localization, or protein expression. ASOs block aberrant polyadenylation signals to redirect processing toward the desired poly(A) site.",
+        targetRegion: "Poly(A) Signal / Cleavage Site / DSE / USE",
+        modality: "Steric-blocking ASO (18–25 nt, PS / 2'-MOE / PMO)",
+        tone: "slate",
+      },
+    ],
+  },
+  {
+    id: "tg08",
+    title: "TG08 — Protein Replacement",
+    subtitle: "Restore protein function by delivering therapeutic RNA molecules that encode the missing or defective protein.",
+    badge: "TG08",
+    badgeTone: "bg-sky-100 text-sky-700",
+    mechanisms: [
+      {
+        code: "A24",
+        name: "Messenger RNA (mRNA) Replacement Therapy",
+        description:
+          "Restore functional protein expression by delivering synthetic mRNA encoding the therapeutic protein. Exogenous mRNA is delivered into the cytoplasm, translated by host ribosomes into the therapeutic protein, thereby restoring or supplementing endogenous protein function.",
+        targetRegion: "N/A (delivered transcript)",
+        modality: "Synthetic linear mRNA (1–5 kb, modified nucleosides)",
+        clinicalExample: "Comirnaty; Spikevax",
+        tone: "sky",
+      },
+      {
+        code: "A26",
+        name: "Circular RNA (circRNA)-Mediated Protein Replacement",
+        description:
+          "Produce sustained therapeutic protein expression using circular RNA molecules with enhanced intracellular stability. Synthetic circular RNAs are translated through cap-independent translation, with the circular topology conferring resistance to exonuclease degradation.",
+        targetRegion: "N/A (delivered circRNA)",
+        modality: "Circular RNA (1–5 kb, IRES-mediated translation)",
+        tone: "teal",
+      },
+    ],
+  },
+  {
+    id: "tg09",
+    title: "TG09 — Protein Function Modulation",
+    subtitle: "Modulate protein activity directly using RNA molecules that bind and regulate protein function rather than gene expression.",
+    badge: "TG09",
+    badgeTone: "bg-orange-100 text-orange-700",
+    mechanisms: [
+      {
+        code: "A23",
+        name: "Small Activating RNA (saRNA)-Mediated Transcriptional Activation",
+        description:
+          "Double-stranded saRNAs target promoter-associated transcripts or promoter regions, recruiting AGO proteins and transcriptional regulatory complexes to enhance transcription of the endogenous gene. Activates gene expression at the DNA level without permanent genome modification.",
+        targetRegion: "Promoter-associated RNA (paRNA) / TSS",
+        modality: "21-mer dsRNA Duplex",
+        clinicalExample: "MTL-CEBPA (clinical development for liver cancer)",
+        tone: "indigo",
+      },
+      {
+        code: "A24",
+        name: "Messenger RNA (mRNA) Replacement Therapy",
+        description:
+          "Exogenous mRNA is delivered into the cytoplasm, translated by host ribosomes into the therapeutic protein, thereby restoring or supplementing endogenous protein function without altering genomic DNA. No genomic integration; rapid protein expression.",
+        targetRegion: "N/A (delivered transcript)",
+        modality: "Synthetic mRNA (1–5 kb, modified nucleosides)",
+        clinicalExample: "Comirnaty; Spikevax",
+        tone: "emerald",
+      },
+      {
+        code: "A25",
+        name: "RNA Aptamer Therapeutics",
+        description:
+          "RNA aptamers fold into defined three-dimensional structures that bind target proteins with high affinity and specificity, preventing ligand binding, receptor activation, or protein function. High specificity; reversible activity; relatively low immunogenicity.",
+        targetRegion: "Extracellular or intracellular target protein",
+        modality: "RNA aptamer (20–100 nt)",
+        clinicalExample: "Pegaptanib (AMD)",
+        tone: "amber",
+      },
+      {
+        code: "A26",
+        name: "Circular RNA (circRNA)-Mediated Protein Replacement",
+        description:
+          "Synthetic circular RNAs enter the cytoplasm and are translated into therapeutic proteins through cap-independent translation. The circular topology confers resistance to exonuclease degradation, resulting in prolonged protein production compared with linear mRNA.",
+        targetRegion: "N/A (delivered circRNA)",
+        modality: "Circular RNA (1–5 kb, IRES-mediated translation)",
+        tone: "teal",
+      },
+    ],
+  },
 ];
 
 const TONE_MAP: Record<string, { bg: string; text: string; pill: string }> = {
@@ -385,13 +664,18 @@ const TONE_MAP: Record<string, { bg: string; text: string; pill: string }> = {
   sky: { bg: "bg-sky-50/60", text: "text-sky-500", pill: "bg-sky-100 text-sky-700" },
   teal: { bg: "bg-teal-50/60", text: "text-teal-500", pill: "bg-teal-100 text-teal-700" },
   slate: { bg: "bg-slate-50/60", text: "text-slate-500", pill: "bg-slate-100 text-slate-700" },
+  orange: { bg: "bg-orange-50/60", text: "text-orange-500", pill: "bg-orange-100 text-orange-700" },
+  purple: { bg: "bg-purple-50/60", text: "text-purple-500", pill: "bg-purple-100 text-purple-700" },
+  yellow: { bg: "bg-yellow-50/60", text: "text-yellow-500", pill: "bg-yellow-100 text-yellow-700" },
+  green: { bg: "bg-green-50/60", text: "text-green-500", pill: "bg-green-100 text-green-700" },
 };
 
 function GoalSection({ goal }: { goal: TherapeuticGoalSection }) {
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
+  const t = TONE_MAP[goal.badgeTone.match(/bg-(\w+)-\d+/)?.[1] ?? "slate"];
 
   return (
-    <section className="rounded-xl border border-[#E5E7EB] bg-white">
+    <div className="rounded-xl border border-[#E5E7EB] bg-white shadow-sm hover:shadow-md transition-all">
       <button
         onClick={() => setExpanded((e) => !e)}
         className="flex w-full items-center gap-3 px-5 py-4 text-left"
@@ -399,11 +683,17 @@ function GoalSection({ goal }: { goal: TherapeuticGoalSection }) {
         <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${goal.badgeTone}`}>
           {goal.badge}
         </span>
-        <h2 className="text-[15px] font-bold text-slate-900">{goal.title}</h2>
+        <div className="flex-1 min-w-0">
+          <h2 className="text-[15px] font-bold text-slate-900 truncate">{goal.title}</h2>
+          <p className="text-[11px] text-slate-500 truncate">{goal.subtitle}</p>
+        </div>
+        <span className="text-[10px] font-medium text-slate-400">
+          {goal.mechanisms.length} mechanism{goal.mechanisms.length !== 1 ? "s" : ""}
+        </span>
         {expanded ? (
-          <ChevronDown className="ml-auto h-4 w-4 text-slate-400" />
+          <ChevronDown className="h-4 w-4 text-slate-400 shrink-0" />
         ) : (
-          <ChevronRight className="ml-auto h-4 w-4 text-slate-400" />
+          <ChevronRight className="h-4 w-4 text-slate-400 shrink-0" />
         )}
       </button>
       {expanded && (
@@ -411,14 +701,14 @@ function GoalSection({ goal }: { goal: TherapeuticGoalSection }) {
           <p className="mb-4 text-[13px] leading-relaxed text-slate-600">{goal.subtitle}</p>
           <div className="grid gap-3">
             {goal.mechanisms.map((mech) => {
-              const t = TONE_MAP[mech.tone];
+              const mt = TONE_MAP[mech.tone];
               return (
                 <div
                   key={mech.code}
                   className="rounded-lg border border-[#E5E7EB] bg-slate-50/50 p-4"
                 >
                   <div className="flex items-center gap-2">
-                    <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${t.pill}`}>
+                    <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${mt.pill}`}>
                       {mech.code}
                     </span>
                     <h3 className="text-[13px] font-semibold text-slate-800">{mech.name}</h3>
@@ -427,8 +717,8 @@ function GoalSection({ goal }: { goal: TherapeuticGoalSection }) {
                     {mech.description}
                   </p>
                   <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                    <div className={`rounded-md ${t.bg} px-2.5 py-1.5`}>
-                      <p className={`text-[10px] font-medium uppercase tracking-wider ${t.text}`}>
+                    <div className={`rounded-md ${mt.bg} px-2.5 py-1.5`}>
+                      <p className={`text-[10px] font-medium uppercase tracking-wider ${mt.text}`}>
                         Target Region
                       </p>
                       <p className="mt-0.5 text-[11px] text-slate-700">{mech.targetRegion}</p>
@@ -478,7 +768,7 @@ function GoalSection({ goal }: { goal: TherapeuticGoalSection }) {
           </div>
         </div>
       )}
-    </section>
+    </div>
   );
 }
 
@@ -499,7 +789,7 @@ export default function DocumentationPage() {
                   Therapeutic Mechanism Documentation
                 </h1>
                 <p className="text-[12px] text-slate-500">
-                  Reference documentation for RNA therapeutics mechanism design — TG01, TG02, TG04
+                  Reference documentation for RNA therapeutics mechanism design — all 9 therapeutic goals
                 </p>
               </div>
             </div>

@@ -7,7 +7,9 @@ for a target exon, and computes biophysical metrics (GC%, Tm, self-dimer risk).
 
 from __future__ import annotations
 
+import json
 import logging
+import os
 import re
 import time
 import requests
@@ -19,7 +21,20 @@ ENSEMBL_REST = "https://rest.ensembl.org"
 MAX_RETRIES = 3
 RETRY_BACKOFF = 1.5  # seconds
 
+# Rulebooks live as plain rule.json files under backend/rulebooks/<MECH_ID>/.
+# Same location as mechanism_service.RULEBOOKS_DIR.
+RULEBOOKS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "rulebooks")
+
 logger = logging.getLogger(__name__)
+
+
+def _load_silencing_rule(mechanism_id: str) -> dict | None:
+    """Load a mechanism's rule.json (None if absent). Mirror of mechanism_service."""
+    path = os.path.join(RULEBOOKS_DIR, mechanism_id, "rule.json")
+    if not os.path.exists(path):
+        return None
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
 
 
 def _ensembl_get(url: str, timeout: int = 20, retries: int = MAX_RETRIES) -> requests.Response:
@@ -190,8 +205,6 @@ CHEMISTRY_OPTIONS = [
      "detail": "A DNA gapmer where the flanking wings contain Locked Nucleic Acids (LNA) \u2014 bicyclic RNA analogues with a methylene bridge locking the ribose in a C3\u2032-endo conformation. Each LNA substitution raises Tm by ~2\u2032-8\u2032C, dramatically increasing target affinity. LNA gapmers also have enhanced nuclease resistance. Used in miravirsen (anti-miR-122) and bepetamers. Higher off-target risk due to increased potency."},
     {"id": "2ome", "label": "2\u2032-O-Methoxyethyl (2\u2032-OMe)", "description": "Steric blocker; splicing modulation and miRNA inhibition.",
      "detail": "A ribose-modified oligonucleotide where the 2\u2032-OH is replaced with a methoxyethyl group. 2\u2032-OMe ASOs sterically block RNA interactions and are commonly used for splice-switching and miRNA inhibition. They have good nuclease resistance, low toxicity, and are often used in combination (e.g., morpholino-2\u2032-OMe mixmers). Lower binding affinity than LNA but fewer off-target effects."},
-    {"id": "sirna", "label": "siRNA duplex", "description": "Duplex RNA guide/passenger design for RISC-mediated mRNA cleavage.",
-     "detail": "A 21\u201323 nt duplex in which the antisense guide strand is loaded into RISC to direct AGO2-mediated cleavage of the complementary mRNA target."},
 ]
 
 MODIFICATION_OPTIONS = [
@@ -334,7 +347,7 @@ def _extinction_coefficient(seq: str) -> float:
 def _nuclease_resistance_score(chemistry: str, modifications: list[str]) -> float:
     """Estimated nuclease resistance (0-100). Higher = more resistant."""
     base = 20  # Unmodified DNA
-    chem_scores = {"gapmer": 55, "lna_gapmer": 70, "pmo": 85, "2ome": 60, "sirna": 50}
+    chem_scores = {"gapmer": 55, "lna_gapmer": 70, "pmo": 85, "2ome": 60}
     mod_scores = {"phosphorothioate": 25, "lna_wings": 20, "2omemod": 15, "pmo_core": 30, "pna_clamp": 35}
     score = base + chem_scores.get(chemistry, 0)
     for m in modifications:
@@ -346,7 +359,7 @@ def _cellular_uptake_score(chemistry: str, length: int) -> float:
     """Estimated cellular uptake efficiency (0-100)."""
     # Shorter oligos cross membranes better
     length_factor = max(0, 100 - (length - 15) * 5)
-    chem_factors = {"gapmer": 60, "lna_gapmer": 65, "pmo": 40, "2ome": 55, "sirna": 50}
+    chem_factors = {"gapmer": 60, "lna_gapmer": 65, "pmo": 40, "2ome": 55}
     base = chem_factors.get(chemistry, 50)
     return round((base + length_factor) / 2, 1)
 
@@ -381,7 +394,7 @@ def _synthesis_difficulty(seq: str, chemistry: str, modifications: list[str]) ->
     # Longer = harder
     difficulty += max(0, (len(seq) - 20) * 2)
     # Chemistry complexity
-    chem_factor = {"gapmer": 5, "lna_gapmer": 15, "pmo": 10, "2ome": 8, "sirna": 12}
+    chem_factor = {"gapmer": 5, "lna_gapmer": 15, "pmo": 10, "2ome": 8}
     difficulty += chem_factor.get(chemistry, 5)
     # Modification complexity
     mod_factor = {"phosphorothioate": 5, "lna_wings": 10, "2omemod": 5, "pmo_core": 8, "pna_clamp": 15}
@@ -435,196 +448,46 @@ def _duplex_stability(gc: float, tm: float, length: int) -> str:
         return "Weak"
 
 
-def _tissue_scores(delivery_context: str | None, chemistry: str, length: int) -> dict:
-    """Calculate tissue-specific scoring adjustments.
+def _defect_scores(defect_type: str | None, silencing_scope: str | None) -> dict:
+    """Informational text for the defect type and silencing scope.
 
-    Returns a dict with uptake_modifier, bbb_modifier, immune_modifier,
-    and tissue_notes based on the target tissue/organ.
+    Notes-only: no numeric bonuses vote into the ranking score. Numeric
+    defect/chemistry preferences were a re-implementation of mechanism
+    eligibility (already enforced by DEFECT_COMPATIBILITY upstream) with
+    invented magnitudes, so they were removed rather than tuned.
     """
-    ctx = (delivery_context or "").lower().strip()
-
-    # Default tissue profiles: uptake, bbb, immune — amplified for meaningful scoring
-    tissue_profiles = {
-        "liver":        {"uptake": 20, "bbb": 0,  "immune": -8, "notes": "High hepatic uptake; PNPLA3 and ASGR-mediated endocytosis favor liver ASOs."},
-        "kidney":       {"uptake": 15, "bbb": 0,  "immune": 0,  "notes": "Good renal tubular uptake but rapid glomerular filtration clearance."},
-        "cns":          {"uptake": -15, "bbb": 25, "immune": -12, "notes": "Requires BBB crossing; intrathecal delivery common. PMO+CPP or LNA preferred."},
-        "brain":        {"uptake": -15, "bbb": 25, "immune": -12, "notes": "Requires BBB crossing; intrathecal delivery common. PMO+CPP or LNA preferred."},
-        "muscle":       {"uptake": 8, "bbb": 0,  "immune": 0,  "notes": "Moderate uptake; large tissue mass dilutes dose. DMD exon-skipping validated."},
-        "skeletal muscle": {"uptake": 8, "bbb": 0, "immune": 0, "notes": "Moderate uptake; large tissue mass dilutes dose. DMD exon-skipping validated."},
-        "heart":        {"uptake": 5, "bbb": 0,  "immune": -5, "notes": "Limited cardiac uptake; systemic delivery reaches myocardium at high doses."},
-        "lung":         {"uptake": 12, "bbb": 0,  "immune": 8,  "notes": "Accessible via inhalation; mucus barrier for systemic delivery. Good for local."},
-        "eye":          {"uptake": 18, "bbb": 0,  "immune": 10, "notes": "Immune-privileged site; intravitreal delivery. Local exposure with minimal systemic."},
-        "retina":       {"uptake": 18, "bbb": 0,  "immune": 10, "notes": "Immune-privileged site; intravitreal delivery. Local exposure with minimal systemic."},
-        "ocular":       {"uptake": 18, "bbb": 0,  "immune": 10, "notes": "Immune-privileged site; intravitreal delivery. Local exposure with minimal systemic."},
-        "spinal cord":  {"uptake": -8, "bbb": 20, "immune": -8, "notes": "Intrathecal delivery required; limited diffusion from CSF."},
-        "tumor":        {"uptake": 8, "bbb": 0,  "immune": 15, "notes": "Tumor microenvironment may enhance uptake; immune stimulation can be beneficial."},
-        "blood":        {"uptake": 12, "bbb": 0,  "immune": 12, "notes": "Hematopoietic cells readily take up ASOs; immune stimulation risk."},
-        "bone marrow":  {"uptake": 12, "bbb": 0,  "immune": 12, "notes": "Hematopoietic cells readily take up ASOs; immune stimulation risk."},
-        "pancreas":     {"uptake": 5, "bbb": 0,  "immune": 0,  "notes": "Limited pancreatic uptake; systemic delivery required."},
-        "skin":         {"uptake": 15, "bbb": 0,  "immune": 8,  "notes": "Topical or intradermal delivery; good local exposure."},
-        "gut":          {"uptake": 10, "bbb": 0,  "immune": 12, "notes": "Oral delivery challenging; enema or local delivery preferred."},
-        "intestine":    {"uptake": 10, "bbb": 0,  "immune": 12, "notes": "Oral delivery challenging; enema or local delivery preferred."},
-        "local_intramuscular": {"uptake": 8, "bbb": 0, "immune": 0, "notes": "Moderate uptake; large tissue mass dilutes dose. DMD exon-skipping validated."},
-        "intramuscular": {"uptake": 8, "bbb": 0, "immune": 0, "notes": "Moderate uptake; large tissue mass dilutes dose. DMD exon-skipping validated."},
-    }
-
-    # Find best matching tissue
-    profile = None
-    for tissue_key, prof in tissue_profiles.items():
-        if tissue_key in ctx:
-            profile = prof
-            break
-
-    if not profile:
-        # Default profile for unknown tissue
-        profile = {"uptake": 0, "bbb": 0, "immune": 0, "notes": "No tissue-specific adjustments applied."}
-
-    # Chemistry-tissue interactions — large bonuses for validated pairings
-    chem_bonus = 0
-    if ctx in ("cns", "brain", "spinal cord"):
-        if chemistry in ("pmo", "lna_gapmer"):
-            chem_bonus = 15  # LNA/PMO strongly preferred for CNS
-        elif chemistry == "gapmer":
-            chem_bonus = -8  # Standard gapmer poor for CNS
-        elif chemistry == "sirna":
-            chem_bonus = 5   # siRNA can work with conjugation
-    elif ctx in ("liver",):
-        if chemistry == "gapmer":
-            chem_bonus = 12  # Gapmers well-validated for liver (e.g., inclisiran)
-        elif chemistry == "lna_gapmer":
-            chem_bonus = 8   # LNA also works well for liver
-        elif chemistry == "sirna":
-            chem_bonus = 10  # siRNA liver-targeted (e.g., patisiran)
-    elif ctx in ("eye", "retina", "ocular"):
-        if chemistry == "pmo":
-            chem_bonus = 10  # PMOs used in retinal diseases (e.g., eteplirsen)
-        elif chemistry == "2ome":
-            chem_bonus = 8   # 2'-OMe used in intravitreal ASOs
-    elif ctx in ("muscle", "skeletal muscle", "local_intramuscular", "intramuscular"):
-        if chemistry in ("pmo",):
-            chem_bonus = 10  # PMO exon-skipping for DMD
-        elif chemistry == "gapmer":
-            chem_bonus = 5
-    elif ctx in ("blood", "bone marrow"):
-        if chemistry == "gapmer":
-            chem_bonus = 8   # Gapmers for hematologic targets
-    elif ctx in ("lung",):
-        if chemistry == "2ome":
-            chem_bonus = 8   # 2'-OMe for inhaled ASOs
-    elif ctx in ("tumor",):
-        if chemistry in ("gapmer", "lna_gapmer"):
-            chem_bonus = 8   # RNase H preferred for tumor knockdown
-
-    # Length-tissue interaction
-    length_modifier = 0
-    if ctx in ("cns", "brain", "spinal cord") and length > 20:
-        length_modifier = -10  # Longer ASOs cross BBB significantly worse
-    elif ctx in ("cns", "brain", "spinal cord") and length <= 16:
-        length_modifier = 5   # Shorter ASOs cross BBB better
-
-    return {
-        "uptake_modifier": profile["uptake"],
-        "bbb_modifier": profile["bbb"],
-        "immune_modifier": profile["immune"],
-        "chem_tissue_bonus": chem_bonus,
-        "length_modifier": length_modifier,
-        "tissue_notes": profile["notes"],
-    }
-
-
-def _defect_scores(defect_type: str | None, silencing_scope: str | None, chemistry: str, nuclease_score: float) -> dict:
-    """Calculate defect-type-specific scoring adjustments.
-
-    Different molecular defects require different ASO strategies:
-    - Loss-of-function: knockdown the toxic/ dysfunctional protein
-    - Gain-of-function: reduce the overactive protein
-    - Haploinsufficiency: upregulate (not applicable for silencing ASOs)
-    - Dominant-negative: knockdown the mutant allele
-    - Toxic RNA: degrade the toxic RNA transcript
-    - Splice defect: correct splicing (steric blocking, not cleavage)
-    """
-    # Canonical defect ids use underscores (gain_of_function, viral_toxic_rna);
-    # labels use spaces/hyphens. Normalize so both forms match the branches below.
     defect = (defect_type or "").lower().strip().replace("_", "-").replace(" ", "-")
     scope = (silencing_scope or "").lower().strip()
 
-    scores = {
-        "defect_bonus": 0,
-        "nuclease_preference": 0,
-        "chemistry_preference": 0,
-        "defect_notes": "No defect-specific adjustments applied.",
-    }
+    notes = "No defect-specific note available."
 
     if "loss-of-function" in defect or "lof" in defect:
-        # LoF: aggressive knockdown preferred; high nuclease resistance important
-        scores["defect_bonus"] = 8
-        scores["nuclease_preference"] = 10 if nuclease_score >= 70 else -5
-        scores["defect_notes"] = "Loss-of-function: aggressive knockdown preferred. High nuclease resistance favors efficacy."
-
+        notes = "Loss-of-function: knockdown of the toxic/dysfunctional transcript may be appropriate; confirm eligibility in the mechanism rulebook."
     elif "haploinsufficiency" in defect:
-        # Haploinsufficiency: silencing ASOs are contraindicated; warn
-        scores["defect_bonus"] = -15
-        scores["defect_notes"] = "Haploinsufficiency: gene silencing may worsen the phenotype. Consider upregulation mechanisms instead."
-
+        notes = "Haploinsufficiency: gene silencing can worsen the phenotype — consider upregulation mechanisms instead."
     elif "dominant" in defect:
-        # Dominant-negative: allele-specific silencing preferred
-        scores["defect_bonus"] = 6
-        scores["defect_notes"] = "Dominant-negative: allele-specific silencing of the mutant allele preferred. Consider variant-specific ASO design."
-
+        notes = "Dominant-negative: allele-specific silencing of the mutant allele is preferred; position the ASO over the variant."
     elif "gain-of-function" in defect or "gof" in defect:
-        # GoF: need substantial reduction; gapmer preferred
-        scores["defect_bonus"] = 6
-        if chemistry in ("gapmer", "lna_gapmer"):
-            scores["chemistry_preference"] = 10
-        scores["defect_notes"] = "Gain-of-function: substantial protein reduction needed. Gapmer/LNA chemistry preferred for potent knockdown."
-
+        notes = "Gain-of-function: substantial reduction of the toxic protein is needed; the mechanism rulebook requires RNase H-recruiting chemistry for degradation."
     elif "toxic" in defect or "viral" in defect:
-        # Toxic RNA (viral_toxic_rna): degrade the toxic transcript; RNAse H preferred
-        scores["defect_bonus"] = 10
-        if chemistry in ("gapmer", "lna_gapmer"):
-            scores["chemistry_preference"] = 12
-        scores["defect_notes"] = "Toxic RNA: transcript degradation preferred. RNase H-recruiting gapmers are most effective."
-
+        notes = "Toxic RNA: transcript degradation is preferred; RNase H-recruiting chemistry applies where the rulebook requires it."
     elif "mirna-dysregulation" in defect or "mirna-dysreg" in defect:
-        # Pathogenic miRNA dysregulation (mirna_dysregulation): anti-miR silencing
-        scores["defect_bonus"] = 10
-        if chemistry in ("pmo", "2ome"):
-            scores["chemistry_preference"] = 10
-        scores["defect_notes"] = "Pathogenic microRNA dysregulation: anti-miR silencing of the toxic miRNA preferred. Steric-blocking chemistry suitable."
-
+        notes = "Pathogenic microRNA dysregulation: anti-miR silencing of the toxic miRNA; the A12 rulebook requires RNase H-independent steric chemistry."
     elif "overexpression" in defect or "oncogene" in defect:
-        # Overexpression: aggressive knockdown required; gapmer preferred
-        scores["defect_bonus"] = 8
-        if chemistry in ("gapmer", "lna_gapmer"):
-            scores["chemistry_preference"] = 12
-        scores["defect_notes"] = "Gene overexpression: aggressive knockdown required. Gapmer/LNA chemistry preferred for deep reduction."
-
+        notes = "Gene overexpression: deep knockdown is needed; the A15 rulebook describes RNase H-compatible gapmer designs."
     elif "splice" in defect or "exon" in defect or "pseudoexon" in defect or "apa" in defect:
-        # Splice defect: steric blocking preferred, not cleavage
-        scores["defect_bonus"] = 8
-        if chemistry in ("pmo", "2ome"):
-            scores["chemistry_preference"] = 15
-        elif chemistry in ("gapmer", "lna_gapmer"):
-            scores["chemistry_preference"] = -10  # Gapmers cleave, not ideal for splice correction
-        scores["defect_notes"] = "Splice defect: steric blocking (PMO/2'-OMe) preferred for splice correction. RNase H gapmers may be counterproductive."
-
+        notes = "Splice defect: splicing correction uses steric-blocking (RNase H-inactive) chemistry — a different modality than gene silencing."
     elif "nonsense" in defect or "premature" in defect:
-        # Nonsense mutations: read-through or exon skipping
-        scores["defect_bonus"] = 6
-        scores["defect_notes"] = "Nonsense mutation: exon-skipping ASOs may bypass the premature stop codon."
-
+        notes = "Nonsense mutation: exon-skipping ASOs may bypass the premature stop codon (RNA-processing mechanism)."
     elif "frameshift" in defect:
-        # Frameshift: similar to nonsense
-        scores["defect_bonus"] = 6
-        scores["defect_notes"] = "Frameshift mutation: exon-skipping or transcript degradation strategies applicable."
+        notes = "Frameshift mutation: exon-skipping or transcript-degradation strategies may apply; eligibility is set by the mechanism rulebook."
 
-    # Silencing scope adjustments
     if scope == "total_knockdown":
-        # Total knockdown: higher nuclease resistance needed for widespread degradation
-        scores["nuclease_preference"] += 8
-        scores["defect_notes"] += " Total transcript knockdown selected — broad targeting across all exons."
+        notes += " Total-transcript knockdown selected — broad targeting across the CDS."
+    elif scope == "allele_specific":
+        notes += " Allele-specific silencing selected — candidates are ranked to prioritise those spanning the variant coordinate."
 
-    return scores
+    return {"defect_notes": notes}
 
 
 def _estimated_binding_energy(gc_content: float, tm: float) -> float:
@@ -658,6 +521,82 @@ def _reverse_complement(seq: str) -> str:
     return seq.upper().translate(str.maketrans("ATGC", "TACG"))[::-1]
 
 
+# Estimated Tm boost (°C) contributed by each chemistry's affinity-modifying
+# backbone/wing design, applied to every candidate of that chemistry.
+#
+# The values reflect documented, cited per-base effects (not invented):
+#   - LNA: ~2-8°C per substituted base (documented LNA literature; +12 for a
+#     short LNA-winged gapmer is ~3°C/base — inside that cited range).
+#   - 2'-OMe: ~0.5-1°C per modified base; the flat +6 for a full-length
+#     2'-OMe ASO is deliberately conservative.
+#   - PMO: neutral binding profile.
+#   - Unmodified-DNA gapmer: primer3's Tm is already the plain DNA value, so 0.
+CHEM_TM_BOOST = {
+    "gapmer": 0,       # unmodified DNA wings
+    "lna_gapmer": 12,  # ~2-8°C per LNA base, cited
+    "pmo": 0,          # morpholino — neutral binding profile
+    "2ome": 6,         # ~0.5-1°C per 2'-OMe base, conservative flat value
+}
+
+MOD_TM_BOOST = {
+    "lna_wings": 8,   # additional LNA at 5'/3'
+    "2omemod": 5,     # 2'-OMe wing modifications
+    "pna_clamp": 10,  # PNA clamps raise affinity strongly
+}
+
+# Per-mechanism effective-Tm windows are INTERNAL DESIGN TARGETS derived from
+# each rulebook's affinity description (A2 = "maintain high binding affinity"
+# steric block; A12 = "optimize affinity" anti-miR; A1/A15 = moderate-affinity
+# RNase H gapmer). They are mechanism-specific guidance for the designer, NOT
+# cited thresholds — the _tm_fit_score term built on them is a heuristic.
+OPTIMAL_TM_RANGES = {
+    "A1": (50, 65),   # RNase H1 cleavage — moderate affinity
+    "A2": (62, 75),   # translation block — tight binding at AUG
+    "A12": (55, 68),  # anti-miR — strong complementarity
+    "A15": (55, 68),  # promoter ASO — moderate
+}
+
+
+def _effective_tm_boost(chemistry: str, modifications: list[str]) -> float:
+    """Estimated effective Tm increase from the chosen chemistry + modifications."""
+    return CHEM_TM_BOOST.get(chemistry, 0) + sum(
+        MOD_TM_BOOST.get(m, 0) for m in modifications
+    )
+
+
+def _tm_fit_score(
+    tm: float, chemistry: str, modifications: list[str], mechanism_id: str
+) -> float:
+    """How well a candidate's chemistry-adjusted Tm fits the mechanism's
+    optimal affinity window (0-100). Because the boost is chemistry-dependent
+    and the base Tm is window-dependent, this term re-ranks candidates when the
+    chemistry or modifications change."""
+    adjusted_tm = tm + _effective_tm_boost(chemistry, modifications)
+    lo, hi = OPTIMAL_TM_RANGES.get(mechanism_id, (50, 70))
+    if lo <= adjusted_tm <= hi:
+        dist = 0
+    else:
+        dist = min(abs(adjusted_tm - lo), abs(adjusted_tm - hi))
+    return round(max(0.0, 100.0 - dist * 6.0), 1)
+
+
+def _composite_score(dg: float, tm_fit: float) -> float:
+    """Ranking score built exclusively from real, physics-based metrics:
+    the ViennaRNA target duplex ΔG and the chemistry-adjusted Tm fit.
+
+    Heuristic drug-like estimates (nuclease, uptake, BBB, off-target, immune,
+    synthesis) and mechanism/defect/tissue/allele point bonuses are deliberately
+    excluded from the sort order. They are surfaced to the user as labeled
+    estimates in ``heuristicEstimates`` rather than silently voted into the
+    ranking.
+    """
+    # Normalize target duplex ΔG (more negative = stronger binding).
+    # Typical perfect-match ΔG for 12-30 nt oligos is roughly -8 to -40 kcal/mol.
+    duplex_score = min(100.0, max(0.0, (-dg - 8.0) * 3.5))
+    # Primary signal is duplex binding; Tm fit is the secondary tiebreaker.
+    return round(0.65 * duplex_score + 0.35 * tm_fit, 1)
+
+
 def _mechanism_design_constraints(mechanism_id: str, aso_length: int, chemistry: str) -> tuple[int, str, str]:
     """Validate mechanism-specific inputs and return effective design settings.
 
@@ -670,7 +609,15 @@ def _mechanism_design_constraints(mechanism_id: str, aso_length: int, chemistry:
     if mechanism_id == "A2":
         return aso_length, chemistry, "translation_start"
     if mechanism_id == "A21":
-        return 21, "sirna", "mrna"
+        # A21 (RNAi / siRNA) is a double-stranded duplex modality, not a
+        # single-stranded ASO. The ASO designer only produces single-stranded
+        # candidates, so A21 requests are refused here rather than silently
+        # emitting a chemically-incorrect design.
+        raise ValueError(
+            "A21 (RNA interference) requires a double-stranded siRNA duplex, which "
+            "the single-stranded ASO designer does not support. Choose a "
+            "single-stranded mechanism: A1, A2, A12, or A15."
+        )
     if mechanism_id == "A12":
         # Anti-miR: cannot design from CDS — return gracefully
         return aso_length, chemistry, "mrna"
@@ -680,105 +627,79 @@ def _mechanism_design_constraints(mechanism_id: str, aso_length: int, chemistry:
     raise ValueError(f"Unsupported gene-silencing mechanism: {mechanism_id}")
 
 
-def _mechanism_scoring_adjustments(
-    mechanism_id: str,
-    chemistry: str,
-    modifications: list[str],
-    candidate_seq: str,
-    gc: float,
-    tm: float,
-) -> dict:
-    """Compute mechanism-specific scoring bonuses/penalties.
+# Chemistry → RNase H capability, as stated in this file's own
+# CHEMISTRY_OPTIONS descriptions (gapmer "recruits RNase H1"; PMO "do not
+# recruit RNase H"; 2'-OMe steric blocker; LNA gapmer is a gapmer with LNA
+# wings, so still RNase H-recruiting). These groupings are not invented — they
+# are the mechanism of action the chemistry options themselves declare.
+RNASE_H_ACTIVE_CHEMISTRIES = {"gapmer", "lna_gapmer"}
+RNASE_H_INDEPENDENT_CHEMISTRIES = {"pmo", "2ome"}
 
-    Each mechanism has different biological requirements that affect what
-    makes a good ASO candidate:
 
-    - A1 (RNase H1 mRNA degradation): Potent cleavage preferred.
-      Gapmer/LNA chemistry strongly favored. Longer ASOs ok.
-    - A2 (Translation blocking): Steric hindrance at AUG.
-      Shorter, high-affinity ASOs preferred. PMO/2'-OMe ok.
-      RNase H gapmers are counterproductive.
-    - A21 (siRNA/RISC): Duplex RNA guide/passenger.
-      21-nt forced. RISC loading efficiency matters.
-    - A12 (Anti-miR): miRNA sponge / complement.
-      Needs mature miRNA sequence (not from CDS).
-    - A15 (Promoter ASO): Transcriptional gene silencing.
-      Needs promoter-associated RNA (not from CDS).
+def _mechanism_rnase_h_requirement(mechanism_id: str) -> str | None:
+    """Classify a mechanism's chemistry requirement from its own rule.json.
+
+    Reads the ``asoChemistry``/``limitations`` text (not an invented preference
+    table). Returns ``"rnase_h"`` for RNase H-recruiting mechanisms,
+    ``"steric"`` for RNase H-inactive/independent mechanisms, or None when the
+    rulebook gives no signal.
     """
-    mech_bonus = 0
-    mech_notes = ""
+    rule = _load_silencing_rule(mechanism_id)
+    if not rule:
+        return None
+    haystack = (
+        str(rule.get("asoChemistry") or "")
+        + " "
+        + str(rule.get("limitations") or "")
+    ).lower()
+    if any(k in haystack for k in ("rnase h-inactive", "rnase h-independent")):
+        return "steric"
+    if any(k in haystack for k in ("rnase h-compatible", "rnase h-active", "requires rnase h1")):
+        return "rnase_h"
+    return None
 
-    if mechanism_id == "A1":
-        # RNase H1: gapmer is gold standard, LNA boosts potency
-        if chemistry in ("gapmer", "lna_gapmer"):
-            mech_bonus = 12  # Strong bonus for RNase H-recruiting chemistries
-            mech_notes = "A1 (RNase H1): Gapmer chemistry recruits RNase H1 for mRNA cleavage."
-        elif chemistry == "sirna":
-            mech_bonus = 5
-            mech_notes = "A1 (RNase H1): siRNA can recruit RNase H via RISC, but gapmer preferred."
-        elif chemistry in ("pmo", "2ome"):
-            mech_bonus = -8  # Steric blockers don't recruit RNase H
-            mech_notes = "A1 (RNase H1): PMO/2'-OMe are steric blockers — poor RNase H recruitment for mRNA degradation."
-        # Length: 18-22 nt optimal for RNase H
-        if 18 <= len(candidate_seq) <= 22:
-            mech_bonus += 3
-        elif len(candidate_seq) > 25:
-            mech_bonus -= 3
 
-    elif mechanism_id == "A2":
-        # Translation blocking: high-affinity steric blocker at AUG
-        if chemistry in ("pmo", "2ome"):
-            mech_bonus = 10  # Steric blockers ideal for translation arrest
-            mech_notes = "A2 (Translation block): PMO/2'-OMe sterically block ribosome at AUG."
-        elif chemistry in ("gapmer", "lna_gapmer"):
-            mech_bonus = -5  # Gapmers cleave mRNA — not ideal for translation blocking
-            mech_notes = "A2 (Translation block): Gapmers recruit RNase H — may degrade mRNA instead of blocking translation."
-        elif chemistry == "sirna":
-            mech_bonus = -10  # siRNA cleaves, doesn't block translation
-            mech_notes = "A2 (Translation block): siRNA degrades mRNA via RISC — not translation blocking."
-        # Higher Tm = tighter binding = better steric block
-        if tm >= 55:
-            mech_bonus += 5
-        elif tm >= 50:
-            mech_bonus += 2
-        # LNA wings boost affinity for steric blocking
-        if "lna_wings" in modifications:
-            mech_bonus += 5
-        if "phosphorothioate" in modifications:
-            mech_bonus += 3  # PS improves cellular retention
+def _mechanism_chemistry_compatibility(mechanism_id: str, chemistry: str) -> str | None:
+    """Hard gate: is the chosen chemistry mechanically compatible with the
+    mechanism, per the mechanism's own rulebook?
 
-    elif mechanism_id == "A21":
-        # siRNA: duplex RNA, RISC-loaded, guide strand cleaves target
-        if chemistry == "sirna":
-            mech_bonus = 15  # siRNA chemistry is required
-            mech_notes = "A21 (siRNA): Duplex guide/passenger loaded into RISC for AGO2-mediated cleavage."
-        else:
-            mech_bonus = -15  # Wrong chemistry for siRNA mechanism
-            mech_notes = "A21 (siRNA): Requires siRNA duplex chemistry — other ASO chemistries incompatible."
-        # GC 30-50% optimal for RISC loading (not too stable, not too weak)
-        if 0.30 <= gc <= 0.50:
-            mech_bonus += 5
-        elif gc > 0.60:
-            mech_bonus -= 5  # Too GC-rich = guide strand may not unwind
-        # Thermodynamic asymmetry: guide strand should have lower 5' stability
-        if tm < 50:
-            mech_bonus += 3  # Moderate Tm preferred for RISC loading
+    A steric-blocking chemistry (PMO, 2'-OMe) cannot perform RNase
+    H-mediated degradation and an RNase H-recruiting chemistry cannot act as a
+    pure steric block, so a mismatch is rejected (ValueError) rather than
+    scored as merely "suboptimal" — emitting a mis-designed ASO is worse than
+    refusing. Returns the requirement string when a rulebook classification
+    exists and the chemistry is unclassified (no gate possible).
+    """
+    requirement = _mechanism_rnase_h_requirement(mechanism_id)
+    if requirement is None:
+        return None
+    if chemistry in RNASE_H_ACTIVE_CHEMISTRIES:
+        capability = "rnase_h"
+    elif chemistry in RNASE_H_INDEPENDENT_CHEMISTRIES:
+        capability = "steric"
+    else:
+        return requirement
+    if requirement != capability:
+        rule = _load_silencing_rule(mechanism_id)
+        wanted = "RNase H-recruiting (e.g. gapmer, LNA gapmer)" if requirement == "rnase_h" else "steric-blocking, RNase H-independent (e.g. PMO, 2'-OMe)"
+        raise ValueError(
+            f"Chemistry '{chemistry}' cannot serve mechanism {mechanism_id}: "
+            f"the {mechanism_id} design rulebook specifies {wanted} chemistry "
+            f"({rule.get('asoChemistry') if rule else 'no rulebook'}). Choose a compatible chemistry."
+        )
+    return requirement
 
-    elif mechanism_id == "A12":
-        # Anti-miR: miRNA inhibitor — needs mature miRNA sequence
-        # This shouldn't normally be reached from CDS, but handle gracefully
-        mech_bonus = -5
-        mech_notes = "A12 (Anti-miR): Requires mature miRNA sequence. CDS-derived design is approximate."
 
-    elif mechanism_id == "A15":
-        # Promoter ASO: transcriptional gene silencing via promoter RNA
-        mech_bonus = -5
-        mech_notes = "A15 (Promoter): Requires promoter-associated RNA. CDS-derived design is approximate."
-
-    return {
-        "mechBonus": mech_bonus,
-        "mechNotes": mech_notes,
-    }
+def _mechanism_note(mechanism_id: str, chemistry: str) -> str:
+    """Short per-candidate mechanism note derived from the rulebook's own text."""
+    rule = _load_silencing_rule(mechanism_id)
+    name = rule.get("name") if rule else mechanism_id
+    requirement = _mechanism_rnase_h_requirement(mechanism_id)
+    if requirement == "rnase_h":
+        return f"{name} ({mechanism_id}): RNase H-recruiting chemistry required — {chemistry} is compatible."
+    if requirement == "steric":
+        return f"{name} ({mechanism_id}): RNase H-independent steric chemistry required — {chemistry} is compatible."
+    return f"{name} ({mechanism_id})"
 
 
 def _parse_variant_position(known_variant: str) -> dict | None:
@@ -839,25 +760,20 @@ def _parse_variant_position(known_variant: str) -> dict | None:
 
 
 def _allele_specific_scoring(
-    candidate_seq: str,
     known_variant: str | None,
-    exon_seq: str,
-    chemistry: str,
-    modifications: list[str],
     spans_variant: bool = False,
 ) -> dict:
-    """Score allele-specific targeting based on the known variant.
+    """Flag allele-specific candidates based on the variant's CDS coordinate.
 
-    An ASO can only discriminate the mutant from the wild-type allele when
-    its binding window actually spans the variant's CDS coordinate. Only
-    candidates overlapping the variant position are rewarded and flagged
-    allele-specific; all others score 0 so that results reflect real
-    positional discrimination rather than a uniform bonus for every
-    candidate.
-
-    Returns allele_bonus (score adjustment) and notes about the design.
+    An ASO can only discriminate the mutant from the wild-type allele when its
+    binding window actually spans the variant's CDS coordinate. That overlap is
+    computed by the caller (``offset <= variant_pos < offset + aso_length``)
+    and passed in — no positional guessing happens here. Candidates spanning
+    the variant are flagged ``alleleSpecific`` and rank first (as a structural
+    tiebreaker); all others stay unranked on this axis. No numeric bonuses are
+    invented for SNP-vs-indel formats or gapmer chemistry.
     """
-    result = {"alleleBonus": 0, "alleleSpecific": False, "alleleNotes": ""}
+    result = {"alleleSpecific": False, "alleleNotes": ""}
 
     if not known_variant:
         return result
@@ -869,81 +785,11 @@ def _allele_specific_scoring(
         )
         return result
 
-    variant = known_variant.strip().upper()
-
-    # Parse common variant formats
-    # HGVS: c.1521_1523delCTT, p.Phe508del, c.1521C>T, rs12345
-    # Simple: c.1521C>T, delCTT, insAG, C>T
-
-    has_snp = False
-    has_deletion = False
-    has_insertion = False
-    variant_base = None
-    reference_base = None
-
-    # Check for point mutation (C>T, G>A, etc.)
-    if ">" in variant:
-        has_snp = True
-        parts = variant.split(">")
-        if len(parts) == 2:
-            reference_base = parts[0][-1] if parts[0] else None
-            variant_base = parts[1][0] if parts[1] else None
-
-    # Check for deletion
-    if "DEL" in variant:
-        has_deletion = True
-    elif "INS" in variant:
-        has_insertion = True
-    elif "_" in variant and ("DEL" in variant or len(variant.split("_")) > 1):
-        has_deletion = True
-
-    # Allele-specific bonus calculations
-    if has_snp and reference_base and variant_base:
-        # For SNPs, check if the candidate overlaps the variant position
-        # and preferentially targets the mutant allele
-        for i in range(len(candidate_seq) - 5):
-            window = candidate_seq[i:i+6]
-            if reference_base * 3 in window or variant_base * 3 in window:
-                # The candidate overlaps a region with the variant base
-                result["alleleBonus"] = 15
-                result["alleleSpecific"] = True
-                result["alleleNotes"] = (
-                    f"Allele-specific design targeting {known_variant}. "
-                    f"Candidate overlaps the variant position and should "
-                    f"discriminate mutant from wild-type allele."
-                )
-                break
-        else:
-            # No overlap found, but still an allele-specific design
-            result["alleleBonus"] = 5
-            result["alleleSpecific"] = True
-            result["alleleNotes"] = (
-                f"Allele-specific design for {known_variant}. "
-                f"Candidate does not directly overlap the variant position; "
-                f"consider repositioning for better discrimination."
-            )
-    elif has_deletion or has_insertion:
-        # For indels, allele-specific bonus is moderate
-        result["alleleBonus"] = 10
-        result["alleleSpecific"] = True
-        result["alleleNotes"] = (
-            f"Allele-specific design for {known_variant}. "
-            f"Indel-based discrimination may use flanking sequence differences."
-        )
-    else:
-        # Generic variant (rsID or unparseable)
-        result["alleleBonus"] = 5
-        result["alleleSpecific"] = True
-        result["alleleNotes"] = (
-            f"Design targets region near {known_variant}. "
-            f"Verify allele-specificity with experimental validation."
-        )
-
-    # Additional bonus for gapmer/PS chemistry (better allele discrimination)
-    if chemistry == "gapmer" and "phosphorothioate" in modifications:
-        result["alleleBonus"] += 5
-        result["alleleNotes"] += " Gapmer + PS chemistry enhances allele discrimination."
-
+    result["alleleSpecific"] = True
+    result["alleleNotes"] = (
+        f"Candidate binding window spans {known_variant} at its CDS coordinate — "
+        "the positional prerequisite for allele discrimination."
+    )
     return result
 
 
@@ -974,6 +820,12 @@ def generate_candidates(
     aso_length, chemistry, targeting_mode = _mechanism_design_constraints(
         mechanism_id, aso_length, chemistry
     )
+
+    # Hard gate: reject chemistry/mechanism combinations that contradict the
+    # mechanism's own rulebook (e.g. a steric-blocking PMO for an RNase H
+    # mechanism). Runs once, before any candidate work.
+    _mechanism_chemistry_compatibility(mechanism_id, chemistry)
+    mechanism_note = _mechanism_note(mechanism_id, chemistry)
 
     seq = mrna_sequence.upper()
     seq_len = len(seq)
@@ -1104,23 +956,19 @@ def generate_candidates(
             pg = _polyg_score(candidate_seq)
             cpg = _cpg_count(candidate_seq)
 
-            # Target duplex energy — most biologically relevant real metric
-            target_region_seq = seq[offset : offset + aso_length]
-            duplex_energy = _target_duplex_energy(candidate_seq, target_region_seq)
+            # Target duplex energy — the antisense ASO bound to its target
+            # window. The stored ASO is the reverse complement of the mRNA
+            # window, so the duplex is computed between that ASO and the target.
+            aso_seq = _reverse_complement(candidate_seq)
+            duplex_energy = _target_duplex_energy(aso_seq, candidate_seq)
 
-            # Mechanism-specific notes — informs chemistry choice without
-            # blending into an opaque composite score
-            mech_adj = _mechanism_scoring_adjustments(
-                mechanism_id, chemistry, modifications, candidate_seq, gc, tm
-            )
-            mech_notes = mech_adj["mechNotes"]
+            # Mechanism note — informational text derived from the mechanism's
+            # rulebook; no numeric bonus is voted into the ranking score.
+            mech_notes = mechanism_note
 
-            # Defect-type-specific notes
-            defect = _defect_scores(
-                defect_type, silencing_scope, chemistry,
-                _nuclease_resistance_score(chemistry, modifications),
-            )
-            defect_notes = defect["defect_notes"]
+            # Defect-type-specific notes — same policy: informative text only,
+            # excluded from the composite ranking score.
+            defect_notes = _defect_scores(defect_type, silencing_scope)["defect_notes"]
 
             if is_total_knockdown:
                 region_label = f"Full Transcript offset +{offset}"
@@ -1168,34 +1016,69 @@ def generate_candidates(
             mw = _molecular_weight(candidate_seq)
             ext_coeff = _extinction_coefficient(candidate_seq)
 
-            # Allele-specific scoring — only candidates whose binding window
+            # Allele-specific flagging — only candidates whose binding window
             # actually spans the variant's CDS coordinate are flagged
-            allele = _allele_specific_scoring(
-                candidate_seq, known_variant, seq, chemistry, modifications,
-                spans_variant=spans_variant,
-            )
+            allele = _allele_specific_scoring(known_variant, spans_variant=spans_variant)
 
-            # Tissue context modifiers (separate from the removed composite score)
-            tissue = _tissue_scores(delivery_context, chemistry, aso_length)
-            tissue_uptake = tissue["uptake_modifier"]
-            tissue_bbb = tissue["bbb_modifier"]
-            tissue_immune = tissue["immune_modifier"]
-            tissue_chem = tissue["chem_tissue_bonus"]
-            tissue_len = tissue["length_modifier"]
+            # Composite ranking score — real metrics only: the ViennaRNA
+            # target-duplex ΔG plus the chemistry-adjusted Tm fit.
+            tm_fit = _tm_fit_score(tm, chemistry, modifications, mechanism_id)
+            composite_score = _composite_score(duplex_energy, tm_fit)
 
             candidates.append({
-                "sequence": _reverse_complement(candidate_seq),
+                "sequence": aso_seq,
                 "length": aso_length,
-                "gcContent": round(gc * 100, 1),
-                "polyGPass": pg == 0,
-                "meltingTempC": tm,  # Real nearest-neighbor Tm (°C) via primer3
-                "selfStructureMfe": self_mfe,  # Real ViennaRNA MFE (kcal/mol)
-                "targetDuplexEnergy": duplex_energy,  # Real ViennaRNA duplex ΔG (kcal/mol)
+                "compositeScore": composite_score,  # 0-100 ranking score
                 "learnedEfficacy": {
                     "available": False,
                     "value": None,
                     "modelInfo": "Not yet trained",
                     "scopeCaveat": None,
+                },
+                # Measured / computed properties — exact physics and sequence
+                # computations, the tier that drives ranking.
+                "realMetrics": {
+                    "targetDuplexEnergy": duplex_energy,  # Real ViennaRNA duplex ΔG (kcal/mol)
+                    "meltingTempC": tm,  # Real nearest-neighbor Tm (°C) via primer3
+                    "selfStructureMfe": self_mfe,  # Real ViennaRNA MFE (kcal/mol)
+                    "gcContent": round(gc * 100, 1),
+                    "cpgCount": cpg,
+                    "longestHomopolymer": _longest_homopolymer(candidate_seq),
+                    "purineContent": _purine_content(candidate_seq),
+                    "gcSkew": _gc_skew(candidate_seq),
+                    "sequenceComplexity": complexity_val,
+                    "polyGPass": pg == 0,
+                    "molecularWeight": mw,
+                    "extinctionCoefficient": ext_coeff,
+                    "duplexStability": stability,
+                },
+                # Rule-of-thumb drug-like estimates — deliberately excluded
+                # from ranking, shown to the user as labeled estimates.
+                "heuristicEstimates": {
+                    "nucleaseResistance": {
+                        "value": nuclease_score,
+                        "note": "Chemistry-class rule of thumb, not measured.",
+                    },
+                    "cellularUptake": {
+                        "value": uptake_score,
+                        "note": "Length/chemistry rule of thumb, not measured.",
+                    },
+                    "bbbCrossing": {
+                        "value": bbb_score,
+                        "note": "Length/chemistry rule of thumb, not measured.",
+                    },
+                    "synthesisDifficulty": {
+                        "value": synthesis_score,
+                        "note": "Sequence/chemistry rule of thumb, not measured.",
+                    },
+                    "offTargetRisk": {
+                        "value": off_target,
+                        "note": "Length/repetitiveness heuristic — not a genome alignment check.",
+                    },
+                    "immuneStimulation": {
+                        "value": immune_risk,
+                        "note": "CpG-count heuristic, not an immunogenicity assay.",
+                    },
                 },
                 "targetRegion": region_label,
                 "mechanismId": mechanism_id,
@@ -1203,27 +1086,7 @@ def generate_candidates(
                 "modifications": modifications,
                 "exonNumber": exon_num,
                 "exonLength": exon_len,
-                "cpgCount": cpg,
-                "longestHomopolymer": _longest_homopolymer(candidate_seq),
-                "purineContent": _purine_content(candidate_seq),
-                "sequenceComplexity": complexity_val,
-                "gcSkew": _gc_skew(candidate_seq),
-                "molecularWeight": mw,
-                "extinctionCoefficient": ext_coeff,
-                "nucleaseResistance": nuclease_score,
-                "cellularUptake": uptake_score,
-                "bbbCrossing": bbb_score,
-                "synthesisDifficulty": synthesis_score,
-                "offTargetRisk": off_target,
-                "immuneStimulation": immune_risk,
-                "duplexStability": stability,
                 "deliveryContext": delivery_context or "",
-                "tissueUptakeModifier": tissue_uptake,
-                "tissueBbbModifier": tissue_bbb,
-                "tissueImmuneModifier": tissue_immune,
-                "tissueChemBonus": tissue_chem,
-                "tissueLengthModifier": tissue_len,
-                "tissueNotes": tissue["tissue_notes"],
                 "defectType": defect_type or "",
                 "silencingScope": silencing_scope or "",
                 "defectNotes": defect_notes,
@@ -1233,17 +1096,19 @@ def generate_candidates(
                 "alleleNotes": allele["alleleNotes"],
             })
 
-    # Rank by target duplex energy (most negative = strongest predicted
-    # target engagement) as the primary real metric. When a known variant
-    # is supplied, candidates whose binding window spans the variant position
-    # are ranked first, with target duplex energy as the tiebreaker.
+    # Rank by the composite design score (higher = better). When a known
+    # variant is supplied, candidates whose binding window spans the variant
+    # position are ranked first, with the composite score as the tiebreaker.
     if variant_pos is not None:
         candidates.sort(
             key=lambda c: (
                 not c["alleleSpecific"],
-                c["targetDuplexEnergy"],
+                -c["compositeScore"],
+                c["realMetrics"]["targetDuplexEnergy"],
             )
         )
     else:
-        candidates.sort(key=lambda c: c["targetDuplexEnergy"])
+        candidates.sort(
+            key=lambda c: (-c["compositeScore"], c["realMetrics"]["targetDuplexEnergy"])
+        )
     return candidates[:10]

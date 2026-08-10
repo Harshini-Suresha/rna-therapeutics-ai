@@ -9,6 +9,8 @@ import TargetAnalysisCard from "@/components/TargetAnalysisCard";
 import AssoDesignForm from "@/components/AssoDesignForm";
 import AssoCandidateCard from "@/components/AssoCandidateCard";
 import AsoReportCard from "@/components/AsoReportCard";
+import AsoAnalysisDashboard from "@/components/AsoAnalysisDashboard";
+import AsoVisualizationSuite from "@/components/AsoVisualizationSuite";
 import { Card, SectionHeader, FieldLabel } from "@/components/ui";
 import { GeneTargetObject } from "@/types/gene";
 import { TargetAnalysis, DesignOptions } from "@/types/geneSilencing";
@@ -75,7 +77,7 @@ export default function GeneUpregulationPage() {
     if (!results) return;
     const header = "Rank,Sequence,Length,GC%,Tm (C),MFE,Duplex Energy,Target Region,Chemistry,Modifications,Purine Content,Complexity,Molecular Weight\n";
     const body = results.candidates.map((c: any, i: number) =>
-      `${i + 1},${c.sequence},${c.length},${c.gcContent},${c.meltingTempC},${c.selfStructureMfe},${c.targetDuplexEnergy},"${c.targetRegion}",${c.chemistry},"${(c.modifications || []).join("; ")}",${c.purineContent},${c.sequenceComplexity},${c.molecularWeight}`
+      `${i + 1},${c.sequence},${c.length},${c.realMetrics.gcContent},${c.realMetrics.meltingTempC},${c.realMetrics.selfStructureMfe},${c.realMetrics.targetDuplexEnergy},"${c.targetRegion}",${c.chemistry},"${(c.modifications || []).join("; ")}",${c.realMetrics.purineContent},${c.realMetrics.sequenceComplexity},${c.realMetrics.molecularWeight}`
     ).join("\n");
     triggerDownload(header + body, `${gene?.geneSymbol ?? "aso"}-candidates.csv`, "text/csv");
     setShowExport(false);
@@ -90,7 +92,7 @@ export default function GeneUpregulationPage() {
   function exportFasta() {
     if (!results) return;
     const content = results.candidates.map((c: any, i: number) =>
-      `>ASO_${i + 1} rank=${i + 1} region=${c.targetRegion} gc=${c.gcContent}% tm=${c.meltingTempC}C\n${c.sequence.match(/.{1,80}/g)?.join("\n") || c.sequence}`
+      `>ASO_${i + 1} rank=${i + 1} region=${c.targetRegion} gc=${c.realMetrics.gcContent}% tm=${c.realMetrics.meltingTempC}C\n${c.sequence.match(/.{1,80}/g)?.join("\n") || c.sequence}`
     ).join("\n\n");
     triggerDownload(content, `${gene?.geneSymbol ?? "aso"}-sequences.fasta`, "text/plain");
     setShowExport(false);
@@ -122,10 +124,10 @@ export default function GeneUpregulationPage() {
         `  #${i + 1}  ${c.targetRegion}`,
         `    Sequence:     ${c.sequence}`,
         `    Length:       ${c.length} nt`,
-        `    GC Content:   ${c.gcContent}%`,
-        `    Melting Temp: ${c.meltingTempC} C`,
-        `    MFE:          ${c.selfStructureMfe} kcal/mol`,
-        `    Duplex Energy:${c.targetDuplexEnergy} kcal/mol`,
+        `    GC Content:   ${c.realMetrics.gcContent}%`,
+        `    Melting Temp: ${c.realMetrics.meltingTempC} C`,
+        `    MFE:          ${c.realMetrics.selfStructureMfe} kcal/mol`,
+        `    Duplex Energy:${c.realMetrics.targetDuplexEnergy} kcal/mol`,
         ""
       );
     });
@@ -368,6 +370,17 @@ export default function GeneUpregulationPage() {
           ) : target ? (
             <TargetAnalysisCard target={target} selectedExons={[]} isTotalKnockdown={true} onToggleTotalKnockdown={() => {}} showTargetingMode={false} />
           ) : null}
+
+          {/* Analysis dashboard + visualization suite (mirrors TG01) */}
+          {results && results.candidates.length > 0 && (
+            <>
+              <AsoAnalysisDashboard
+                candidates={results.candidates}
+                mechanismId={results.mechanismId}
+              />
+              <AsoVisualizationSuite candidates={results.candidates} />
+            </>
+          )}
 
           {/* Step 2 + 3: Design Form + Results */}
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-5">

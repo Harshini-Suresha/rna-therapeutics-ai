@@ -120,14 +120,14 @@ export default function StackingEnergyChart({ data, seqLength }: { data: EnergyP
 
         {/* Y axis labels */}
         {yTickValues.map((v, i) => (
-          <text key={i} x={PAD.left - 4} y={yScale(v) + 3} textAnchor="end" className="fill-slate-400" fontSize={8}>
+          <text key={i} x={PAD.left - 4} y={yScale(v) + 3} textAnchor="end" className="fill-black" fontSize={8} fontWeight={700}>
             {v.toFixed(2)}
           </text>
         ))}
 
         {/* X axis labels */}
         {xTickValues.map((v, i) => (
-          <text key={i} x={xScale(v)} y={H - 4} textAnchor="middle" className="fill-slate-400" fontSize={8}>
+          <text key={i} x={xScale(v)} y={H - 4} textAnchor="middle" className="fill-black" fontSize={8} fontWeight={700}>
             {v}
           </text>
         ))}

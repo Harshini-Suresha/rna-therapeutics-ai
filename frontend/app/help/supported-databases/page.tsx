@@ -16,9 +16,13 @@ const DATABASES = [
   { name: "RNAdecayCafe (Zenodo dataset)", use: "RNA half-life estimates, averaged across 12 human cell lines", status: "live" },
   { name: "FAVOR gene annotation API", use: "Gene dependency/essentiality score", status: "unverified" },
   { name: "Curated viral reference set", use: "Gene data for the 6 supported viruses (Tier 5) — hand-compiled, not a live connector", status: "curated" },
+  { name: "KEGG REST API", use: "Pathway lookup, disease associations, drug targets", status: "live" },
+  { name: "Reactome Content Service", use: "Pathway and reaction annotations, cross-references", status: "live" },
+  { name: "Pathway Commons API", use: "Pathway search across multiple databases (WikiPathways, Reactome, KEGG, etc.)", status: "live" },
+  { name: "Gene Ontology (QuickGO / EBI)", use: "Biological process, molecular function, cellular component annotations", status: "live" },
+  { name: "GTEx Portal API v2", use: "Tissue-level TPM expression across 54 human tissues", status: "live" },
+  { name: "ADMET Prediction Engine", use: "Absorption, Distribution, Metabolism, Excretion, Toxicity for RNA therapeutics", status: "live" },
 ];
-
-const NOT_CONNECTED = ["KEGG", "Reactome", "Pathway Commons", "GO term annotations", "GTEx (tissue-level, beyond the human single-cell HPA data above)"];
 
 function StatusBadge({ status }: { status: string }) {
   if (status === "live") {
@@ -79,17 +83,17 @@ export default function SupportedDatabasesPage() {
       </Card>
 
       <Card className="p-5">
-        <p className="text-[13px] font-semibold text-slate-800">Not yet connected</p>
+        <p className="text-[13px] font-semibold text-slate-800">Analysis Modules</p>
         <p className="mt-1 text-[12.5px] text-slate-500">
-          Fields for these sources exist in the data model but currently show &ldquo;Not yet
-          connected&rdquo; rather than any value:
+          Computed insights and predictions built on top of connected data sources:
         </p>
         <ul className="mt-2 space-y-1">
-          {NOT_CONNECTED.map((n) => (
-            <li key={n} className="text-[12.5px] text-slate-600">
-              • {n}
-            </li>
-          ))}
+          <li className="text-[12.5px] text-slate-600">• <strong>Pathway Enrichment</strong> — KEGG, Reactome, Pathway Commons via mygene.info</li>
+          <li className="text-[12.5px] text-slate-600">• <strong>GO Term Analysis</strong> — Biological Process, Molecular Function, Cellular Component (EBI QuickGO)</li>
+          <li className="text-[12.5px] text-slate-600">• <strong>Tissue Expression</strong> — GTEx v8, Human Protein Atlas, UniProt fallback chain</li>
+          <li className="text-[12.5px] text-slate-600">• <strong>ADMET Prediction</strong> — Sequence-based heuristic model for RNA therapeutics</li>
+          <li className="text-[12.5px] text-slate-600">• <strong>Interaction Network</strong> — STRING high/medium confidence PPI with density scoring</li>
+          <li className="text-[12.5px] text-slate-600">• <strong>Constraint Analysis</strong> — gnomAD pLI, LOEUF, ClinGen haploinsufficiency</li>
         </ul>
       </Card>
     </HelpPageShell>

@@ -282,4 +282,52 @@ export interface GeneTargetObject {
       modalityType: string;
     }[];
   } | null;
+
+  // ADMET predictions for RNA therapeutics
+  admetAvailable: boolean;
+  absorptionScore: number | null;
+  absorptionLevel: string | null;
+  distributionScore: number | null;
+  distributionLevel: string | null;
+  metabolismScore: number | null;
+  metabolismLevel: string | null;
+  excretionScore: number | null;
+  excretionLevel: string | null;
+  toxicityScore: number | null;
+  toxicityLevel: string | null;
+  cellUptake: {
+    score: number;
+    level: string;
+    notes?: string[];
+  } | null;
+  proteinBinding: {
+    score: number;
+    level: string;
+  } | null;
+  nucleaseSensitivity: {
+    score: number;
+    level: string;
+    halfLifeHours?: number;
+  } | null;
+  renalClearance: {
+    score: number;
+    level: string;
+    mechanism: string;
+  } | null;
+  immunogenicity: {
+    score: number;
+    level: string;
+    motifs: string[];
+  } | null;
+  offTargetRisk: {
+    score: number;
+    level: string;
+  } | null;
+  hemolysisRisk: {
+    score: number;
+    level: string;
+  } | null;
+  admetAnalysis: string | null;
+  admetWarnings: string[];
+  admetStrengths: string[];
 }

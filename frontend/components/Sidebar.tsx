@@ -77,7 +77,7 @@ export default function Sidebar() {
             <p className="text-[12px] font-semibold tracking-wide text-white">
               RNA THERAPEUTICS
             </p>
-            <p className="text-[10px] text-slate-500">Platform</p>
+            <p className="text-[10px] text-white/70">Platform</p>
           </div>
         </a>
       </div>
@@ -88,7 +88,7 @@ export default function Sidebar() {
             {gi > 0 && (
               <div className="mx-2 mb-1.5 border-t border-white/[0.08]" />
             )}
-            <p className="px-2 mb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            <p className="px-2 mb-1.5 text-[10px] font-bold uppercase tracking-wider text-white/70">
               {group.section === "overview"
                 ? "Overview"
                 : group.section === "pipeline"
@@ -108,20 +108,20 @@ export default function Sidebar() {
                       className={`group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium transition-colors ${
                         active
                           ? "bg-sidebar-active text-white"
-                          : "text-slate-300 hover:bg-sidebar-hover hover:text-white"
+                          : "text-white/80 hover:bg-sidebar-hover hover:text-white"
                       }`}
                     >
                       <Icon
                         className={`h-4 w-4 shrink-0 ${
                           active
                             ? item.color ?? "text-accent-biology"
-                            : "text-slate-400 group-hover:text-slate-200"
+                            : "text-white/70 group-hover:text-white"
                         }`}
                         strokeWidth={active ? 2.2 : 2}
                       />
                       <span className="flex-1">{item.label}</span>
                       {item.badge && (
-                        <span className="rounded bg-brand/20 px-1 py-0.5 text-[8px] font-semibold text-slate-300">
+                        <span className="rounded bg-brand/20 px-1 py-0.5 text-[8px] font-semibold text-white">
                           {item.badge}
                         </span>
                       )}
@@ -135,9 +135,9 @@ export default function Sidebar() {
       </nav>
 
       <div className="px-4 py-3 text-[11px] font-medium leading-relaxed border-t border-white/[0.08]">
-        <span className="text-slate-300">&copy; 2026, KoshKey Sciences Pvt Ltd</span>
+        <span className="text-white/70">&copy; 2026, KoshKey Sciences Pvt Ltd</span>
         <br />
-        <a href="mailto:mail@koshkey.com" className="text-slate-300 hover:text-white transition-colors">
+        <a href="mailto:mail@koshkey.com" className="text-white/70 hover:text-white transition-colors">
           mail@koshkey.com
         </a>
       </div>

@@ -9,6 +9,8 @@ import TargetAnalysisCard from "@/components/TargetAnalysisCard";
 import RnaEditingDesignForm from "@/components/RnaEditingDesignForm";
 import GuideRnaCandidateCard from "@/components/GuideRnaCandidateCard";
 import AsoReportCard from "@/components/AsoReportCard";
+import AsoAnalysisDashboard from "@/components/AsoAnalysisDashboard";
+import AsoVisualizationSuite from "@/components/AsoVisualizationSuite";
 import { Card, SectionHeader } from "@/components/ui";
 import { GeneTargetObject } from "@/types/gene";
 import { TargetAnalysis, ClinVarVariant } from "@/types/geneSilencing";
@@ -25,6 +27,7 @@ import {
   fetchRnaEditingClinVarVariants,
 } from "@/lib/rnaEditingApi";
 import { saveReport } from "@/lib/auth";
+import { visualAssoCandidates } from "@/lib/visualizeCandidates";
 
 const CONFIRMED_TARGET_KEY = "aso:confirmedTarget";
 const SELECTED_MECHANISM_KEY = "aso:selectedMechanism";
@@ -251,6 +254,8 @@ export default function RnaEditingPage() {
     }
   }
 
+  const visualCandidates = visualAssoCandidates(results?.candidates ?? []);
+
   // No gene → redirect
   if (!gene) {
     return (
@@ -358,6 +363,17 @@ export default function RnaEditingPage() {
                 onToggleTotalKnockdown={() => {}}
                 showTargetingMode={false}
               />
+            )}
+
+            {/* Analysis dashboard + visualization suite (mirrors TG01) */}
+            {results && results.candidates.length > 0 && (
+              <>
+                <AsoAnalysisDashboard
+                  candidates={visualCandidates}
+                  mechanismId={results.mechanismId}
+                />
+                <AsoVisualizationSuite candidates={visualCandidates} />
+              </>
             )}
 
             {/* Two-column layout */}

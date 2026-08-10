@@ -35,7 +35,7 @@ function ScoreBar({ value, max = 100 }: { value: number; max?: number }) {
   );
 }
 
-function Td({ label, value, unit, warn, highlight, bar }: { label: string; value?: string | number | null; unit?: string; warn?: boolean; highlight?: boolean; bar?: number }) {
+function Td({ label, value, unit, warn, highlight, bar, note }: { label: string; value?: string | number | null; unit?: string; warn?: boolean; highlight?: boolean; bar?: number; note?: string }) {
   if (value === null || value === undefined) return null;
   return (
     <tr className="border-b border-slate-100 last:border-0">
@@ -50,6 +50,7 @@ function Td({ label, value, unit, warn, highlight, bar }: { label: string; value
             {value}{unit && <span className="text-[10px] font-normal text-slate-400 ml-0.5">{unit}</span>}
           </span>
         )}
+        {note && <div className="mt-0.5 text-[9.5px] text-slate-400 italic">{note}</div>}
       </td>
     </tr>
   );
@@ -82,21 +83,24 @@ export default function AssoCandidateCard({
     });
   }
 
+  const rm = candidate.realMetrics;
+  const he = candidate.heuristicEstimates;
+
   const selfDimerLabel =
-    candidate.selfStructureMfe === 0
+    rm.selfStructureMfe === 0
       ? "None"
-      : candidate.selfStructureMfe > -3
+      : rm.selfStructureMfe > -3
         ? "Low"
-        : candidate.selfStructureMfe > -6
+        : rm.selfStructureMfe > -6
           ? "Moderate"
           : "High";
 
-  const nucleaseLabel = candidate.nucleaseResistance >= 80 ? "Excellent" : candidate.nucleaseResistance >= 60 ? "Good" : candidate.nucleaseResistance >= 40 ? "Moderate" : "Low";
-  const uptakeLabel = candidate.cellularUptake >= 70 ? "High" : candidate.cellularUptake >= 50 ? "Moderate" : "Low";
-  const bbbLabel = candidate.bbbCrossing >= 60 ? "Good" : candidate.bbbCrossing >= 30 ? "Limited" : "Poor";
-  const offTargetLabel = candidate.offTargetRisk <= 20 ? "Low" : candidate.offTargetRisk <= 40 ? "Moderate" : "High";
-  const immuneLabel = candidate.immuneStimulation <= 15 ? "Low" : candidate.immuneStimulation <= 35 ? "Moderate" : "High";
-  const synthesisLabel = candidate.synthesisDifficulty <= 30 ? "Standard" : candidate.synthesisDifficulty <= 55 ? "Moderate" : "Complex";
+  const nucleaseLabel = he.nucleaseResistance.value >= 80 ? "Excellent" : he.nucleaseResistance.value >= 60 ? "Good" : he.nucleaseResistance.value >= 40 ? "Moderate" : "Low";
+  const uptakeLabel = he.cellularUptake.value >= 70 ? "High" : he.cellularUptake.value >= 50 ? "Moderate" : "Low";
+  const bbbLabel = he.bbbCrossing.value >= 60 ? "Good" : he.bbbCrossing.value >= 30 ? "Limited" : "Poor";
+  const offTargetLabel = he.offTargetRisk.value <= 20 ? "Low" : he.offTargetRisk.value <= 40 ? "Moderate" : "High";
+  const immuneLabel = he.immuneStimulation.value <= 15 ? "Low" : he.immuneStimulation.value <= 35 ? "Moderate" : "High";
+  const synthesisLabel = he.synthesisDifficulty.value <= 30 ? "Standard" : he.synthesisDifficulty.value <= 55 ? "Moderate" : "Complex";
 
   return (
     <Card className="overflow-hidden">
@@ -114,7 +118,12 @@ export default function AssoCandidateCard({
                 <span className="text-[11px] text-slate-500">{candidate.length} nt</span>
                 <span className="text-[11px] text-slate-400">·</span>
                 <span className="rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-600">{candidate.mechanismId}</span>
-                <DuplexEnergyBadge energy={candidate.targetDuplexEnergy} />
+                <DuplexEnergyBadge energy={rm.targetDuplexEnergy} />
+                {candidate.compositeScore != null && (
+                  <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
+                    Score {candidate.compositeScore}
+                  </span>
+                )}
               </div>
               <p className="text-[10.5px] text-slate-400 mt-0.5">{candidate.targetRegion}</p>
             </div>
@@ -134,9 +143,9 @@ export default function AssoCandidateCard({
             {candidate.sequence}
           </div>
           <div className="mt-1.5 flex flex-wrap gap-x-5 gap-y-1 text-[10px] text-slate-400">
-            <span>Molecular Weight: <strong className="text-slate-600">{candidate.molecularWeight?.toLocaleString()} Da</strong></span>
-            <span>Extinction Coefficient: <strong className="text-slate-600">{candidate.extinctionCoefficient?.toLocaleString()} L/mol·cm</strong></span>
-            <span>Duplex Stability: <strong className="text-slate-600">{candidate.duplexStability}</strong></span>
+            <span>Molecular Weight: <strong className="text-slate-600">{rm.molecularWeight?.toLocaleString()} Da</strong></span>
+            <span>Extinction Coefficient: <strong className="text-slate-600">{rm.extinctionCoefficient?.toLocaleString()} L/mol·cm</strong></span>
+            <span>Duplex Stability: <strong className="text-slate-600">{rm.duplexStability}</strong></span>
           </div>
         </div>
 
@@ -154,6 +163,12 @@ export default function AssoCandidateCard({
               <TableSection title="Identification" />
               <Td label="Rank" value={`#${rank}`} highlight />
               <Td label="Chemistry" value={candidate.chemistry} />
+              {candidate.compositeScore != null && (
+                <>
+                  <Td label="Composite Design Score" bar={candidate.compositeScore} />
+                  <Td label="Ranking Basis" value="Real metrics (duplex ΔG + Tm fit)" note="Heuristic drug-like estimates are shown below but do not affect ranking." />
+                </>
+              )}
               <Td label="Oligo Length" value={candidate.length} unit="nt" />
               <Td label="Target Region" value={candidate.targetRegion} />
               {candidate.exonNumber != null && <Td label="Target Exon" value={`Exon ${candidate.exonNumber}`} highlight />}
@@ -171,70 +186,77 @@ export default function AssoCandidateCard({
                 </tr>
               )}
 
-              {/* BIOPHYSICAL */}
-              <TableSection title="Biophysical Properties" />
-              <Td label="GC Content" value={`${candidate.gcContent}%`} warn={candidate.gcContent < 40 || candidate.gcContent > 60} />
-              <Td label="Melting Temperature (Tm)" value={candidate.meltingTempC} unit="°C" />
-              <Td label="Self-Structure MFE" value={candidate.selfStructureMfe} unit="kcal/mol" />
+              {/* REAL BIOPHYSICAL */}
+              <TableSection title="Predicted Binding (Real Metrics)" />
+              <Td label="Target Duplex ΔG" value={rm.targetDuplexEnergy} unit="kcal/mol" />
+              <Td label="GC Content" value={`${rm.gcContent}%`} warn={rm.gcContent < 40 || rm.gcContent > 60} />
+              <Td label="Melting Temperature (Tm)" value={rm.meltingTempC} unit="°C" />
+              <Td label="Self-Structure MFE" value={rm.selfStructureMfe} unit="kcal/mol" />
               <Td label="Self-Structure Risk" value={selfDimerLabel} warn={selfDimerLabel === "High" || selfDimerLabel === "Moderate"} />
-              <Td label="Poly-G Tracts (≥3 G)" value={candidate.polygTracts ?? 0} warn={(candidate.polygTracts ?? 0) > 0} />
-              <Td label="Target Duplex ΔG" value={candidate.targetDuplexEnergy} unit="kcal/mol" />
+              <Td label="Poly-G Tracts (≥3 G)" value={rm.polyGPass ? "None" : "Detected"} warn={!rm.polyGPass} />
 
               {/* SEQUENCE COMPOSITION */}
               <TableSection title="Sequence Composition" />
-              <Td label="CpG Dinucleotides" value={candidate.cpgCount} warn={candidate.cpgCount >= 3} />
-              <Td label="CpG Immune Risk" value={candidate.cpgCount >= 3 ? "Elevated" : "Normal"} warn={candidate.cpgCount >= 3} />
-              <Td label="Longest Homopolymer Run" value={candidate.longestHomopolymer} unit="bp" warn={candidate.longestHomopolymer >= 4} />
-              <Td label="Purine Content (A+G)" value={`${(candidate.purineContent * 100).toFixed(1)}%`} />
-              <Td label="Pyrimidine Content (C+T)" value={`${((1 - candidate.purineContent) * 100).toFixed(1)}%`} />
-              <Td label="GC Skew" value={candidate.gcSkew.toFixed(3)} />
-              <Td label="Sequence Complexity" value={candidate.sequenceComplexity.toFixed(3)} warn={candidate.sequenceComplexity < 0.7} />
-              <Td label="Repetitive Elements" value={candidate.longestHomopolymer >= 4 ? "Detected" : "None"} warn={candidate.longestHomopolymer >= 4} />
+              <Td label="CpG Dinucleotides" value={rm.cpgCount} warn={rm.cpgCount >= 3} />
+              <Td label="CpG Immune Risk" value={rm.cpgCount >= 3 ? "Elevated" : "Normal"} warn={rm.cpgCount >= 3} />
+              <Td label="Longest Homopolymer Run" value={rm.longestHomopolymer} unit="bp" warn={rm.longestHomopolymer >= 4} />
+              <Td label="Purine Content (A+G)" value={`${(rm.purineContent * 100).toFixed(1)}%`} />
+              <Td label="Pyrimidine Content (C+T)" value={`${((1 - rm.purineContent) * 100).toFixed(1)}%`} />
+              <Td label="GC Skew" value={rm.gcSkew.toFixed(3)} />
+              <Td label="Sequence Complexity" value={rm.sequenceComplexity.toFixed(3)} warn={rm.sequenceComplexity < 0.7} />
+              <Td label="Repetitive Elements" value={rm.longestHomopolymer >= 4 ? "Detected" : "None"} warn={rm.longestHomopolymer >= 4} />
 
               {/* THERMODYNAMICS */}
               <TableSection title="Thermodynamic Profile" />
-              <Td label="Duplex Stability" value={candidate.duplexStability} />
-              <Td label="MW" value={candidate.molecularWeight?.toLocaleString()} unit="Da" />
-              <Td label="Extinction Coeff (ε₂₆₀)" value={candidate.extinctionCoefficient?.toLocaleString()} unit="L/mol·cm" />
+              <Td label="Duplex Stability" value={rm.duplexStability} />
+              <Td label="MW" value={rm.molecularWeight?.toLocaleString()} unit="Da" />
+              <Td label="Extinction Coeff (ε₂₆₀)" value={rm.extinctionCoefficient?.toLocaleString()} unit="L/mol·cm" />
 
-              {/* DRUG-LIKE PROPERTIES */}
-              <TableSection title="Drug-like Properties" />
-              <Td label="Nuclease Resistance" bar={candidate.nucleaseResistance} />
-              <Td label="Nuclease Rating" value={nucleaseLabel} />
-              <Td label="Cellular Uptake" bar={candidate.cellularUptake} />
-              <Td label="Uptake Rating" value={uptakeLabel} />
-              <Td label="BBB Crossing Potential" bar={candidate.bbbCrossing} />
-              <Td label="BBB Rating" value={bbbLabel} />
-              <Td label="In Vivo Stability" value={nucleaseLabel} />
+              {/* HEURISTIC ESTIMATES */}
+              <TableSection title="Drug-like Estimates (not used for ranking)" />
+              <Td label="Nuclease Resistance" bar={he.nucleaseResistance.value} />
+              <Td label="Nuclease Rating" value={nucleaseLabel} note={he.nucleaseResistance.note} />
+              <Td label="Cellular Uptake" bar={he.cellularUptake.value} />
+              <Td label="Uptake Rating" value={uptakeLabel} note={he.cellularUptake.note} />
+              <Td label="BBB Crossing Potential" bar={he.bbbCrossing.value} />
+              <Td label="BBB Rating" value={bbbLabel} note={he.bbbCrossing.note} />
 
               {/* RISK ASSESSMENT */}
-              <TableSection title="Risk Assessment" />
-              <Td label="Off-target Risk" bar={100 - candidate.offTargetRisk} />
-              <Td label="Off-target Rating" value={offTargetLabel} warn={offTargetLabel === "High"} />
-              <Td label="Immune Stimulation Risk" bar={100 - candidate.immuneStimulation} />
-              <Td label="Immune Rating" value={immuneLabel} warn={immuneLabel === "High"} />
-              <Td label="Synthesis Feasibility" bar={100 - candidate.synthesisDifficulty} />
-              <Td label="Synthesis Rating" value={synthesisLabel} warn={synthesisLabel === "Complex"} />
-              <Td label="Toxicity Flags" value={candidate.cpgCount >= 3 ? "CpG-mediated" : (candidate.polygTracts ?? 0) > 1 ? "Poly-G aggregation" : "None flagged"} warn={candidate.cpgCount >= 3 || (candidate.polygTracts ?? 0) > 1} />
+              <TableSection title="Risk Estimates (not used for ranking)" />
+              <Td label="Off-target Risk" bar={100 - he.offTargetRisk.value} />
+              <Td label="Off-target Rating" value={offTargetLabel} warn={offTargetLabel === "High"} note={he.offTargetRisk.note} />
+              <Td label="Immune Stimulation Risk" bar={100 - he.immuneStimulation.value} />
+              <Td label="Immune Rating" value={immuneLabel} warn={immuneLabel === "High"} note={he.immuneStimulation.note} />
+              <Td label="Synthesis Feasibility" bar={100 - he.synthesisDifficulty.value} />
+              <Td label="Synthesis Rating" value={synthesisLabel} warn={synthesisLabel === "Complex"} note={he.synthesisDifficulty.note} />
+              <Td label="Toxicity Flags" value={rm.cpgCount >= 3 ? "CpG-mediated" : !rm.polyGPass ? "Poly-G aggregation" : "None flagged"} warn={rm.cpgCount >= 3 || !rm.polyGPass} />
 
-              {/* TISSUE CONTEXT */}
-              {candidate.deliveryContext && (
+              {/* ADMET PREDICTION */}
+              {candidate.admet && candidate.admet.admetAvailable && (
                 <>
-                  <TableSection title={`Tissue Context: ${candidate.deliveryContext}`} />
-                  <Td label="Target Tissue" value={candidate.deliveryContext} highlight />
-                   {(candidate.tissueUptakeModifier ?? 0) !== 0 && <Td label="Tissue Uptake Modifier" value={`${(candidate.tissueUptakeModifier ?? 0) > 0 ? "+" : ""}${candidate.tissueUptakeModifier}`} warn={(candidate.tissueUptakeModifier ?? 0) < 0} />}
-                  {candidate.tissueBbbModifier !== 0 && <Td label="BBB Crossing Modifier" value={`+${candidate.tissueBbbModifier}`} />}
-                   {(candidate.tissueImmuneModifier ?? 0) !== 0 && <Td label="Immune Modifier" value={`${(candidate.tissueImmuneModifier ?? 0) > 0 ? "+" : ""}${candidate.tissueImmuneModifier}`} warn={(candidate.tissueImmuneModifier ?? 0) < 0} />}
-                  {candidate.tissueChemBonus !== 0 && <Td label="Chemistry-Tissue Match" value={`+${candidate.tissueChemBonus}`} />}
-                  {candidate.tissueLengthModifier !== 0 && <Td label="Length Penalty" value={candidate.tissueLengthModifier} warn />}
-                  <tr className="border-b border-slate-100">
-                    <td className="py-1.5 pr-4 text-[11px] text-slate-500">Tissue Notes</td>
-                    <td className="py-1.5 text-right text-[10.5px] text-slate-500 italic max-w-[250px]">{candidate.tissueNotes}</td>
-                  </tr>
+                  <TableSection title="ADMET Prediction" colSpan={2} />
+                  <Td label="Absorption (Uptake)" value={candidate.admet.absorptionLevel} bar={candidate.admet.absorptionScore != null ? candidate.admet.absorptionScore * 100 : undefined} />
+                  <Td label="Distribution" value={candidate.admet.distributionLevel} bar={candidate.admet.distributionScore != null ? candidate.admet.distributionScore * 100 : undefined} />
+                  <Td label="Metabolism (Nuclease)" value={candidate.admet.metabolismLevel} bar={candidate.admet.metabolismScore != null ? candidate.admet.metabolismScore * 100 : undefined} note={candidate.admet.nucleaseSensitivity?.halfLifeHours ? `t½ ~ ${candidate.admet.nucleaseSensitivity.halfLifeHours}h` : undefined} />
+                  <Td label="Excretion" value={candidate.admet.excretionLevel} bar={candidate.admet.excretionScore != null ? candidate.admet.excretionScore * 100 : undefined} />
+                  <Td label="Toxicity" value={candidate.admet.toxicityLevel} bar={candidate.admet.toxicityScore != null ? (1 - candidate.admet.toxicityScore) * 100 : undefined} warn={candidate.admet.toxicityScore != null && candidate.admet.toxicityScore > 0.4} />
+                  <Td label="Immunogenicity" value={candidate.admet.immunogenicity?.level} warn={(candidate.admet.immunogenicity?.score ?? 0) > 0.3} note={candidate.admet.immunogenicity?.motifs?.slice(0, 1)[0]} />
+                  <Td label="Off-target Risk" value={candidate.admet.offTargetRisk?.level} warn={(candidate.admet.offTargetRisk?.score ?? 0) > 0.4} />
+                  <Td label="Protein Binding" value={candidate.admet.proteinBinding?.level} />
+                  {candidate.admet.admetWarnings?.length > 0 && (
+                    <tr className="border-b border-slate-100">
+                      <td className="py-1.5 pr-4 text-[11px] text-slate-500">ADMET Warnings</td>
+                      <td className="py-1.5 text-right">
+                        <ul className="text-[10px] text-amber-600 list-disc list-inside text-left">
+                          {candidate.admet.admetWarnings.slice(0, 3).map((w, i) => (
+                            <li key={`admet-warn-${i}`}>{w}</li>
+                          ))}
+                        </ul>
+                      </td>
+                    </tr>
+                  )}
                 </>
               )}
-
-
 
               {/* ALLELE-SPECIFIC */}
               {candidate.knownVariant && (
@@ -265,13 +287,19 @@ export default function AssoCandidateCard({
           {showBreakdown && (
             <div className="mt-3 rounded-lg border border-slate-100 bg-slate-50 px-5 py-4 text-[10.5px] text-slate-500 leading-relaxed space-y-4">
               <div>
-                <p className="font-bold text-slate-700 mb-1">Drug Likeness Score</p>
+                <p className="font-bold text-slate-700 mb-1">Composite Design Score</p>
                 <code className="block rounded bg-slate-100 px-3 py-2 text-[10px] font-mono text-slate-600">
-                  DrugLike = Quality×0.35 + Nuclease×0.25 + Uptake×0.20 + (100−OffTarget)×0.20
+                  Score = 0.65×Duplex(ΔG) + 0.35×TmFit
                 </code>
+                <p className="mt-1 text-[10px]">
+                  <strong>Duplex:</strong> normalized target duplex ΔG (antisense ASO vs target window) — the primary binding signal.
+                  <strong> TmFit:</strong> how well the chemistry-adjusted Tm fits the mechanism's optimal affinity window.
+                  Chemistry and modification choices shift TmFit (LNA/2'-OMe boost effective Tm), so different options re-rank candidates.
+                  All other drug-like estimates are excluded from the score by design.
+                </p>
               </div>
               <div>
-                <p className="font-bold text-slate-700 mb-1">Property Scores</p>
+                <p className="font-bold text-slate-700 mb-1">Drug-like Estimates (informational only)</p>
                 <ul className="space-y-0.5 text-[10px]">
                   <li><strong>Nuclease Resistance:</strong> Base 20 + chemistry score + modification scores (PS +25, LNA +20, PNA +35).</li>
                   <li><strong>Cellular Uptake:</strong> Chemistry factor + length factor (shorter = better).</li>

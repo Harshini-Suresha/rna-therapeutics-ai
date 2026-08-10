@@ -220,8 +220,9 @@ export default function StabilityIndexChart({
               x={PAD.left - 4}
               y={yScale(v) + 3}
               textAnchor="end"
-              className="fill-slate-400"
+              className="fill-black"
               fontSize={8}
+              fontWeight={700}
             >
               {v.toFixed(2)}
             </text>
@@ -234,8 +235,9 @@ export default function StabilityIndexChart({
               x={xScale(v)}
               y={H - 4}
               textAnchor="middle"
-              className="fill-slate-400"
+              className="fill-black"
               fontSize={8}
+              fontWeight={700}
             >
               {v}
             </text>

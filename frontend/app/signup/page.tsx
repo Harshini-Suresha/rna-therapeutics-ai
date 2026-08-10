@@ -13,13 +13,17 @@ export default function SignupPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
+  const [serverMessage, setServerMessage] = useState("");
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError("");
     setLoading(true);
     try {
-      await apiSignup(name, email, password);
+      const result = await apiSignup(name, email, password);
+      setEmailSent(result.email_sent);
+      setServerMessage(result.message);
       setSubmitted(true);
     } catch (err: any) {
       setError(err.message || "Signup failed");
@@ -44,16 +48,34 @@ export default function SignupPage() {
         </div>
         <div className="flex flex-1 items-center justify-center px-6 py-12">
           <div className="w-full max-w-sm text-center space-y-4">
-            <Mail className="h-12 w-12 text-indigo-500 mx-auto" />
-            <h1 className="text-[22px] font-bold text-slate-900">Check your email</h1>
-            <p className="text-[13px] text-slate-500">
-              We sent a verification link to <span className="font-medium text-slate-700">{email}</span>.
-              Click the link to activate your account.
-            </p>
-            <p className="text-[12px] text-slate-400">
-              Didn&apos;t get it? Check your spam folder or{" "}
-              <a href="/verify-email" className="font-medium text-indigo-600 hover:text-indigo-700">resend verification</a>.
-            </p>
+            {emailSent ? (
+              <>
+                <Mail className="h-12 w-12 text-indigo-500 mx-auto" />
+                <h1 className="text-[22px] font-bold text-slate-900">Check your email</h1>
+                <p className="text-[13px] text-slate-500">
+                  We sent a verification link to <span className="font-medium text-slate-700">{email}</span>.
+                  Click the link to activate your account.
+                </p>
+                <p className="text-[12px] text-slate-400">
+                  Didn&apos;t get it? Check your spam folder or{" "}
+                  <a href="/verify-email" className="font-medium text-indigo-600 hover:text-indigo-700">resend verification</a>.
+                </p>
+              </>
+            ) : (
+              <>
+                <AlertCircle className="h-12 w-12 text-amber-500 mx-auto" />
+                <h1 className="text-[22px] font-bold text-slate-900">Account created</h1>
+                <p className="text-[13px] text-slate-500">
+                  Your account was created successfully, but the verification email could not be sent.
+                  This usually means the email server is not configured.
+                </p>
+                <p className="text-[12px] text-slate-400">
+                  Please contact support, or try again later. You can also visit the{" "}
+                  <a href="/verify-email" className="font-medium text-indigo-600 hover:text-indigo-700">verify email page</a>{" "}
+                  to attempt resending.
+                </p>
+              </>
+            )}
             <div className="pt-4">
               <a href="/login" className="text-[12px] font-medium text-indigo-600 hover:text-indigo-700">
                 Back to sign in

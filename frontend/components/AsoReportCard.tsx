@@ -25,6 +25,7 @@ export default function AsoReportCard({ ctx, step = "aso_design" }: AsoReportCar
   const candidates = results?.candidates ?? [];
   const top = candidates[0] as any;
   const goal = THERAPEUTIC_GOALS.find((g) => g.id === ctx.therapeuticGoal);
+  const topDuplexEnergy = top?.realMetrics?.targetDuplexEnergy ?? top?.targetDuplexEnergy;
 
   function handleDownload() {
     const report = buildAsoReport(ctx);
@@ -106,9 +107,9 @@ export default function AsoReportCard({ ctx, step = "aso_design" }: AsoReportCar
             <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Candidates</p>
             <p className="mt-1 text-[13px] font-semibold text-slate-800">
               {candidates.length} generated
-              {top?.targetDuplexEnergy != null ? (
+              {topDuplexEnergy != null ? (
                 <span className="ml-1.5 text-[11px] font-normal text-slate-500">
-                  top {top.targetDuplexEnergy} kcal/mol
+                  top {topDuplexEnergy} kcal/mol
                 </span>
               ) : null}
             </p>

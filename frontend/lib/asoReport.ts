@@ -102,7 +102,56 @@ function formatExons(target: TargetAnalysis | null): string {
     .join(", ");
 }
 
-function formatAsoCandidate(lines: string[], c: AssoCandidate, rank: number): void {
+// asoReport is a shared formatter: gene silencing feeds nested realMetrics /
+// heuristicEstimates, while upregulation/other pipelines still emit flat
+// candidates. FlatOrNestedCandidate accepts both so the report is resilient
+// to either shape.
+export type FlatOrNestedCandidate = AssoCandidate & {
+  targetDuplexEnergy?: number;
+  molecularWeight?: number;
+  extinctionCoefficient?: number;
+  duplexStability?: string;
+  gcContent?: number;
+  meltingTempC?: number;
+  selfStructureMfe?: number;
+  polygTracts?: number;
+  cpgCount?: number;
+  longestHomopolymer?: number;
+  purineContent?: number;
+  gcSkew?: number;
+  sequenceComplexity?: number;
+  nucleaseResistance?: number;
+  cellularUptake?: number;
+  bbbCrossing?: number;
+  offTargetRisk?: number;
+  immuneStimulation?: number;
+  synthesisDifficulty?: number;
+  knownRegulatoryElement?: string;
+};
+
+function formatAsoCandidate(lines: string[], c: FlatOrNestedCandidate, rank: number): void {
+  const rm = c.realMetrics;
+  const he = c.heuristicEstimates;
+  const dg = rm?.targetDuplexEnergy ?? c.targetDuplexEnergy;
+  const gc = rm?.gcContent ?? c.gcContent;
+  const tm = rm?.meltingTempC ?? c.meltingTempC;
+  const mfe = rm?.selfStructureMfe ?? c.selfStructureMfe;
+  const mw = rm?.molecularWeight ?? c.molecularWeight;
+  const extCoeff = rm?.extinctionCoefficient ?? c.extinctionCoefficient;
+  const duplexStab = rm?.duplexStability ?? c.duplexStability;
+  const polyg = rm?.polyGPass != null ? (rm.polyGPass ? 0 : c.length) : c.polygTracts;
+  const cpg = rm?.cpgCount ?? c.cpgCount;
+  const homo = rm?.longestHomopolymer ?? c.longestHomopolymer;
+  const purine = rm?.purineContent ?? c.purineContent;
+  const gcSkew = rm?.gcSkew ?? c.gcSkew;
+  const complexity = rm?.sequenceComplexity ?? c.sequenceComplexity;
+  const nuc = he?.nucleaseResistance?.value ?? c.nucleaseResistance;
+  const uptake = he?.cellularUptake?.value ?? c.cellularUptake;
+  const bbb = he?.bbbCrossing?.value ?? c.bbbCrossing;
+  const offTarget = he?.offTargetRisk?.value ?? c.offTargetRisk;
+  const immune = he?.immuneStimulation?.value ?? c.immuneStimulation;
+  const synthesis = he?.synthesisDifficulty?.value ?? c.synthesisDifficulty;
+
   lines.push(`  ── Candidate #${rank} ─────────────────────────────`);
   lines.push(`  Rank              #${rank}`);
   lines.push(`  Chemistry         ${c.chemistry}`);
@@ -112,42 +161,42 @@ function formatAsoCandidate(lines: string[], c: AssoCandidate, rank: number): vo
   if (c.exonNumber != null) lines.push(`  Target Exon       Exon ${c.exonNumber}`);
   if (c.exonLength != null) lines.push(`  Exon Length       ${c.exonLength} bp`);
   if (c.modifications.length > 0) lines.push(`  Modifications     ${c.modifications.join(", ")}`);
-  lines.push(`  Duplex Energy     ${c.targetDuplexEnergy} kcal/mol`);
+  if (dg != null) lines.push(`  Duplex Energy     ${dg} kcal/mol`);
   lines.push("");
 
   lines.push("  Antisense Sequence (5'→3'):");
   lines.push(`    ${c.sequence}`);
   lines.push("");
-  lines.push(`  Molecular Weight:    ${c.molecularWeight?.toLocaleString() ?? "—"} Da`);
-  lines.push(`  Extinction Coeff:    ${c.extinctionCoefficient?.toLocaleString() ?? "—"} L/mol·cm`);
-  lines.push(`  Duplex Stability:    ${c.duplexStability}`);
+  lines.push(`  Molecular Weight:    ${mw?.toLocaleString() ?? "—"} Da`);
+  lines.push(`  Extinction Coeff:    ${extCoeff?.toLocaleString() ?? "—"} L/mol·cm`);
+  lines.push(`  Duplex Stability:    ${duplexStab ?? "—"}`);
   lines.push("");
 
   header(lines, "Biophysical Properties");
-  lines.push(pad("GC Content", `${c.gcContent}%`));
-  lines.push(pad("Melting Temperature", `${c.meltingTempC} °C`));
-  lines.push(pad("Self-Structure MFE", `${c.selfStructureMfe} kcal/mol`));
-  lines.push(pad("Target Duplex ΔG", `${c.targetDuplexEnergy} kcal/mol`));
-  lines.push(pad("Self-Structure Risk", selfDimerLabel(c.selfStructureMfe)));
-  lines.push(pad("Poly-G Tracts (≥3 G)", c.polygTracts));
-  lines.push(pad("CpG Dinucleotides", c.cpgCount));
-  lines.push(pad("Longest Homopolymer Run", `${c.longestHomopolymer} bp`));
-  lines.push(pad("Purine Content (A+G)", `${(c.purineContent * 100).toFixed(1)}%`));
-  lines.push(pad("GC Skew", c.gcSkew.toFixed(3)));
-  lines.push(pad("Sequence Complexity", c.sequenceComplexity.toFixed(3)));
+  if (gc != null) lines.push(pad("GC Content", `${gc}%`));
+  if (tm != null) lines.push(pad("Melting Temperature", `${tm} °C`));
+  if (mfe != null) lines.push(pad("Self-Structure MFE", `${mfe} kcal/mol`));
+  if (dg != null) lines.push(pad("Target Duplex ΔG", `${dg} kcal/mol`));
+  if (mfe != null) lines.push(pad("Self-Structure Risk", selfDimerLabel(mfe)));
+  if (polyg != null) lines.push(pad("Poly-G Tracts (≥3 G)", polyg));
+  if (cpg != null) lines.push(pad("CpG Dinucleotides", cpg));
+  if (homo != null) lines.push(pad("Longest Homopolymer Run", `${homo} bp`));
+  if (purine != null) lines.push(pad("Purine Content (A+G)", `${(purine * 100).toFixed(1)}%`));
+  if (gcSkew != null) lines.push(pad("GC Skew", gcSkew.toFixed(3)));
+  if (complexity != null) lines.push(pad("Sequence Complexity", complexity.toFixed(3)));
   lines.push("");
 
   header(lines, "Drug-like Properties");
-  lines.push(pad("Nuclease Resistance", `${c.nucleaseResistance}/100 (${nucleaseLabel(c.nucleaseResistance)})`));
-  lines.push(pad("Cellular Uptake", `${c.cellularUptake}/100 (${uptakeLabel(c.cellularUptake)})`));
-  lines.push(pad("BBB Crossing Potential", `${c.bbbCrossing}/100 (${bbbLabel(c.bbbCrossing)})`));
-  lines.push(pad("Off-target Risk", `${c.offTargetRisk}/100 (${offTargetLabel(c.offTargetRisk)})`));
-  lines.push(pad("Immune Stimulation Risk", `${c.immuneStimulation}/100 (${immuneLabel(c.immuneStimulation)})`));
-  lines.push(pad("Synthesis Feasibility", `${c.synthesisDifficulty}/100 (${synthesisLabel(c.synthesisDifficulty)})`));
+  if (nuc != null) lines.push(pad("Nuclease Resistance", `${nuc}/100 (${nucleaseLabel(nuc)})`));
+  if (uptake != null) lines.push(pad("Cellular Uptake", `${uptake}/100 (${uptakeLabel(uptake)})`));
+  if (bbb != null) lines.push(pad("BBB Crossing Potential", `${bbb}/100 (${bbbLabel(bbb)})`));
+  if (offTarget != null) lines.push(pad("Off-target Risk", `${offTarget}/100 (${offTargetLabel(offTarget)})`));
+  if (immune != null) lines.push(pad("Immune Stimulation Risk", `${immune}/100 (${immuneLabel(immune)})`));
+  if (synthesis != null) lines.push(pad("Synthesis Feasibility", `${synthesis}/100 (${synthesisLabel(synthesis)})`));
   lines.push("");
 
   header(lines, "Target Duplex Energy");
-  lines.push(pad("Duplex ΔG", `${c.targetDuplexEnergy} kcal/mol`));
+  if (dg != null) lines.push(pad("Duplex ΔG", `${dg} kcal/mol`));
   if (c.mechanismNotes) lines.push(pad("Mechanism Notes", c.mechanismNotes));
   lines.push("");
 
@@ -386,7 +435,7 @@ export function buildAsoReport(ctx: AsoReportContext): string {
   if (candidates.length === 0) {
     lines.push("  No candidates generated.");
   }
-  const isAsso = (results as GenerateResponse)?.asoLength !== undefined || candidates.some((c: any) => "duplexStability" in c && !("editType" in c));
+  const isAsso = (results as GenerateResponse)?.asoLength !== undefined || candidates.some((c: any) => ("duplexStability" in c || "realMetrics" in c) && !("editType" in c));
   candidates.forEach((c: any, i: number) => {
     if (isAsso) {
       formatAsoCandidate(lines, c as AssoCandidate, i + 1);

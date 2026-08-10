@@ -46,7 +46,12 @@ async function authFetch(path: string, options: RequestInit = {}): Promise<Respo
   return fetch(`${API_BASE}${path}`, { ...options, headers });
 }
 
-export async function signup(name: string, email: string, password: string): Promise<AuthUser> {
+export interface SignupResult extends AuthUser {
+  email_sent: boolean;
+  message: string;
+}
+
+export async function signup(name: string, email: string, password: string): Promise<SignupResult> {
   const res = await fetch(`${API_BASE}/api/auth/signup`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -56,7 +61,7 @@ export async function signup(name: string, email: string, password: string): Pro
     const err = await res.json().catch(() => ({ detail: "Signup failed" }));
     throw new Error(err.detail || "Signup failed");
   }
-  const data: AuthUser = await res.json();
+  const data: SignupResult = await res.json();
   setToken(data.token);
   return data;
 }

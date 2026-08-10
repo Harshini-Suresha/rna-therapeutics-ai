@@ -163,8 +163,9 @@ export default function KmerFrequencyChart({
                       x={x + barW / 2}
                       y={PAD.top + plotH + 10}
                       textAnchor="middle"
-                      className="fill-slate-500"
+                      className="fill-black"
                       fontSize={7}
+                      fontWeight={700}
                       transform={`rotate(-45, ${x + barW / 2}, ${
                         PAD.top + plotH + 10
                       })`}
@@ -183,8 +184,9 @@ export default function KmerFrequencyChart({
                 x={PAD.left - 4}
                 y={PAD.top + plotH - v * plotH + 3}
                 textAnchor="end"
-                className="fill-slate-400"
+                className="fill-black"
                 fontSize={8}
+                fontWeight={700}
               >
                 {Math.round(v * maxCount)}
               </text>

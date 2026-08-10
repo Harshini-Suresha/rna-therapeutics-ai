@@ -40,6 +40,8 @@ from services.gene_silencing_service import (
     _duplex_stability,
     _reverse_complement,
     _target_duplex_energy,
+    _tm_fit_score,
+    _composite_score,
     CHEMISTRY_OPTIONS,
     MODIFICATION_OPTIONS,
     LENGTH_RANGE,
@@ -326,43 +328,84 @@ def generate_upregulation_candidates(
                 "spliceElement": splice_element or "",
             }
 
+        # Composite ranking score — real metrics only, mirroring TG01.
+        tm_fit = _tm_fit_score(tm, chemistry, modifications, mechanism_id)
+        composite_score = _composite_score(duplex_energy, tm_fit)
+
         candidates.append({
             "sequence": candidate_seq,
             "length": effective_length,
-            "gcContent": round(gc, 4),
-            "meltingTempC": tm,
-            "selfStructureMfe": self_mfe,
-            "polygTracts": pg,
-            "targetDuplexEnergy": duplex_energy,
+            "compositeScore": composite_score,  # 0-100 ranking score
+            "learnedEfficacy": {
+                "available": False,
+                "value": None,
+                "modelInfo": "Not yet trained",
+                "scopeCaveat": None,
+            },
+            # Measured / computed properties — exact physics and sequence
+            # computations, the tier that drives ranking.
+            "realMetrics": {
+                "targetDuplexEnergy": duplex_energy,
+                "meltingTempC": tm,
+                "selfStructureMfe": self_mfe,
+                "gcContent": round(gc * 100, 1),
+                "cpgCount": cpg,
+                "longestHomopolymer": _longest_homopolymer(candidate_seq),
+                "purineContent": _purine_content(candidate_seq),
+                "gcSkew": skew,
+                "sequenceComplexity": complexity,
+                "polyGPass": pg == 0,
+                "molecularWeight": mw,
+                "extinctionCoefficient": ec,
+                "duplexStability": ds,
+            },
+            # Rule-of-thumb drug-like estimates — deliberately excluded from
+            # ranking, shown to the user as labeled estimates.
+            "heuristicEstimates": {
+                "nucleaseResistance": {
+                    "value": nuc_res,
+                    "note": "Chemistry-class rule of thumb, not measured.",
+                },
+                "cellularUptake": {
+                    "value": uptake,
+                    "note": "Length/chemistry rule of thumb, not measured.",
+                },
+                "bbbCrossing": {
+                    "value": bbb,
+                    "note": "Length/chemistry rule of thumb, not measured.",
+                },
+                "synthesisDifficulty": {
+                    "value": synth,
+                    "note": "Sequence/chemistry rule of thumb, not measured.",
+                },
+                "offTargetRisk": {
+                    "value": off_target,
+                    "note": "Length/repetitiveness heuristic — not a genome alignment check.",
+                },
+                "immuneStimulation": {
+                    "value": immune,
+                    "note": "CpG-count heuristic, not an immunogenicity assay.",
+                },
+            },
             "targetRegion": region_label,
             "mechanismId": mechanism_id,
             "chemistry": chemistry,
             "modifications": modifications,
             "exonNumber": exon_number,
             "exonLength": exon_length,
-            "mechanismNotes": mech_adj["mechNotes"],
-            "cpgCount": cpg,
-            "longestHomopolymer": _longest_homopolymer(candidate_seq),
-            "purineContent": _purine_content(candidate_seq),
-            "sequenceComplexity": complexity,
-            "gcSkew": skew,
-            "molecularWeight": mw,
-            "extinctionCoefficient": ec,
-            "nucleaseResistance": nuc_res,
-            "cellularUptake": uptake,
-            "bbbCrossing": bbb,
-            "synthesisDifficulty": synth,
-            "offTargetRisk": off_target,
-            "immuneStimulation": immune,
-            "duplexStability": ds,
+            "deliveryContext": "",
             "defectType": defect_type or "",
             "defectNotes": defect_notes,
+            "mechanismNotes": mech_adj["mechNotes"],
             "knownRegulatoryElement": known_regulatory_element or "",
             **tango_fields,
         })
 
-    # Sort by target duplex energy (most negative = strongest binding)
-    candidates.sort(key=lambda c: c["targetDuplexEnergy"])
+    # Sort by composite score (higher = better), with duplex ΔG as the
+    # tiebreaker — mirroring the TG01 ranking.
+    candidates.sort(
+        key=lambda c: (-c["compositeScore"], c["realMetrics"]["targetDuplexEnergy"])
+    )
 
     return candidates
 

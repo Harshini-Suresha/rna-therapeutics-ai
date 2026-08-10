@@ -19,6 +19,7 @@ from services.gene_silencing_service import (
 )
 from services.variant_details_service import get_clinvar_variants
 from services.notification_service import add_notification
+from services.admet_service import get_admet_prediction
 
 router = APIRouter()
 
@@ -98,6 +99,22 @@ async def generate_aso_candidates(payload: CandidateRequest):
         f"Candidate design completed for {payload.ensembl_gene_id}.",
     )
 
+    top_admet = {}
+    if candidates:
+        top_admet = get_admet_prediction(
+            aso_sequence=candidates[0]["sequence"],
+            transcript_count=len(target.get("transcripts", [])),
+        )
+
+    enriched_candidates = []
+    for candidate in candidates:
+        admet = get_admet_prediction(
+            aso_sequence=candidate["sequence"],
+            transcript_count=len(target.get("transcripts", [])),
+        )
+        enriched = {**candidate, "admet": admet}
+        enriched_candidates.append(enriched)
+
     return {
         "geneId": payload.ensembl_gene_id,
         "mechanismId": payload.mechanism_id,
@@ -108,7 +125,8 @@ async def generate_aso_candidates(payload: CandidateRequest):
         "totalExons": len(target.get("exons", [])),
         "cdsLength": target.get("cdsLength"),
         "mechanismNotes": candidates[0].get("mechanismNotes", "") if candidates else "",
-        "candidates": candidates,
+        "admet": top_admet,
+        "candidates": enriched_candidates,
     }
 
 

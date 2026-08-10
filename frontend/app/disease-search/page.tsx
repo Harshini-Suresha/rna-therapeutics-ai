@@ -30,16 +30,9 @@ import {
 import Sidebar from "@/components/Sidebar";
 import Topbar from "@/components/Topbar";
 import { Card } from "@/components/ui";
-import { fetchDiseaseDetail, fetchOrthologs } from "@/lib/diseaseSearchApi";
+import { fetchDiseaseDetail } from "@/lib/diseaseSearchApi";
 import { getOrganism } from "@/lib/organisms";
 import { DiseaseDetailResponse, DiseaseGeneMatch, KnownDrug, GeneOrtholog } from "@/types/diseaseSearch";
-
-// Ortholog mapping runs after the disease results load so non-human searches
-// feel as fast as human ones. Only the top genes are mapped (matches the
-// backend's _ORTHOLOG_LIMIT), fetched in small sequential chunks so the
-// badges fill in progressively.
-const ORTHOLOG_SCOPE = 25;
-const ORTHOLOG_CHUNK = 5;
 
 const PREFILL_KEY = "aso:prefillGeneSearch";
 
@@ -198,7 +191,7 @@ function OrthologLink({ ortholog }: { ortholog: GeneOrtholog }) {
   );
 }
 
-function GeneRow({ gene, index, expanded, onToggle, onUseGene, organismId, organismName, mapping }: {
+function GeneRow({ gene, index, expanded, onToggle, onUseGene, organismId, organismName }: {
   gene: DiseaseGeneMatch;
   index: number;
   expanded: boolean;
@@ -206,7 +199,6 @@ function GeneRow({ gene, index, expanded, onToggle, onUseGene, organismId, organ
   onUseGene: () => void;
   organismId: string;
   organismName: string;
-  mapping: boolean;
 }) {
   const scorePct = gene.score !== null ? Math.round(gene.score * 100) : 0;
   const scoreColor = scorePct >= 70 ? "bg-emerald-500" : scorePct >= 50 ? "bg-blue-500" : scorePct >= 30 ? "bg-amber-500" : "bg-slate-300";
@@ -233,13 +225,9 @@ function GeneRow({ gene, index, expanded, onToggle, onUseGene, organismId, organ
             </p>
           )}
           {organismId !== "human" && !gene.ortholog && (
-            mapping ? (
-              <p className="mt-0.5 animate-pulse text-[10px] text-slate-400">Mapping {organismName} ortholog…</p>
-            ) : (
-              <p className="mt-0.5 text-[10px] text-slate-400" title="No ortholog found for this organism">
-                No {organismName} ortholog
-              </p>
-            )
+            <p className="mt-0.5 text-[10px] text-slate-400" title="No ortholog found for this organism">
+              No {organismName} ortholog
+            </p>
           )}
         </td>
         <td className="py-2.5 pr-4 text-[11.5px] text-slate-500 max-w-[200px] truncate" title={gene.name || ""}>
@@ -281,7 +269,7 @@ function GeneRow({ gene, index, expanded, onToggle, onUseGene, organismId, organ
           <button
             onClick={onUseGene}
             disabled={!usable}
-            title={usable ? undefined : mapping ? `Mapping ${organismName} ortholog…` : `No ${organismName} ortholog to add to the project`}
+            title={usable ? undefined : `No ${organismName} ortholog to add to the project`}
             className="rounded-lg border border-[#E5E7EB] px-3 py-1 text-[11px] font-medium text-slate-600 hover:border-brand hover:text-brand transition-colors disabled:cursor-not-allowed disabled:opacity-40"
           >
             Use this gene
@@ -331,20 +319,6 @@ function GeneRow({ gene, index, expanded, onToggle, onUseGene, organismId, organ
                         {gene.mousePhenotypes.slice(0, 8).map((mp, i) => (
                           <span key={i} className="rounded-full bg-slate-100 px-2 py-0.5 text-[10.5px] text-slate-600">
                             {mp}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {gene.ortholog && gene.ortholog.phenotypeCount !== undefined && gene.ortholog.phenotypeCount > 0 && (
-                    <div>
-                      <p className="mb-1 flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-wide text-slate-500">
-                        <Dna className="h-3 w-3" /> {orthologSourceLabel(gene.ortholog)} phenotypes ({gene.ortholog.phenotypeCount})
-                      </p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {gene.ortholog.phenotypes?.slice(0, 4).map((s, i) => (
-                          <span key={i} className="rounded-full bg-slate-100 px-2 py-0.5 text-[10.5px] text-slate-600" title={s}>
-                            {s.length > 60 ? `${s.slice(0, 57)}...` : s}
                           </span>
                         ))}
                       </div>
@@ -599,35 +573,6 @@ export default function DiseaseSearchResultsPage() {
   const [error, setError] = useState<string | null>(null);
   const [expandedGenes, setExpandedGenes] = useState<Set<string>>(new Set());
   const [expandedDrugs, setExpandedDrugs] = useState<Set<number>>(new Set());
-  const [orthologsLoading, setOrthologsLoading] = useState(false);
-  const [orthologDone, setOrthologDone] = useState(0);
-  const [orthologTotal, setOrthologTotal] = useState(0);
-
-  async function loadOrthologs(genes: DiseaseGeneMatch[]) {
-    const scope = genes.slice(0, ORTHOLOG_SCOPE);
-    setOrthologsLoading(true);
-    setOrthologTotal(scope.length);
-    setOrthologDone(0);
-    for (let i = 0; i < scope.length; i += ORTHOLOG_CHUNK) {
-      const chunk = scope.slice(i, i + ORTHOLOG_CHUNK).map((g) => ({ symbol: g.symbol, ensemblId: g.ensemblId }));
-      try {
-        const res = await fetchOrthologs(organism, chunk);
-        if (res.orthologMapped > 0) {
-          setDetail((prev) => {
-            if (!prev) return prev;
-            const genesNext = prev.genes.map((g) =>
-              res.orthologs[g.symbol] ? { ...g, ortholog: res.orthologs[g.symbol] } : g
-            );
-            return { ...prev, genes: genesNext, orthologMapped: genesNext.filter((g) => g.ortholog).length };
-          });
-        }
-      } catch {
-        // A failed chunk just leaves those rows unmapped — never block the page.
-      }
-      setOrthologDone(Math.min(i + ORTHOLOG_CHUNK, scope.length));
-    }
-    setOrthologsLoading(false);
-  }
 
   useEffect(() => {
     if (!query) {
@@ -637,18 +582,12 @@ export default function DiseaseSearchResultsPage() {
     }
     setLoading(true);
     setError(null);
-    setOrthologsLoading(false);
-    setOrthologDone(0);
-    setOrthologTotal(0);
     fetchDiseaseDetail(query, organism)
       .then((res) => {
         if (!res.diseaseId) {
           setError(`No matching disease found for "${query}".`);
         }
         setDetail(res);
-        if (!isHuman && (res.genes ?? []).length > 0) {
-          loadOrthologs(res.genes);
-        }
       })
       .catch(() => setError("Could not reach the disease search service."))
       .finally(() => setLoading(false));
@@ -795,22 +734,7 @@ export default function DiseaseSearchResultsPage() {
               return (
                 <div className="flex items-start gap-2 rounded-xl border border-brand/20 bg-brand/5 px-4 py-3 text-[12.5px] text-slate-600">
                   <AlertTriangle className="h-4 w-4 shrink-0 text-brand" />
-                  {orthologsLoading && mapped === 0 ? (
-                    <p>
-                      Disease associations are human-based (Open Targets). Mapping the top genes to their{" "}
-                      <span className="font-medium text-slate-700">{organismName}</span> orthologs{" "}
-                      <Loader2 className="inline h-3 w-3 animate-spin" />
-                      {orthologDone}/{orthologTotal}...
-                    </p>
-                  ) : orthologsLoading ? (
-                    <p>
-                      Disease associations are human-based (Open Targets). Mapping genes to their{" "}
-                      <span className="font-medium text-slate-700">{organismName}</span> orthologs via Ensembl, the Alliance of
-                      Genome Resources, or NCBI — {mapped} gene{mapped === 1 ? "" : "s"} mapped so far{" "}
-                      <Loader2 className="inline h-3 w-3 animate-spin" />
-                      {orthologDone}/{orthologTotal}...
-                    </p>
-                  ) : mapped === 0 ? (
+                  {mapped === 0 ? (
                     <p>
                       Disease associations are human-based (Open Targets), and ortholog mapping is currently unavailable — so the
                       genes below are <span className="font-medium text-slate-700">human</span> genes. Use them to identify your target,
@@ -1242,7 +1166,6 @@ export default function DiseaseSearchResultsPage() {
                             index={gi}
                             organismId={organism}
                             organismName={organismName}
-                            mapping={orthologsLoading && gi < ORTHOLOG_SCOPE}
                             expanded={expandedGenes.has(g.symbol)}
                             onToggle={() =>
                               setExpandedGenes((prev) => {

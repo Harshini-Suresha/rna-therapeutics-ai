@@ -25,11 +25,11 @@ export default function NucleotideCompositionChart({
   const total = entries.reduce((s, [, v]) => s + v, 0);
   if (total === 0) return null;
 
-  const size = 140;
+  const size = 190;
   const cx = size / 2;
   const cy = size / 2;
-  const R = 52;
-  const r = 30;
+  const R = 72;
+  const r = 40;
 
   let acc = 0;
   const arcs = entries.map(([base, count]) => {
@@ -61,32 +61,32 @@ export default function NucleotideCompositionChart({
   }
 
   return (
-    <div className="flex items-center gap-5">
-      <svg viewBox={`0 0 ${size} ${size}`} className="h-[140px] w-[140px] shrink-0">
+    <div className="flex items-center gap-6">
+      <svg viewBox={`0 0 ${size} ${size}`} className="h-[190px] w-[190px] shrink-0">
         {arcs.map((a) => (
           <path
             key={a.base}
             d={describeArc(a.start, a.end, R, r)}
             fill={COLORS[a.base]}
             stroke="#fff"
-            strokeWidth={1.5}
+            strokeWidth={2}
           />
         ))}
-        <text x={cx} y={cy - 4} textAnchor="middle" className="fill-slate-700" fontSize={14} fontWeight={700}>
+        <text x={cx} y={cy - 5} textAnchor="middle" className="fill-slate-700" fontSize={20} fontWeight={700}>
           {total}
         </text>
-        <text x={cx} y={cy + 9} textAnchor="middle" className="fill-slate-400" fontSize={8}>
+        <text x={cx} y={cy + 13} textAnchor="middle" className="fill-slate-400" fontSize={10.5}>
           total nt
         </text>
       </svg>
-      <div className="space-y-1.5">
+      <div className="space-y-2">
         {arcs.map((a) => (
-          <div key={a.base} className="flex items-center gap-2 text-[11.5px]">
+          <div key={a.base} className="flex items-center gap-2 text-[13px]">
             <span
-              className="inline-block h-2.5 w-2.5 rounded-sm"
+              className="inline-block h-3 w-3 rounded-sm"
               style={{ backgroundColor: COLORS[a.base] }}
             />
-            <span className="font-mono font-semibold text-slate-700 w-3">{a.base}</span>
+            <span className="font-mono font-semibold text-slate-700 w-4">{a.base}</span>
             <span className="text-slate-500">
               {a.count} <span className="text-slate-400">({a.pct}%)</span>
             </span>

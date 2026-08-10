@@ -18,7 +18,7 @@ SMTP_HOST = os.environ.get("SMTP_HOST", "")
 SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
 SMTP_USER = os.environ.get("SMTP_USER", "")
 SMTP_PASS = os.environ.get("SMTP_PASS", "")
-SMTP_FROM = os.environ.get("SMTP_FROM", "noreply@rna-therapeutics.dev")
+SMTP_FROM = os.environ.get("SMTP_FROM", "rnatherapeuticsai@gmail.com")
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:3000")
 
 
@@ -40,7 +40,7 @@ def send_verification_email(email: str, name: str, token: str) -> bool:
         logger.info(f"  Name: {name}")
         logger.info(f"  Verify link: {verify_url}")
         logger.info("═══════════════════════════════════════════════════")
-        return True
+        return False
 
     try:
         msg = EmailMessage()

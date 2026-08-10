@@ -12,7 +12,7 @@ const FAQS = [
   },
   {
     q: "Why do some fields say \"Not yet connected\" instead of a value?",
-    a: "Those are fields (pathways, GO terms, some interaction data) that exist in the data model but don't have a live data source wired in yet. They intentionally show as unconnected rather than a zero or blank, so it's not mistaken for a confirmed \"no data\" result.",
+    a: "Most data sources are now live (KEGG, Reactome, GO, Pathway Commons, GTEx, STRING, ADMET). If a card still shows \"Not yet connected\", the upstream API timed out or returned no data for this gene — it's not a permanent disconnect, just a transient fetch failure. Try re-running the target lookup.",
   },
   {
     q: "Why doesn't Mechanism Selection cover all 26 mechanisms?",
