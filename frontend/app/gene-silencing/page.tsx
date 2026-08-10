@@ -607,7 +607,7 @@ export default function GeneSilencingPage() {
                   {results.mechanismNotes && (
                     <p className="text-[11.5px] text-slate-400 italic mb-3">{results.mechanismNotes}</p>
                   )}
-                  <AsoAnalysisDashboard candidates={results.candidates} mechanismId={results.mechanismId} />
+                  <AsoAnalysisDashboard candidates={results.candidates} />
                   {results.candidates.map((c, i) => (
                     <AssoCandidateCard key={c.sequence} candidate={c} rank={i + 1} />
                   ))}

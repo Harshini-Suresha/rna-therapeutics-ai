@@ -15,8 +15,8 @@ export default function GcWindowChart({
   if (n === 0) return null;
 
   const W = 760;
-  const H = 300;
-  const PAD = { top: 20, right: 16, bottom: 40, left: 52 };
+  const H = 320;
+  const PAD = { top: 20, right: 16, bottom: 62, left: 52 };
   const plotW = W - PAD.left - PAD.right;
   const plotH = H - PAD.top - PAD.bottom;
 
@@ -101,15 +101,18 @@ export default function GcWindowChart({
                   {gc}%
                 </text>
               )}
-              <text x={PAD.left + i * slot + slot / 2} y={H - 12} textAnchor="middle" className="fill-black" fontSize={11} fontWeight={700}>
+              <text x={PAD.left + i * slot + slot / 2} y={H - 34} textAnchor="middle" className="fill-black" fontSize={11} fontWeight={700}>
                 #{i + 1}
               </text>
             </g>
           );
         })}
 
-        <text x={PAD.left + plotW / 2} y={H - 22} textAnchor="middle" className="fill-black" fontSize={11} fontWeight={700}>
-          GC content per candidate — shaded band = 40-60% design window
+        <text x={PAD.left + plotW / 2} y={H - 12} textAnchor="middle" className="fill-black" fontSize={11} fontWeight={700}>
+          Candidate (design rank)
+        </text>
+        <text x={16} y={PAD.top + plotH / 2} textAnchor="middle" className="fill-black" fontSize={11} fontWeight={700} transform={`rotate(-90 16 ${PAD.top + plotH / 2})`}>
+          GC content (%)
         </text>
       </svg>
     </div>

@@ -374,10 +374,7 @@ export default function GeneUpregulationPage() {
           {/* Analysis dashboard + visualization suite (mirrors TG01) */}
           {results && results.candidates.length > 0 && (
             <>
-              <AsoAnalysisDashboard
-                candidates={results.candidates}
-                mechanismId={results.mechanismId}
-              />
+              <AsoAnalysisDashboard candidates={results.candidates} />
               <AsoVisualizationSuite candidates={results.candidates} />
             </>
           )}

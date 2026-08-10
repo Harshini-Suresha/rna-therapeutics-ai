@@ -368,10 +368,7 @@ export default function RnaEditingPage() {
             {/* Analysis dashboard + visualization suite (mirrors TG01) */}
             {results && results.candidates.length > 0 && (
               <>
-                <AsoAnalysisDashboard
-                  candidates={visualCandidates}
-                  mechanismId={results.mechanismId}
-                />
+                <AsoAnalysisDashboard candidates={visualCandidates} />
                 <AsoVisualizationSuite candidates={visualCandidates} />
               </>
             )}

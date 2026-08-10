@@ -10,7 +10,6 @@ import {
   Dna,
   TrendingDown,
   ShieldAlert,
-  Sparkles,
   Info,
 } from "lucide-react";
 import { AssoCandidate } from "@/types/geneSilencing";
@@ -63,10 +62,8 @@ function StatTile({
 
 export default function AsoAnalysisDashboard({
   candidates,
-  mechanismId,
 }: {
   candidates: AssoCandidate[];
-  mechanismId: string;
 }) {
   if (!candidates.length) return null;
 
@@ -147,14 +144,8 @@ export default function AsoAnalysisDashboard({
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-teal-50 text-teal-700">
-            <Sparkles className="h-4 w-4" />
-          </span>
           <div>
             <p className="text-[13px] font-semibold text-slate-800">Candidate Analysis &amp; Visualizations</p>
-            <p className="text-[10.5px] text-slate-400">
-              Auto-computed from the returned candidates for mechanism {mechanismId}
-            </p>
           </div>
         </div>
         <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-medium text-amber-700">
