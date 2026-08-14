@@ -272,6 +272,13 @@ export default function GeneSilencingPage() {
         setTherapeuticGoal(parsed.therapeuticGoal ?? null);
         setKnownVariant(parsed.knownVariant ?? "");
         setParsedVariant(parsed.parsedVariant ?? null);
+        if (parsed.mechanism?.id === "A7") {
+          // Exon skipping (A7) requires steric-blocking, RNase H-independent
+          // chemistry per its rulebook — preselect PMO and drop the PS-backbone
+          // default so the first generate attempt is chemistry-compatible.
+          setChemistry("pmo");
+          setSelectedMods([]);
+        }
       } catch { setMechanism(null); }
     }
 
@@ -462,7 +469,7 @@ export default function GeneSilencingPage() {
               selectedExons={selectedExons}
               isTotalKnockdown={isTotalKnockdown}
               onToggleTotalKnockdown={handleToggleTotalKnockdown}
-              showTargetingMode={!isAlleleSpecific}
+              showTargetingMode={!isAlleleSpecific && mechanism?.id !== "A7"}
             />
           ) : null}
 

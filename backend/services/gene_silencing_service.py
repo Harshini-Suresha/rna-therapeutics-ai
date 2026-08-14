@@ -83,6 +83,8 @@ def _parse_exons_from_transcript(transcript: dict) -> list[dict]:
             "start": e.get("start"),
             "end": e.get("end"),
             "length": (e.get("end", 0) - e.get("start", 0) + 1),
+            "chromosome": transcript.get("seq_region_name"),
+            "strand": strand,
         }
         for idx, e in enumerate(sorted_exons)
         if e.get("start") and e.get("end")
@@ -602,6 +604,7 @@ MOD_TM_BOOST = {
 OPTIMAL_TM_RANGES = {
     "A1": (50, 65),   # RNase H1 cleavage — moderate affinity
     "A2": (62, 75),   # translation block — tight binding at AUG
+    "A7": (55, 70),   # exon skipping — steric block needs stable binding
     "A12": (55, 68),  # anti-miR — strong complementarity
     "A15": (55, 68),  # promoter ASO — moderate
 }
@@ -658,6 +661,14 @@ def _mechanism_design_constraints(mechanism_id: str, aso_length: int, chemistry:
         return aso_length, chemistry, "mrna"
     if mechanism_id == "A2":
         return aso_length, chemistry, "translation_start"
+    if mechanism_id == "A7":
+        # A7 (exon skipping) is a splice-modulation mechanism: the ASO is a
+        # steric blocker that masks splice-regulatory sequences in the target
+        # exon rather than recruiting RNase H for degradation. Candidates are
+        # scanned across the selected exon(s) the same way as other exon-based
+        # mechanisms, and the chemistry gate (below) enforces a steric-blocking
+        # chemistry per the A7 rulebook.
+        return aso_length, chemistry, "splice_modulation"
     if mechanism_id == "A21":
         # A21 (RNAi / siRNA) is a double-stranded duplex modality, not a
         # single-stranded ASO. The ASO designer only produces single-stranded
@@ -745,6 +756,14 @@ def _mechanism_note(mechanism_id: str, chemistry: str) -> str:
     rule = _load_silencing_rule(mechanism_id)
     name = rule.get("name") if rule else mechanism_id
     requirement = _mechanism_rnase_h_requirement(mechanism_id)
+    if mechanism_id == "A7":
+        return (
+            f"Exon Skipping (A7): steric-blocking ASO masks splice-regulatory "
+            f"sequences in the target exon and its flanking introns ({chemistry} "
+            f"is compatible). Candidates are designed against real pre-mRNA sequence, "
+            f"so they can span the 3' splice-acceptor and 5' splice-donor junctions "
+            f"as well as the exon body (ESEs)."
+        )
     if requirement == "rnase_h":
         return f"{name} ({mechanism_id}): RNase H-recruiting chemistry required — {chemistry} is compatible."
     if requirement == "steric":
@@ -969,6 +988,245 @@ def _allele_specific_scoring(
     return result
 
 
+# Length of flanking intronic sequence fetched on each side of a target exon for
+# splice-modulation (A7) design. This is where the splice donor/acceptor sites
+# and intronic splice-regulatory elements the rulebook lists actually live.
+INTRON_FLANK = 30
+
+
+def _fetch_exon_splice_context(exon: dict, flank: int = INTRON_FLANK) -> dict | None:
+    """Fetch the pre-mRNA sequence spanning an exon plus its flanking introns.
+
+    Returns ``{"seq", "exonStart", "exonEnd"}`` where ``seq`` is the genomic
+    sequence for the region (transcript-strand oriented, so exon and introns
+    read 5'→3' as in the pre-mRNA) and ``exonStart``/``exonEnd`` are the 0-based
+    half-open offsets of the exon within it. The intronic flanks let A7
+    candidates span the real splice donor (exon 3′ → intron) and acceptor
+    (intron → exon 5′) junctions instead of being restricted to the exon body.
+    """
+    chromosome = exon.get("chromosome")
+    start = exon.get("start")
+    end = exon.get("end")
+    strand = exon.get("strand", 1)
+    if not chromosome or not start or not end:
+        return None
+    region_start = max(1, start - flank)
+    region_end = end + flank
+    try:
+        resp = _ensembl_get(
+            f"{ENSEMBL_REST}/sequence/region/homo_sapiens/"
+            f"{chromosome}:{region_start}-{region_end}"
+            f"?coord_system=chromosome;strand={strand}"
+        )
+    except Exception as exc:
+        logger.warning("Splice context fetch failed for exon %s: %s", start, exc)
+        return None
+    if not resp.ok:
+        return None
+    seq = (resp.json().get("seq") or "").upper()
+    exon_len = end - start + 1
+    if len(seq) < exon_len:
+        return None
+    exon_offset = start - region_start
+    return {
+        "seq": seq,
+        "exonStart": exon_offset,
+        "exonEnd": exon_offset + exon_len,
+    }
+
+
+def _generate_splice_modulation_candidates(
+    target_exon_indices: list[int] | None,
+    aso_length: int,
+    chemistry: str,
+    modifications: list[str],
+    exons: list[dict],
+    mechanism_id: str,
+    mechanism_note: str,
+    delivery_context: str | None,
+    defect_type: str | None,
+    silencing_scope: str | None,
+    known_variant: str | None,
+) -> list[dict]:
+    """Generate exon-skipping (A7) candidates against real pre-mRNA sequence.
+
+    For each selected exon the exon plus ``INTRON_FLANK`` nt of flanking intron
+    is fetched from Ensembl on the transcript strand. Every window of the
+    requested length is scored with the same physics as the CDS-based pipeline;
+    windows are classified by where they fall relative to the exon, so the
+    results include the splice-acceptor junction (intron → exon 5′), the
+    splice-donor junction (exon 3′ → intron), the intronic flanking regions,
+    and the exon body (exonic splicing enhancers).
+    """
+    candidates = []
+    if not exons:
+        return candidates
+
+    is_total_knockdown = target_exon_indices is None
+    requested_exons = (
+        list(range(1, len(exons) + 1))
+        if is_total_knockdown
+        else (target_exon_indices or [])
+    )
+    target_indices = sorted({i for i in requested_exons if 0 < i <= len(exons)})
+    if not target_indices:
+        return candidates
+
+    # Whole-transcript "knockdown" is not a meaningful exon-skipping strategy
+    # (skipping every exon would delete the transcript), so when no exon is
+    # explicitly requested we still cap the fetch to the first handful of exons
+    # to avoid fanning out across a multi-megabase gene one region call at a time.
+    if is_total_knockdown:
+        target_indices = target_indices[:12]
+        mechanism_note += (
+            " No specific exon selected — splice-context design limited to the "
+            "first 12 exons. Choose one or more exons for a complete screen."
+        )
+
+    seen = set()
+    step = max(1, aso_length // 3)
+    defect_notes = _defect_scores(defect_type, silencing_scope)["defect_notes"]
+
+    for idx in target_indices:
+        context = _fetch_exon_splice_context(exons[idx - 1])
+        if not context:
+            continue
+        seq = context["seq"]
+        es, ee = context["exonStart"], context["exonEnd"]
+        seq_len = len(seq)
+        if seq_len < aso_length:
+            continue
+
+        for offset in range(0, seq_len - aso_length + 1, step):
+            window = seq[offset : offset + aso_length]
+            if window in seen:
+                continue
+            seen.add(window)
+
+            gc = _calc_gc(window)
+            if gc < MIN_GC or gc > MAX_GC:
+                continue
+
+            tm = _calc_tm(window)
+            self_mfe = _self_complement_mfe(window)
+            pg = _polyg_score(window)
+            cpg = _cpg_count(window)
+            aso_seq = _reverse_complement(window)
+            duplex_energy = _target_duplex_energy(aso_seq, window)
+
+            if offset + aso_length <= es:
+                region_label = f"Exon {idx} 5' intronic flank (acceptor context)"
+            elif offset >= ee:
+                region_label = f"Exon {idx} 3' intronic flank (donor context)"
+            elif offset < es < offset + aso_length:
+                region_label = f"Exon {idx} 3' splice-acceptor junction"
+            elif offset < ee < offset + aso_length:
+                region_label = f"Exon {idx} 5' splice-donor junction"
+            else:
+                region_label = f"Exon {idx} body offset +{offset - es}"
+
+            tm_fit = _tm_fit_score(tm, chemistry, modifications, mechanism_id)
+            composite_score = _composite_score(duplex_energy, tm_fit)
+
+            nuclease_score = _nuclease_resistance_score(chemistry, modifications)
+            uptake_score = _cellular_uptake_score(chemistry, aso_length)
+            bbb_score = _bbb_crossing_score(chemistry, aso_length, modifications)
+            synthesis_score = _synthesis_difficulty(window, chemistry, modifications)
+            complexity_val = _sequence_complexity(window)
+            off_target = _off_target_risk(window, complexity_val)
+            immune_risk = _immune_stimulation_risk(window, chemistry)
+            stability = _duplex_stability(gc, tm, aso_length)
+            mw = _molecular_weight(window)
+            ext_coeff = _extinction_coefficient(window)
+
+            candidates.append({
+                "sequence": aso_seq,
+                "length": aso_length,
+                "compositeScore": composite_score,
+                "learnedEfficacy": {
+                    "available": False,
+                    "value": None,
+                    "modelInfo": "Not yet trained",
+                    "scopeCaveat": None,
+                },
+                "realMetrics": {
+                    "targetDuplexEnergy": duplex_energy,
+                    "meltingTempC": tm,
+                    "selfStructureMfe": self_mfe,
+                    "gcContent": round(gc * 100, 1),
+                    "cpgCount": cpg,
+                    "longestHomopolymer": _longest_homopolymer(window),
+                    "purineContent": _purine_content(window),
+                    "gcSkew": _gc_skew(window),
+                    "sequenceComplexity": complexity_val,
+                    "polyGPass": pg == 0,
+                    "molecularWeight": mw,
+                    "extinctionCoefficient": ext_coeff,
+                    "duplexStability": stability,
+                },
+                "heuristicEstimates": {
+                    "nucleaseResistance": {"value": nuclease_score, "note": "Chemistry-class rule of thumb, not measured."},
+                    "cellularUptake": {"value": uptake_score, "note": "Length/chemistry rule of thumb, not measured."},
+                    "bbbCrossing": {"value": bbb_score, "note": "Length/chemistry rule of thumb, not measured."},
+                    "synthesisDifficulty": {"value": synthesis_score, "note": "Sequence/chemistry rule of thumb, not measured."},
+                    "offTargetRisk": {"value": off_target, "note": "Length/repetitiveness heuristic — not a genome alignment check."},
+                    "immuneStimulation": {"value": immune_risk, "note": "CpG-count heuristic, not an immunogenicity assay."},
+                },
+                "targetRegion": region_label,
+                "mechanismId": mechanism_id,
+                "chemistry": chemistry,
+                "modifications": modifications,
+                "exonNumber": idx,
+                "exonLength": ee - es,
+                "deliveryContext": delivery_context or "",
+                "defectType": defect_type or "",
+                "silencingScope": silencing_scope or "",
+                "defectNotes": defect_notes,
+                "mechanismNotes": mechanism_note,
+                "knownVariant": known_variant or "",
+                "alleleSpecific": False,
+                "alleleNotes": "",
+                "alleleDiscriminationScore": None,
+                "alleleDiscriminationNote": None,
+            })
+
+    candidates.sort(
+        key=lambda c: (-c["compositeScore"], c["realMetrics"]["targetDuplexEnergy"])
+    )
+
+    # Splice donor/acceptor masking is a primary exon-skipping strategy (per the
+    # A7 rulebook), but junction-spanning windows tend to bind slightly weaker
+    # than exon-body windows, so a pure physics sort can bury every junction
+    # candidate below the top-10. Stratify the returned set: the best candidate
+    # from each region class (acceptor junction, donor junction, intronic flank,
+    # exon body) is always surfaced, and the remaining slots fill by physics.
+    representatives: dict[str, dict] = {}
+    for c in candidates:
+        region = c["targetRegion"]
+        cls = (
+            "acceptor"
+            if "acceptor junction" in region
+            else "donor"
+            if "donor junction" in region
+            else "flank"
+            if "intronic flank" in region
+            else "body"
+        )
+        if cls not in representatives:
+            representatives[cls] = c
+
+    final = list(representatives.values())
+    for c in candidates:
+        if len(final) >= 10:
+            break
+        if c not in final:
+            final.append(c)
+    final.sort(
+        key=lambda c: (-c["compositeScore"], c["realMetrics"]["targetDuplexEnergy"])
+    )
+    return final[:10]
+
+
 def generate_candidates(
     target_exon_indices: list[int] | None,
     aso_length: int,
@@ -1004,6 +1262,24 @@ def generate_candidates(
     # mechanism). Runs once, before any candidate work.
     _mechanism_chemistry_compatibility(mechanism_id, chemistry)
     mechanism_note = _mechanism_note(mechanism_id, chemistry)
+
+    # Exon-skipping (A7) designs against real pre-mRNA sequence so candidates
+    # can span the splice donor/acceptor junctions and intronic regulatory
+    # elements — the CDS-only path below cannot reach introns.
+    if targeting_mode == "splice_modulation":
+        return _generate_splice_modulation_candidates(
+            target_exon_indices=target_exon_indices,
+            aso_length=aso_length,
+            chemistry=chemistry,
+            modifications=modifications,
+            exons=exons,
+            mechanism_id=mechanism_id,
+            mechanism_note=mechanism_note,
+            delivery_context=delivery_context,
+            defect_type=defect_type,
+            silencing_scope=silencing_scope,
+            known_variant=known_variant,
+        )
 
     seq = mrna_sequence.upper()
     seq_len = len(seq)
