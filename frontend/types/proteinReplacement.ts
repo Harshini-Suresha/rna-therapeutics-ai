@@ -35,6 +35,13 @@ export interface RnaCandidate {
   sequence: string;
   features: ConstructFeature[];
   diagnostics: ConstructDiagnostics;
+  fivePrimeUtrLength?: number;
+  orfLength?: number;
+  threePrimeUtrLength?: number;
+  polyATailLength?: number;
+  gcContent?: number;
+  proteinLength?: string;
+  molecularWeight?: string;
 }
 
 export interface ConstructFeature {

@@ -22,13 +22,23 @@ def get_gene_dependency(gene_symbol: str) -> dict:
             - depmapDependency: str | None - Formatted dependency score
             - depmapDependencyScore: float | None - Raw indispensability score (0-1)
             - essentialGene: str | None - Essentiality prediction ("Essential" or "Non-essential")
+            - essentialGeneCrispr: str | None - Essentiality prediction from CRISPR screen
+            - essentialGeneCrispr2: str | None - Essentiality prediction from CRISPR2 screen
+            - essentialGeneGeneTrap: str | None - Essentiality prediction from gene trap screen
             - depmapSource: str - Data source citation
     """
     result = {
         "depmapDependency": None,
         "depmapDependencyScore": None,
         "essentialGene": None,
+        "essentialGeneCrispr": None,
+        "essentialGeneCrispr2": None,
+        "essentialGeneGeneTrap": None,
         "depmapSource": "FAVOR (Xiong et al. 2024)",
+        "essentialGeneSource": "FAVOR (Xiong et al. 2024)",
+        "essentialGeneCrisprSource": "FAVOR (Xiong et al. 2024)",
+        "essentialGeneCrispr2Source": "FAVOR (Xiong et al. 2024)",
+        "essentialGeneGeneTrapSource": "FAVOR (Xiong et al. 2024)",
     }
     
     if not gene_symbol:
@@ -70,17 +80,41 @@ def get_gene_dependency(gene_symbol: str) -> dict:
             essential_str = str(essential_raw).strip().upper()
             if essential_str == "E":
                 result["essentialGene"] = "Essential"
+                result["essentialGeneSource"] = "FAVOR (Xiong et al. 2024)"
             elif essential_str == "N":
                 result["essentialGene"] = "Non-essential"
+                result["essentialGeneSource"] = "FAVOR (Xiong et al. 2024)"
         
         # Also check CRISPR-based essentiality if available
         crispr_raw = data.get("essential_gene_crispr")
-        if crispr_raw and str(crispr_raw).strip().upper() == "Y":
-            result["essentialGene"] = "Essential (CRISPR)"
+        if crispr_raw:
+            crispr_str = str(crispr_raw).strip().upper()
+            if crispr_str == "E":
+                result["essentialGeneCrispr"] = "Essential"
+                result["essentialGeneCrisprSource"] = "FAVOR (Xiong et al. 2024)"
+            elif crispr_str == "N":
+                result["essentialGeneCrispr"] = "Non-essential"
+                result["essentialGeneCrisprSource"] = "FAVOR (Xiong et al. 2024)"
         
         crispr2_raw = data.get("essential_gene_crispr2")
-        if crispr2_raw and str(crispr2_raw).strip().upper() == "Y":
-            result["essentialGene"] = "Essential (CRISPR2)"
+        if crispr2_raw:
+            crispr2_str = str(crispr2_raw).strip().upper()
+            if crispr2_str == "E":
+                result["essentialGeneCrispr2"] = "Essential"
+                result["essentialGeneCrispr2Source"] = "FAVOR (Xiong et al. 2024)"
+            elif crispr2_str == "N":
+                result["essentialGeneCrispr2"] = "Non-essential"
+                result["essentialGeneCrispr2Source"] = "FAVOR (Xiong et al. 2024)"
+        
+        gene_trap_raw = data.get("essential_gene_gene_trap")
+        if gene_trap_raw:
+            gene_trap_str = str(gene_trap_raw).strip().upper()
+            if gene_trap_str == "E":
+                result["essentialGeneGeneTrap"] = "Essential"
+                result["essentialGeneGeneTrapSource"] = "FAVOR (Xiong et al. 2024)"
+            elif gene_trap_str == "N":
+                result["essentialGeneGeneTrap"] = "Non-essential"
+                result["essentialGeneGeneTrapSource"] = "FAVOR (Xiong et al. 2024)"
         
     except requests.RequestException as e:
         logger.info(f"FAVOR API request failed for {symbol}: {e}")

@@ -21,7 +21,6 @@ const DATABASES = [
   { name: "Pathway Commons API", use: "Pathway search across multiple databases (WikiPathways, Reactome, KEGG, etc.)", status: "live" },
   { name: "Gene Ontology (QuickGO / EBI)", use: "Biological process, molecular function, cellular component annotations", status: "live" },
   { name: "GTEx Portal API v2", use: "Tissue-level TPM expression across 54 human tissues", status: "live" },
-  { name: "ADMET Prediction Engine", use: "Absorption, Distribution, Metabolism, Excretion, Toxicity for RNA therapeutics", status: "live" },
 ];
 
 function StatusBadge({ status }: { status: string }) {
@@ -91,7 +90,6 @@ export default function SupportedDatabasesPage() {
           <li className="text-[12.5px] text-slate-600">• <strong>Pathway Enrichment</strong> — KEGG, Reactome, Pathway Commons via mygene.info</li>
           <li className="text-[12.5px] text-slate-600">• <strong>GO Term Analysis</strong> — Biological Process, Molecular Function, Cellular Component (EBI QuickGO)</li>
           <li className="text-[12.5px] text-slate-600">• <strong>Tissue Expression</strong> — GTEx v8, Human Protein Atlas, UniProt fallback chain</li>
-          <li className="text-[12.5px] text-slate-600">• <strong>ADMET Prediction</strong> — Sequence-based heuristic model for RNA therapeutics</li>
           <li className="text-[12.5px] text-slate-600">• <strong>Interaction Network</strong> — STRING high/medium confidence PPI with density scoring</li>
           <li className="text-[12.5px] text-slate-600">• <strong>Constraint Analysis</strong> — gnomAD pLI, LOEUF, ClinGen haploinsufficiency</li>
         </ul>

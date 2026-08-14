@@ -9,6 +9,7 @@ Upregulation). Mechanism IDs follow the rulebooks (backend/rulebooks/A*/rule.jso
 - A5   uORF blocking               — steric-blocking ASOs at 5' UTR / start codon
 - A6   miRNA site blocking         — steric-blocking ASOs masking the seed site
 - A23  saRNA                       — promoter-targeted 21-mer dsRNA duplexes
+- A28  RBP masking                 — steric-blocking ASOs at RBP recognition sites
 
 Reuses biophysical scoring helpers from ``gene_silencing_service``.
 """
@@ -104,6 +105,12 @@ UPREGULATION_MECHANISM_DESIGN = {
         "preferred_chemistry": ["sirna", "lna_gapmer", "gapmer"],
         "forced_length": 21,
         "notes": "saRNA targets promoter-associated RNAs to activate transcription. Requires a functional endogenous promoter. Candidates are windows in the real promoter upstream of the TSS and must be verified against validated promoter elements.",
+    },
+    "A28": {
+        "label": "RBP Binding Site Blocking (Target Protector / RBP Masking)",
+        "target_region": "RBP binding sites in 5' UTR, CDS, or 3' UTR",
+        "preferred_chemistry": ["pmo", "2ome", "lna_gapmer"],
+        "notes": "Masks RBP recognition elements (e.g., PTB, IRP, hnRNP, TTP sites) to relieve translational repression or prevent mRNA decay. Candidates are windows across the transcript and must be verified against validated RBP binding sites.",
     },
 }
 
@@ -204,6 +211,14 @@ def _mechanism_scoring_adjustments(
         elif chemistry in ("pmo", "2ome"):
             mech_notes = "A23 (saRNA): Steric-blocking chemistries are less suitable for promoter activation which requires RNA duplex formation."
 
+    elif mechanism_id == "A28":
+        if chemistry in ("pmo", "2ome"):
+            mech_notes = "A28 (RBP masking): Steric-blocking chemistry blocks RBP recognition elements without cleaving the transcript — correct modality for translational upregulation via RBP displacement. Candidates are windows across the transcript and must be verified against validated RBP binding sites."
+        elif chemistry == "lna_gapmer":
+            mech_notes = "A28 (RBP masking): LNA gapmer can block with high affinity, though RNase H activity is secondary."
+        elif chemistry == "gapmer":
+            mech_notes = "A28 (RBP masking): Gapmers cleave mRNA — less ideal for steric RBP site blocking."
+
     else:
         mech_notes = "No mechanism-specific adjustments."
 
@@ -286,6 +301,8 @@ def generate_upregulation_candidates(
             target_label = "Promoter (upstream of TSS)"
         else:
             target_label = "5' CDS region (promoter unavailable)"
+    elif mechanism_id == "A28":
+        target_label = "Full transcript (putative RBP binding site windows)"
 
     search_start = 0
     search_end = max(0, len(scan_seq) - effective_length)
@@ -391,12 +408,24 @@ def generate_upregulation_candidates(
 
         # Composite ranking score — real metrics only, mirroring TG01.
         tm_fit = _tm_fit_score(tm, chemistry, modifications, mechanism_id)
+        # Normalize target duplex ΔG (more negative = stronger binding), matching
+        # the normalization used inside _composite_score so the two components
+        # are exposed for the score-decomposition visualization.
+        duplex_score = min(100.0, max(0.0, (-duplex_energy - 8.0) * 3.5))
         composite_score = _composite_score(duplex_energy, tm_fit)
 
         candidates.append({
             "sequence": aso_seq,
             "length": effective_length,
             "compositeScore": composite_score,  # 0-100 ranking score
+            # Exposed weighted components of the composite score so the UI can
+            # show exactly how each candidate was ranked.
+            "scoreBreakdown": {
+                "duplexScore": round(duplex_score, 1),  # normalized 0-100 binding
+                "tmFitScore": tm_fit,                    # normalized 0-100 Tm fit
+                "duplexRaw": duplex_energy,              # kcal/mol
+                "tmRaw": tm,                             # °C
+            },
             "learnedEfficacy": {
                 "available": False,
                 "value": None,

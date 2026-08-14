@@ -26,6 +26,20 @@ import {
   Network,
   Sparkles,
   AlertTriangle,
+  PieChart,
+  Filter,
+  Cloud,
+  ThermometerSun,
+  Shield,
+  Target,
+  Database,
+  TrendingUp,
+  Hash,
+  Zap,
+  Scale,
+  BadgePercent,
+  GitCommit,
+  Award,
 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import Topbar from "@/components/Topbar";
@@ -33,6 +47,7 @@ import { Card } from "@/components/ui";
 import { fetchDiseaseDetail } from "@/lib/diseaseSearchApi";
 import { getOrganism } from "@/lib/organisms";
 import { DiseaseDetailResponse, DiseaseGeneMatch, KnownDrug, GeneOrtholog } from "@/types/diseaseSearch";
+import DiseaseVisualizations from "@/components/DiseaseVisualizations";
 
 const PREFILL_KEY = "aso:prefillGeneSearch";
 
@@ -700,6 +715,137 @@ export default function DiseaseSearchResultsPage() {
 
   const totalGenes = detail?.genes.length ?? 0;
 
+  const scoreDistribution = useMemo(() => {
+    const bins = [0, 0, 0, 0, 0];
+    for (const g of detail?.genes ?? []) {
+      if (g.score !== null && g.score !== undefined) {
+        const b = Math.min(4, Math.floor(g.score * 5));
+        bins[b]++;
+      }
+    }
+    const max = Math.max(...bins, 1);
+    return bins.map((count, i) => ({
+      label: `${(i * 0.2).toFixed(1)}–${((i + 1) * 0.2).toFixed(1)}`,
+      count,
+      pct: (count / max) * 100,
+    }));
+  }, [detail]);
+
+  const therapeuticAreaCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const ta of detail?.therapeuticAreas ?? []) {
+      counts[ta] = (counts[ta] ?? 0) + 1;
+    }
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  }, [detail]);
+
+  const drugStageCounts = useMemo(() => {
+    const stages = ["Pre-clinical", "Phase 1", "Phase 2", "Phase 3", "Approved"];
+    const counts = { "Pre-clinical": 0, "Phase 1": 0, "Phase 2": 0, "Phase 3": 0, "Approved": 0 };
+    for (const d of detail?.knownDrugs ?? []) {
+      const phase = d.phase;
+      if (phase === 4 || d.status?.toLowerCase().includes("approved")) counts["Approved"]++;
+      else if (phase === 3) counts["Phase 3"]++;
+      else if (phase === 2) counts["Phase 2"]++;
+      else if (phase === 1) counts["Phase 1"]++;
+      else counts["Pre-clinical"]++;
+    }
+    return stages.map((s) => ({ stage: s, count: counts[s as keyof typeof counts] }));
+  }, [detail]);
+
+  const biotypeDonut = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const g of detail?.genes ?? []) {
+      counts[g.biotype || "unknown"] = (counts[g.biotype || "unknown"] ?? 0) + 1;
+    }
+    const total = detail?.genes.length ?? 0;
+    const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+    const colors = ["bg-indigo-500", "bg-blue-500", "bg-emerald-500", "bg-amber-500", "bg-rose-500", "bg-slate-400"];
+    return sorted.map(([biotype, count], i) => ({
+      label: biotype,
+      count,
+      pct: (count / total) * 100,
+      color: colors[i % colors.length],
+    }));
+  }, [detail, totalGenes]);
+
+  const evidenceHeatmapGenes = useMemo(() => {
+    const topGenes = (detail?.genes ?? []).slice(0, 8);
+    return topGenes.map((g) => ({
+      symbol: g.symbol,
+      evidence: {
+        genetic: g.evidence?.genetic_association ?? 0,
+        geneticLit: g.evidence?.genetic_literature ?? 0,
+        somatic: g.evidence?.somatic_mutation ?? 0,
+        clinical: g.evidence?.clinical ?? 0,
+        pathway: g.evidence?.pathway ?? 0,
+        drug: g.evidence?.drug ?? 0,
+        textMining: g.evidence?.text_mining ?? 0,
+        animalModel: g.evidence?.animal_model ?? 0,
+        rnaExpr: g.evidence?.rna_expression ?? 0,
+      },
+    }));
+  }, [detail]);
+
+  const tractabilityData = useMemo(() => {
+    const tracts: Record<string, number> = {};
+    for (const g of detail?.genes ?? []) {
+      for (const t of g.tractability ?? []) {
+        const modality = TRACTABILITY_MODALITY[t.modality] ?? t.modality;
+        const key = `${t.label} (${modality})`;
+        tracts[key] = (tracts[key] ?? 0) + 1;
+      }
+    }
+    const max = Math.max(...Object.values(tracts), 1);
+    return Object.entries(tracts)
+      .map(([label, count]) => ({ label, count, pct: (count / max) * 100 }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8);
+  }, [detail]);
+
+  const safetyBubbleData = useMemo(() => {
+    const bubbles: { symbol: string; liabilityCount: number; score: number | null }[] = [];
+    for (const g of detail?.genes ?? []) {
+      const liabs = g.safetyLiabilities ?? [];
+      if (liabs.length > 0) {
+        bubbles.push({ symbol: g.symbol, liabilityCount: liabs.length, score: g.score });
+      }
+    }
+    const maxLiab = Math.max(...bubbles.map((b) => b.liabilityCount), 1);
+    const maxScore = Math.max(...(detail?.genes ?? []).map((g) => g.score ?? 0), 0.01);
+    return bubbles.map((b) => ({
+      ...b,
+      size: 20 + (b.liabilityCount / maxLiab) * 60,
+      opacity: (b.score ?? 0) / maxScore,
+    })).slice(0, 12);
+  }, [detail]);
+
+  const chemicalProbeData = useMemo(() => {
+    const withProbes = (detail?.genes ?? []).filter((g) => (g.chemicalProbes?.length ?? 0) > 0).length;
+    const total = totalGenes;
+    const withHQ = (detail?.genes ?? []).filter((g) => g.chemicalProbes?.some((p) => p.isHighQuality)).length;
+    const pct = total > 0 ? (withProbes / total) * 100 : 0;
+    const pctHQ = total > 0 ? (withHQ / total) * 100 : 0;
+    return { total, withProbes, withHQ, pct, pctHQ };
+  }, [detail, totalGenes]);
+
+  const pathwayBarData = useMemo(() => {
+    return pathwaySummary.slice(0, 8);
+  }, [pathwaySummary]);
+
+  const literatureScatterData = useMemo(() => {
+    const genes = detail?.genes ?? [];
+    const maxLit = Math.max(...genes.map((g) => g.literatureCount ?? 0), 1);
+    const maxScore = Math.max(...genes.map((g) => g.score ?? 0), 0.01);
+    return genes.slice(0, 12).map((g) => ({
+      symbol: g.symbol,
+      lit: g.literatureCount ?? 0,
+      score: g.score ?? 0,
+      xPct: ((g.literatureCount ?? 0) / maxLit) * 100,
+      yPct: ((g.score ?? 0) / maxScore) * 100,
+    }));
+  }, [detail]);
+
   return (
     <div className="flex min-h-screen bg-[#F8FAFC]">
       <Sidebar />
@@ -831,7 +977,7 @@ export default function DiseaseSearchResultsPage() {
                           </>
                         )}
 
-                        {detail.phenotypes.length > 0 && (
+{detail.phenotypes.length > 0 && (
                           <>
                             <SectionHeader icon={Heart} title="Clinical Features (HPO)" />
                             <tr>
@@ -848,6 +994,29 @@ export default function DiseaseSearchResultsPage() {
                                       {p.name}
                                     </a>
                                   ))}
+                                </div>
+                              </td>
+                            </tr>
+                          </>
+                        )}
+
+                        {detail.hpoPhenotypes && detail.hpoPhenotypes.length > 0 && (
+                          <>
+                            <SectionHeader icon={Heart} title="Clinical Features (HPO Ontology)" />
+                            <tr>
+                              <td colSpan={2} className="py-2">
+                                <div className="flex flex-wrap gap-1.5">
+                                  {detail.hpoPhenotypes.map((p, i) => (
+                                    <a
+                                      key={i}
+                                      href={`https://hpo.jax.org/browse/term/${p.id}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="rounded-full bg-rose-50 px-2.5 py-1 text-[11px] text-rose-700 hover:bg-rose-100 transition-colors"
+                                      >
+                                        {p.name}
+                                      </a>
+                                    ))}
                                 </div>
                               </td>
                             </tr>
@@ -894,7 +1063,12 @@ export default function DiseaseSearchResultsPage() {
 
                 {/* At-a-glance snapshot */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-                  <SnapshotStat label="Clinical features" value={detail.phenotypes.length} />
+                  <SnapshotStat
+                    label="Clinical features"
+                    value={detail.phenotypes.length > 0
+                      ? detail.phenotypes.length
+                      : (detail.hpoPhenotypes?.length ?? 0)}
+                  />
                   <SnapshotStat label="Alternative names" value={detail.synonyms.length} />
                   <SnapshotStat label="Subtypes" value={detail.childDiseases.length} />
                   <SnapshotStat label="Related diseases" value={detail.relatedDiseases.length} />
@@ -1123,6 +1297,9 @@ export default function DiseaseSearchResultsPage() {
                     </div>
                   </Card>
                 )}
+
+                {/* === 10 Data Visualizations === */}
+                <DiseaseVisualizations detail={detail} />
 
                 {/* Associated genes table */}
                 <Card className="p-0 overflow-hidden">

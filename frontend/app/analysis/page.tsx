@@ -43,7 +43,6 @@ export default function AnalysisPage() {
         {
           label: "Safety & Delivery",
           items: [
-            "ADMET prediction",
             "Nuclease sensitivity & half-life",
             "Immunogenicity risk (TLR7/8/9)",
             "Off-target hybridization risk",

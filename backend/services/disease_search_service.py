@@ -17,6 +17,7 @@ from concurrent.futures import ThreadPoolExecutor
 import requests
 
 OPEN_TARGETS_URL = "https://api.platform.opentargets.org/api/v4/graphql"
+HPO_BASE_URL = "https://ontology.jax.org/api/hp"
 _TIMEOUT = 120
 TARGET_PAGE_SIZE = 500
 _TARGET_FETCH_WORKERS = 4
@@ -45,6 +46,7 @@ def get_disease_detail(query: str) -> dict:
         "knownDrugs": [],
         "synonyms": [],
         "phenotypes": [],
+        "hpoPhenotypes": [],
         "relatedDiseases": [],
         "childDiseases": [],
         "databaseRefs": {},
@@ -78,8 +80,9 @@ def get_disease_detail(query: str) -> dict:
             return result
 
         disease_id = hits[0]["id"]
+        disease_name = hits[0]["name"]
         result["diseaseId"] = disease_id
-        result["diseaseName"] = hits[0]["name"]
+        result["diseaseName"] = disease_name
 
         detail_query = """
         query diseaseDetail($efoId: String!) {
@@ -189,6 +192,13 @@ def get_disease_detail(query: str) -> dict:
             if hpo.get("name"):
                 phenotypes.append({"id": hpo.get("id", ""), "name": hpo["name"]})
         result["phenotypes"] = phenotypes[:20]  # Limit to 20 phenotypes
+
+        # Fallback: when Open Targets has no curated HPO phenotypes for this
+        # disease (common for complex / multifactorial diseases like
+        # atherosclerosis, diabetes, etc.), query the HPO ontology API
+        # directly to surface disease-relevant clinical features.
+        if not phenotypes:
+            result["hpoPhenotypes"] = _fetch_hpo_phenotypes(disease_name)
 
         # Parse child diseases (subtypes)
         child_diseases = []
@@ -366,6 +376,65 @@ def _fetch_all_targets(disease_id: str, total: int):
             return None, None
         all_rows.extend(page.get("rows") or [])
     return all_rows, total
+
+
+def _fetch_hpo_phenotypes(disease_name: str) -> list:
+    """Fallback clinical-feature source for diseases with no curated HPO
+    annotations in Open Targets.
+
+    Complex / common diseases (e.g. atherosclerosis, type-2 diabetes) are
+    rarely in the HPO Annotation (HPOA) file, so Open Targets returns zero
+    phenotypes.  However, the HPO *ontology* itself often contains a disease
+    phenotype term (e.g. "Atherosclerosis" → HP:0002621).  Its descendant
+    terms represent the clinical features / morphologic manifestations of
+    that disease (e.g. "Atherosclerotic lesion", "Foam cells").
+
+    Strategy:
+      1. Search the HPO ontology API for a term whose name matches the
+         disease name.
+      2. If found, fetch its descendant terms — these are the clinical
+         features.
+      3. Return them as [{"id", "name"}, …], limited to 20.
+    """
+    try:
+        search_url = f"{HPO_BASE_URL}/search?q={disease_name}"
+        resp = requests.get(search_url, timeout=_TIMEOUT)
+        if resp.status_code != 200:
+            return []
+        search_data = resp.json()
+        terms = (search_data.get("terms") or []) if isinstance(search_data, dict) else []
+        if not terms:
+            return []
+
+        # Prefer an exact (case-insensitive) name match; otherwise take
+        # the top result.
+        best = None
+        for t in terms:
+            if isinstance(t, dict) and (t.get("name") or "").lower() == disease_name.lower():
+                best = t
+                break
+        if best is None:
+            best = terms[0]
+
+        term_id = best.get("id") if isinstance(best, dict) else None
+        if not term_id:
+            return []
+
+        desc_url = f"{HPO_BASE_URL}/terms/{term_id}/descendants"
+        resp2 = requests.get(desc_url, timeout=_TIMEOUT)
+        if resp2.status_code != 200:
+            return []
+        desc_data = resp2.json()
+        desc_list = desc_data if isinstance(desc_data, list) else []
+
+        phenotypes = []
+        for d in desc_list:
+            if isinstance(d, dict) and d.get("name"):
+                phenotypes.append({"id": d.get("id", ""), "name": d["name"]})
+        return phenotypes[:20]
+
+    except requests.RequestException:
+        return []
 
 
 def _resolve_ancestor_names(ancestor_ids):

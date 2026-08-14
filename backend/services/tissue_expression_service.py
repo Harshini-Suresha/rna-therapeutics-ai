@@ -33,6 +33,38 @@ def _calculate_expression_cv(tpm_values: List[float]) -> Optional[float]:
     return round(std_dev / mean_tpm, 3)
 
 
+def _calculate_circadian_amplitude(tpm_values: List[float]) -> Optional[str]:
+    """Approximate circadian-like expression amplitude from GTEx tissue variation.
+    
+    Uses peak-to-trough ratio (max/min TPM) across tissues as a proxy for
+    expression amplitude. Genes with high circadian variation often show
+    high expression variation across tissues/conditions.
+    
+    Returns: "High", "Moderate", "Low", or None
+    """
+    if not tpm_values or len(tpm_values) < 2:
+        return None
+    
+    positive_tpms = [t for t in tpm_values if t and t > 0]
+    if len(positive_tpms) < 2:
+        return None
+    
+    max_tpm = max(positive_tpms)
+    min_tpm = min(positive_tpms)
+    
+    if min_tpm == 0:
+        return "High" if max_tpm > 10 else "Moderate"
+    
+    ratio = max_tpm / min_tpm
+    
+    if ratio >= 10:
+        return "High"
+    elif ratio >= 3:
+        return "Moderate"
+    else:
+        return "Low"
+
+
 def _get_tissue_level(tpm: float) -> str:
     """Classify expression level based on TPM value."""
     if tpm > 25:
@@ -367,6 +399,7 @@ async def get_tissue_expression(
         "tissueExpressionLevel": None,
         "topTissues": [],
         "expressionStabilityCV": None,
+        "circadianAmplitude": None,
         "vitalOrganTissues": [],
         "dominantIsoformFraction": None,
         "dominantIsoformId": None,
@@ -387,6 +420,8 @@ async def get_tissue_expression(
             result["tissueExpressionLevel"] = _get_tissue_level(gtex_data["tpm"]) if gtex_data["tpm"] else None
             result["topTissues"] = gtex_data["top_tissues"]
             result["expressionStabilityCV"] = gtex_data["expression_cv"]
+            tpm_vals = [t["tpm"] for t in gtex_data["top_tissues"] if t.get("tpm") is not None]
+            result["circadianAmplitude"] = _calculate_circadian_amplitude(tpm_vals)
             result["vitalOrganTissues"] = gtex_data["vital_organ_tissues"]
             result["dominantIsoformFraction"] = gtex_data["dominant_isoform_fraction"]
             result["dominantIsoformId"] = gtex_data["dominant_isoform_id"]
@@ -402,6 +437,8 @@ async def get_tissue_expression(
             result["tissueExpressionLevel"] = _get_tissue_level(hpa_data["tpm"]) if hpa_data["tpm"] else None
             result["topTissues"] = hpa_data["top_tissues"]
             result["expressionStabilityCV"] = hpa_data["expression_cv"]
+            tpm_vals = [t["tpm"] for t in hpa_data["top_tissues"] if t.get("tpm") is not None]
+            result["circadianAmplitude"] = _calculate_circadian_amplitude(tpm_vals)
             result["vitalOrganTissues"] = hpa_data["vital_organ_tissues"]
             result["source"] = "Human Protein Atlas"
             return result

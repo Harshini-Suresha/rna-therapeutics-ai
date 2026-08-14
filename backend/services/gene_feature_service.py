@@ -9,7 +9,6 @@ for each upregulation mechanism:
   fetching spliced cDNA sequences and scanning each 5' UTR for ATG start
   codons that close an in-frame stop codon before the main CDS
 - A6 (miRNA site block): needs 3' UTR with miRNA binding sites (always available)
-- A22 (miRNA replacement): always available (deficient miRNA)
 - A23 (promoter activation): always available (all genes have promoters)
 """
 
@@ -563,9 +562,9 @@ def analyze_gene_features(
             "available": True,
             "reason": "Most protein-coding mRNAs contain miRNA binding sites in their 3' UTR",
         },
-        "miRNA_replacement": {
+        "RBP_block": {
             "available": True,
-            "reason": "Applicable when a regulatory miRNA is deficient or downregulated",
+            "reason": "Protein-coding transcripts contain RNA-binding protein (RBP) binding sites that can be masked to relieve translational repression",
         },
     }
 

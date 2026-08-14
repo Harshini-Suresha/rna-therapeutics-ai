@@ -2,9 +2,9 @@ export interface ValidationReport {
   valid: boolean;
   error?: string;
   sequence: string;
-  sequenceType: "dna" | "rna" | "unknown";
+  sequenceType: "dna" | "rna" | "protein" | "unknown";
   length: number;
-  gcContent: number;
+  gcContent: number | null;
   invalidChars: string[];
   features: string[];
   orfs: OrfInfo[];
@@ -217,29 +217,56 @@ export interface AnalysisReport {
   sequence: string;
   sequenceType: string;
   length: number;
-  gcContent: number;
+  gcContent: number | null;
   offTarget: OffTargetResult;
   secondaryStructure: SecondaryStructureResult;
   immuneScreen: ImmuneMotif[];
   modality: ModalityResult;
   gcCurve: GcWindow[];
-  composition: NucleotideComposition;
+  composition: Record<string, number>;
   orfs: OrfInfo[];
-  meltingTemp?: MeltingTemp;
-  complexity?: SequenceComplexity;
-  codonUsage?: CodonUsage;
-  modificationScores?: ModificationScores;
+  meltingTemp?: MeltingTemp | null;
+  complexity?: SequenceComplexity | null;
+  codonUsage?: CodonUsage | null;
+  modificationScores?: ModificationScores | null;
   energyProfile?: EnergyPoint[];
   restrictionSites?: RestrictionSite[];
   mirnaTargets?: MiRNATarget[];
   hairpins?: Hairpin[];
-  kmerFrequency?: KmerFrequency;
-  thermoProfile?: ThermoProfile;
+  kmerFrequency?: KmerFrequency | null;
+  thermoProfile?: ThermoProfile | null;
   dotPlot?: DotPlotPoint[];
   modificationLandscape?: ModificationLandscapePoint[];
   riskScores?: RiskScores;
   physicochemical?: PhysicochemicalProfile;
   stabilityIndex?: StabilityIndexPoint[];
+  grnaCandidates?: GrnaCandidate[];
+  proteinAnalysis?: {
+    aminoAcidComposition: Record<string, number>;
+    molecularWeight: number;
+    length: number;
+    hydrophobicFraction: number;
+    hydrophilicFraction: number;
+    chargedFraction: number;
+    aromaticFraction: number;
+  };
+}
+
+export interface GrnaCandidate {
+  id: string;
+  position: number;
+  sequence: string;
+  pam: string;
+  strand: "+" | "-";
+  score: number;
+  gc: number;
+  selfComplementarity: number;
+  offTargets: number;
+  polyT: boolean;
+  color: string;
+  specificityScore: number;
+  efficiencyScore: number;
+  mismatchDistribution: number[];
 }
 
 export type Modality = "aso" | "sirna" | "mrna" | "sgrna";

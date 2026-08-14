@@ -2,14 +2,13 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { AlertCircle, ArrowLeft, Loader2, Dna, Beaker, Download, ChevronDown } from "lucide-react";
+import { AlertCircle, ArrowLeft, Loader2, Dna, Beaker, Download, ChevronDown, Filter } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import Topbar from "@/components/Topbar";
 import TargetAnalysisCard from "@/components/TargetAnalysisCard";
 import AssoDesignForm from "@/components/AssoDesignForm";
 import AssoCandidateCard from "@/components/AssoCandidateCard";
 import AsoReportCard from "@/components/AsoReportCard";
-import AsoAnalysisDashboard from "@/components/AsoAnalysisDashboard";
 import AsoVisualizationSuite from "@/components/AsoVisualizationSuite";
 import { Card, SectionHeader, FieldLabel } from "@/components/ui";
 import { GeneTargetObject } from "@/types/gene";
@@ -53,6 +52,7 @@ export default function GeneUpregulationPage() {
   const [results, setResults] = useState<any>(null);
   const [genLoading, setGenLoading] = useState(false);
   const [showExport, setShowExport] = useState(false);
+  const [candidateViewMode, setCandidateViewMode] = useState<"top10" | "all">("top10");
   const exportRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -73,15 +73,15 @@ export default function GeneUpregulationPage() {
     URL.revokeObjectURL(url);
   }
 
-  function exportCsv() {
-    if (!results) return;
-    const header = "Rank,Sequence,Length,GC%,Tm (C),MFE,Duplex Energy,Target Region,Chemistry,Modifications,Purine Content,Complexity,Molecular Weight\n";
-    const body = results.candidates.map((c: any, i: number) =>
-      `${i + 1},${c.sequence},${c.length},${c.realMetrics.gcContent},${c.realMetrics.meltingTempC},${c.realMetrics.selfStructureMfe},${c.realMetrics.targetDuplexEnergy},"${c.targetRegion}",${c.chemistry},"${(c.modifications || []).join("; ")}",${c.realMetrics.purineContent},${c.realMetrics.sequenceComplexity},${c.realMetrics.molecularWeight}`
-    ).join("\n");
-    triggerDownload(header + body, `${gene?.geneSymbol ?? "aso"}-candidates.csv`, "text/csv");
-    setShowExport(false);
-  }
+   function exportCsv() {
+     if (!results) return;
+     const header = "Rank,Sequence,Length,GC%,Tm (C),MFE,Duplex Energy,Target Region,Chemistry,Modifications,Purine Content,Complexity,Molecular Weight\n";
+     const body = displayedCandidates.map((c: any, i: number) =>
+       `${i + 1},${c.sequence},${c.length},${c.realMetrics.gcContent},${c.realMetrics.meltingTempC},${c.realMetrics.selfStructureMfe},${c.realMetrics.targetDuplexEnergy},"${c.targetRegion}",${c.chemistry},"${(c.modifications || []).join("; ")}",${c.realMetrics.purineContent},${c.realMetrics.sequenceComplexity},${c.realMetrics.molecularWeight}`
+     ).join("\n");
+     triggerDownload(header + body, `${gene?.geneSymbol ?? "aso"}-candidates.csv`, "text/csv");
+     setShowExport(false);
+   }
 
   function exportJson() {
     if (!results) return;
@@ -91,7 +91,7 @@ export default function GeneUpregulationPage() {
 
   function exportFasta() {
     if (!results) return;
-    const content = results.candidates.map((c: any, i: number) =>
+    const content = displayedCandidates.map((c: any, i: number) =>
       `>ASO_${i + 1} rank=${i + 1} region=${c.targetRegion} gc=${c.realMetrics.gcContent}% tm=${c.realMetrics.meltingTempC}C\n${c.sequence.match(/.{1,80}/g)?.join("\n") || c.sequence}`
     ).join("\n\n");
     triggerDownload(content, `${gene?.geneSymbol ?? "aso"}-sequences.fasta`, "text/plain");
@@ -106,7 +106,7 @@ export default function GeneUpregulationPage() {
   }
 
   function collectVisualizationSvg(): string {
-    const root = document.getElementById("aso-analysis-dashboard");
+    const root = document.getElementById("aso-visualizations");
     if (!root) return "";
     const svgs = Array.from(root.querySelectorAll("svg"));
     if (!svgs.length) return "";
@@ -145,8 +145,9 @@ export default function GeneUpregulationPage() {
       `  Chemistry:     ${results.chemistry}`,
       `  ASO Length:    ${results.asoLength} nt`,
       `  Modifications: ${(results.modifications || []).join(", ")}`,
-      `  Candidates:    ${results.candidates.length}`,
+      `  Candidates:    ${displayedCandidates.length}${results.candidates.length !== displayedCandidates.length ? ` (of ${results.candidates.length} generated)` : ""}`,
       `  Ranked by:     Composite score (0.65×duplex ΔG + 0.35×Tm fit)`,
+      `  View mode:     ${candidateViewMode === "top10" ? "Top 10 candidates" : "All candidates"}`,
       "",
     ];
     if (results.mechanismNotes) lines.push(`  Mechanism note: ${results.mechanismNotes}`, "");
@@ -159,7 +160,7 @@ export default function GeneUpregulationPage() {
       "  by a composite design score built exclusively from real metrics.",
       ""
     );
-    results.candidates.forEach((c: any, i: number) => {
+    displayedCandidates.forEach((c: any, i: number) => {
       lines.push(
         `  #${i + 1}  ${c.targetRegion}`,
         `    Sequence:     ${c.sequence}`,
@@ -250,6 +251,7 @@ export default function GeneUpregulationPage() {
     setGenLoading(true);
     setGenError(null);
     setResults(null);
+    setCandidateViewMode("top10");
     try {
       const res = await generateUpregulationCandidates({
         ensemblGeneId: gene.geneId,
@@ -279,10 +281,15 @@ export default function GeneUpregulationPage() {
       });
     } catch (err) {
       setGenError(err instanceof Error ? err.message : "Generation failed.");
-    } finally {
+     } finally {
       setGenLoading(false);
     }
   }
+
+  const displayedCandidates = results?.candidates?.slice(
+    0,
+    candidateViewMode === "top10" ? 10 : results.candidates.length
+  ) ?? [];
 
   if (!gene) {
     return (
@@ -415,14 +422,6 @@ export default function GeneUpregulationPage() {
           ) : target ? (
             <TargetAnalysisCard target={target} selectedExons={[]} isTotalKnockdown={true} onToggleTotalKnockdown={() => {}} showTargetingMode={false} />
           ) : null}
-
-          {/* Analysis dashboard + visualization suite (mirrors TG01) */}
-          {results && results.candidates.length > 0 && (
-            <>
-              <AsoAnalysisDashboard candidates={results.candidates} />
-              <AsoVisualizationSuite candidates={results.candidates} />
-            </>
-          )}
 
           {/* Step 2 + 3: Design Form + Results */}
           <div className="space-y-5">
@@ -590,6 +589,13 @@ export default function GeneUpregulationPage() {
               </Card>
             </div>
 
+              {/* Visualizations (two-column grid) */}
+              {results && results.candidates.length > 0 && (
+                <div id="aso-visualizations">
+                  <AsoVisualizationSuite candidates={displayedCandidates} />
+                </div>
+              )}
+
             <div className="space-y-3">
               <SectionHeader step="3" title="Generated ASO Candidates" />
 
@@ -599,53 +605,93 @@ export default function GeneUpregulationPage() {
                 </div>
               )}
 
-              {!results && !genLoading && (
-                <Card className="flex flex-col items-center justify-center px-6 py-12 text-center">
-                  <Beaker className="h-8 w-8 text-slate-300" />
-                  <p className="mt-3 text-[13px] font-medium text-slate-500">
-                    Click Generate to create upregulation ASO candidates
-                  </p>
-                  <p className="mt-1 text-[12px] text-slate-400">
-                    Candidates are ranked by target duplex energy (ΔG, kcal/mol)
-                  </p>
-                </Card>
-              )}
+               {!results && !genLoading && (
+                 <Card className="flex flex-col items-center justify-center px-6 py-12 text-center">
+                   <Beaker className="h-8 w-8 text-slate-300" />
+                   <p className="mt-3 text-[13px] font-medium text-slate-500">
+                     Click Generate to create upregulation ASO candidates
+                   </p>
+                   <p className="mt-1 text-[12px] text-slate-400">
+                     Candidates are ranked by composite score (0.65× duplex ΔG + 0.35× Tm fit)
+                   </p>
+                 </Card>
+               )}
 
-              {results && results.candidates.length === 0 && (
-                <Card className="px-6 py-8 text-center">
-                  <p className="text-[13px] text-slate-500">
-                    No valid candidates generated for this configuration. Try a
-                    different chemistry, modifications, or length.
-                  </p>
-                </Card>
-              )}
+               {results && results.candidates.length === 0 && (
+                 <Card className="px-6 py-8 text-center">
+                   <p className="text-[13px] text-slate-500">
+                     No valid candidates generated for this configuration. Try a
+                     different chemistry, modifications, or length.
+                   </p>
+                 </Card>
+               )}
 
-              {results && results.candidates.length > 0 && (
-                <>
-                  <p className="text-[12.5px] text-slate-500">
-                    {results.candidates.length} candidate
-                    {results.candidates.length !== 1 ? "s" : ""} for{" "}
-                    {results.mechanismId} · {results.chemistry} ·{" "}
-                    {results.asoLength} nt
-                  </p>
-                  {results.mechanismNotes && (
-                    <p className="text-[11.5px] text-slate-400 italic mb-3">
-                      {results.mechanismNotes}
+               {results && results.candidates.length > 0 && (
+                 <>
+                   {/* View mode selector: top 10 vs all candidates */}
+                   <Card className="p-4">
+                     <div className="flex items-center justify-between">
+                       <div className="flex items-center gap-2">
+                         <Filter className="h-4 w-4 text-slate-600" />
+                          <span className="text-[12.5px] font-medium text-slate-700">
+                            Displaying {candidateViewMode === "top10" ? "top 10" : "all"} candidates
+                          </span>
+                     </div>
+                     <div className="flex gap-1.5">
+                       <button
+                         onClick={() => setCandidateViewMode("top10")}
+                         className={`rounded-lg px-3 py-1.5 text-[12px] font-medium transition-colors ${
+                           candidateViewMode === "top10"
+                             ? "bg-brand text-white"
+                             : "border border-[#E5E7EB] bg-white text-slate-600 hover:bg-slate-50"
+                         }`}
+                       >
+                         Top 10 candidates
+                       </button>
+                       <button
+                         onClick={() => setCandidateViewMode("all")}
+                         className={`rounded-lg px-3 py-1.5 text-[12px] font-medium transition-colors ${
+                           candidateViewMode === "all"
+                             ? "bg-brand text-white"
+                             : "border border-[#E5E7EB] bg-white text-slate-600 hover:bg-slate-50"
+                         }`}
+                       >
+                         All candidates
+                        </button>
+                      </div>
+                      </div>
+                    </Card>
+
+                    <p className="text-[12.5px] text-slate-500">
+                      {displayedCandidates.length} candidate
+                      {displayedCandidates.length !== 1 ? "s" : ""} for{" "}
+                      {results.mechanismId} · {results.chemistry} ·{" "}
+                      {results.asoLength} nt
+                       {results.candidates.length > displayedCandidates.length && (
+                         <span className="text-[11px] text-slate-400">
+                           {" "}
+                           (showing top 10 of {results.candidates.length})
+                         </span>
+                       )}
                     </p>
-                  )}
-                  {results.candidates.map((c: any, i: number) => (
-                    <AssoCandidateCard
-                      key={c.sequence}
-                      candidate={c}
-                      rank={i + 1}
-                    />
-                  ))}
-                </>
-              )}
+                    {results.mechanismNotes && (
+                      <p className="text-[11.5px] text-slate-400 italic mb-3">
+                        {results.mechanismNotes}
+                      </p>
+                    )}
+                    {displayedCandidates.map((c: any, i: number) => (
+                      <AssoCandidateCard
+                        key={c.sequence}
+                        candidate={c}
+                        rank={i + 1}
+                      />
+                    ))}
+                  </>
+                )}
+              </div>
             </div>
-          </div>
-        </main>
-      </div>
-    </div>
-  );
+          </main>
+         </div>
+       </div>
+   );
 }

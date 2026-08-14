@@ -3,7 +3,7 @@ Scores mechanisms within a therapeutic goal against user-provided inputs.
 
 Implements:
 - Gene Silencing (TG01): A1, A2, A12, A15, A21
-- Gene Activation / Upregulation (TG02): A3, A4, A5, A6, A22, A23
+- Gene Activation / Upregulation (TG02): A3, A4, A5, A6, A23, A28
 - RNA Processing Modulation (TG04): A7, A8, A9, A10, A11
 - RNA Editing / Correction (TG03): A13, A16, A17, A18, A19, A20
 - RNA Neutralization (TG05): A12, A14, A25
@@ -142,29 +142,12 @@ NON_DESIGNABLE_SILENCING_REASON = (
     "cannot generate. Choose a single-stranded mechanism (A1, A2, A12, A15)."
 )
 
-# Same platform-capability gate for TG02. A22 (miRNA replacement) delivers a
-# synthetic miRNA mimic — a double-stranded duplex the single-stranded ASO
-# designer cannot produce — even though replacing a deficient miRNA is a
-# biologically valid strategy.
-NON_DESIGNABLE_UPREGULATION_MECHANISMS = {"A22"}
-NON_DESIGNABLE_UPREGULATION_REASON = (
-    "Not designable in this pipeline: miRNA replacement (A22) delivers a "
-    "double-stranded miRNA mimic duplex, which the single-stranded ASO "
-    "designer cannot generate. Choose a single-stranded mechanism (A3, A4, "
-    "A5, A6, or A23)."
-)
-
 # ---------------------------------------------------------------------------
 # TG02 — Gene Activation / Upregulation
 #
 # Defect types below are derived directly from each mechanism's real
 # suitableVariantTypes / transcriptRequirement text (backend/rulebooks/A*/
-# rule.json), same as TG01/TG04 — not invented categories. Two mechanisms
-# (A6, A22) both involve microRNAs but in opposite directions: A6 blocks a
-# pathogenic miRNA that is repressing the target gene; A22 replaces a
-# beneficial miRNA that is itself deficient. They are kept as distinct
-# defect types rather than merged, because conflating them would be a
-# real biological error, not just imprecise categorization.
+# rule.json), same as TG01/TG04 — not invented categories.
 # ---------------------------------------------------------------------------
 
 GENE_UPREGULATION_DEFECT_TYPES = {
@@ -173,7 +156,7 @@ GENE_UPREGULATION_DEFECT_TYPES = {
     "nat_mediated_repression": "A validated disease-associated natural antisense transcript (NAT) repressing the gene",
     "uorf_mediated_repression": "A validated inhibitory upstream ORF (uORF) limiting translation",
     "mirna_mediated_repression": "A validated pathogenic microRNA binding site repressing the target transcript",
-    "deficient_mirna": "Loss or downregulation of a regulatory (e.g. tumor-suppressive) microRNA itself",
+    "rbp_mediated_repression": "A validated RNA-binding protein (RBP) repressor bound to the target transcript, limiting translation or stability",
     "epigenetic_promoter_silencing": "Epigenetic silencing or promoter dysfunction reducing transcription",
 }
 
@@ -183,11 +166,17 @@ UPREGULATION_DEFECT_COMPATIBILITY = {
     "A4": {"haploinsufficiency", "nat_mediated_repression"},
     "A5": {"uorf_mediated_repression"},
     "A6": {"haploinsufficiency", "mirna_mediated_repression"},
-    "A22": {"deficient_mirna"},
     "A23": {"haploinsufficiency", "epigenetic_promoter_silencing"},
+    "A28": {"rbp_mediated_repression"},
 }
 
-GENE_UPREGULATION_MECHANISM_IDS = ["A3", "A4", "A5", "A6", "A22", "A23"]
+GENE_UPREGULATION_MECHANISM_IDS = ["A3", "A4", "A5", "A6", "A23", "A28"]
+
+NON_DESIGNABLE_UPREGULATION_MECHANISMS = set()
+NON_DESIGNABLE_UPREGULATION_REASON = (
+    "Not designable in this pipeline: this upregulation mechanism requires a "
+    "delivery format the single-stranded ASO designer cannot produce."
+)
 
 # ---------------------------------------------------------------------------
 # TG04 — RNA Processing Modulation
@@ -240,6 +229,11 @@ MISMATCH_POCKET = {
 SPLICING_DIRECTIONS = {
     "three_prime": "3' Exon Replacement",
     "five_prime": "5' Exon Replacement",
+}
+
+INTRON_SITES = {
+    "acceptor_junction": "Acceptor Junction",
+    "donor_junction": "Donor Junction",
 }
 
 EDIT_TYPE_MECHANISMS = {
@@ -808,6 +802,12 @@ def rank_gene_silencing_mechanisms(
         scope_ok = silencing_scope in SCOPE_COMPATIBILITY.get(mechanism_id, set())
         designable = mechanism_id not in NON_DESIGNABLE_SILENCING_MECHANISMS
 
+        # A non-designable mechanism (e.g. A21 / ds-siRNA) cannot be produced by
+        # the single-stranded ASO designer — drop it entirely from the ranking so
+        # it is never shown as a selectable option.
+        if not designable:
+            continue
+
         delivery_tier, delivery_citation = _delivery_precedent(mechanism_id, delivery_context)
 
         vkh = _variant_keyword_hit(rule, known_variant)
@@ -878,8 +878,8 @@ def rank_gene_upregulation_mechanisms(
         "A4": "NAT",         # Natural antisense transcript knockdown
         "A5": "uORF",        # uORF blocking
         "A6": "miRNA_block", # miRNA binding site blocking
-        "A22": "miRNA_replacement",  # miRNA replacement
         "A23": "saRNA",      # Promoter activation
+        "A28": "RBP_block",  # RBP binding site blocking
     }
 
     feature_flags = {}
@@ -1236,12 +1236,16 @@ SCAFFOLD_TO_MECHANISMS = {
 
 
 def _generate_rna_sequence(structural_class: str, scaffold: str, length_range: tuple[int, int]) -> str:
-    import random
-    random.seed(hash(structural_class + scaffold))
-    length = random.randint(*length_range)
+    """Deterministic sequence generation based on structural class and scaffold."""
+    low, high = length_range
+    length = ((hash(structural_class + scaffold) % (high - low + 1)) + low)
     bases = "ACGU"
-    seq = "".join(random.choice(bases) for _ in range(length))
-    return seq
+    seq_chars = []
+    seed_val = hash(structural_class + scaffold)
+    for i in range(length):
+        seed_val = (seed_val * 31 + i) % 256
+        seq_chars.append(bases[seed_val % 4])
+    return "".join(seq_chars)
 
 
 def _calc_gc(seq: str) -> float:
@@ -1275,14 +1279,14 @@ def _estimate_delta_g(seq: str, tm: float) -> float:
 
 
 def _predict_kd(structural_class: str, scaffold: str, kd_goal: str, tm: float, gc: float) -> float | str:
-    import random
-    random.seed(hash(structural_class + scaffold + kd_goal + str(tm)))
+    """Deterministic Kd prediction based on structural class and Kd goal."""
     if structural_class == "catalytic_ribozyme":
-        k_cat = round(random.uniform(0.5, 5.0), 1)
+        k_cat = round(0.5 + (hash(structural_class + scaffold + kd_goal) % 45) / 10, 1)
         return f"N/A (k_cat={k_cat}/min)"
     base = 0.5 if kd_goal == "sub_nanomolar" else 3.0
     variance = 0.3 if kd_goal == "sub_nanomolar" else 2.0
-    kd = round(max(0.1, random.gauss(base, variance)), 1)
+    seed = hash(structural_class + scaffold + kd_goal + str(tm)) % 100
+    kd = round(max(0.1, base + (seed - 50) / 100 * variance), 1)
     return kd
 
 
@@ -1308,19 +1312,19 @@ def _structural_motif(structural_class: str, scaffold: str) -> str:
 
 
 def _generate_dot_bracket(seq: str, structural_class: str) -> str:
+    """Deterministic dot-bracket structure generation."""
     n = len(seq)
     bracket = ["."] * n
-    import random
-    random.seed(hash(seq + structural_class))
+    seed_val = hash(seq + structural_class)
     i = 0
     while i < n - 3:
-        if random.random() < 0.35:
-            pair_len = random.randint(3, min(8, (n - i) // 2))
+        if (seed_val + i) % 7 < 2:
+            pair_len = 3 + ((seed_val + i) % 6)
             for j in range(pair_len):
                 if i + j < n and i + pair_len * 2 - 1 - j < n:
                     bracket[i + j] = "("
                     bracket[i + pair_len * 2 - 1 - j] = ")"
-            i += pair_len * 2 + random.randint(0, 2)
+            i += pair_len * 2 + ((seed_val + i) % 3)
         else:
             i += 1
     return "".join(bracket[:n])
@@ -1334,8 +1338,6 @@ def _generate_rna_engineering_candidates(
     kd_goal: str,
     gene_symbol: str,
 ) -> list[dict]:
-    import random
-
     candidates = []
     mechanism_ids = STRUCTURAL_CLASS_TO_MECHANISMS.get(structural_class, ["A23"])
     if target_type in TARGET_TYPE_TO_MECHANISMS:
@@ -1366,9 +1368,10 @@ def _generate_rna_engineering_candidates(
         motif = _structural_motif(structural_class, scaffold)
         serum = _serum_half_life(chem_stabilization, structural_class)
 
-        specificity = min(100, max(70, random.gauss(92, 5)))
-        folding_score = min(100, max(60, random.gauss(85, 8)))
-        t_half_score = min(100, max(40, random.gauss(80, 10)))
+        seed_val = hash(structural_class + scaffold + kd_goal + gene_symbol + str(i))
+        specificity = 70 + (seed_val % 25)
+        folding_score = 60 + ((seed_val * 7) % 35)
+        t_half_score = 40 + ((seed_val * 13) % 50)
 
         construct_id = f"{'Apt' if structural_class == 'rna_aptamer' else 'Rbo' if structural_class == 'catalytic_ribozyme' else 'Rsw' if structural_class == 'riboswitch' else 'Scf'}-{gene_symbol}-v{i+1}"
 

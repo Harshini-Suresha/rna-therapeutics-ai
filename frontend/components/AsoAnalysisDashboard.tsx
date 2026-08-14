@@ -11,6 +11,8 @@ import {
   TrendingDown,
   ShieldAlert,
   Info,
+  Layers,
+  Weight,
 } from "lucide-react";
 import { AssoCandidate } from "@/types/geneSilencing";
 import { Card } from "./ui";
@@ -24,6 +26,11 @@ import RiskFlagMatrix from "./RiskFlagMatrix";
 import CandidateHeatmap from "./CandidateHeatmap";
 import HeuristicComparisonChart from "./HeuristicComparisonChart";
 import CandidateDeepDiveCard from "./CandidateDeepDiveCard";
+import CompositeBreakdownChart from "./CompositeBreakdownChart";
+import BaseCompositionChart from "./BaseCompositionChart";
+import PhysicochemicalChart from "./PhysicochemicalChart";
+import TargetCoverageChart from "./TargetCoverageChart";
+import CandidateMetricsTable from "./CandidateMetricsTable";
 
 function StatTile({
   icon: Icon,
@@ -190,7 +197,7 @@ export default function AsoAnalysisDashboard({
       </Card>
 
       {/* Landscape + binding strength */}
-      <div className="grid grid-cols-1 gap-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <Card className="p-5">
           <div className="mb-3 flex items-center gap-2">
             <TrendingDown className="h-3.5 w-3.5 text-blue-700" />
@@ -209,7 +216,7 @@ export default function AsoAnalysisDashboard({
       </div>
 
       {/* GC window + purine balance */}
-      <div className="grid grid-cols-1 gap-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <Card className="p-5">
           <div className="mb-3 flex items-center gap-2">
             <Target className="h-3.5 w-3.5 text-emerald-700" />
@@ -228,7 +235,7 @@ export default function AsoAnalysisDashboard({
       </div>
 
       {/* Stability distributions + risk flags */}
-      <div className="grid grid-cols-1 gap-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <Card className="p-5">
           <div className="mb-3 flex items-center gap-2">
             <Activity className="h-3.5 w-3.5 text-blue-700" />
@@ -262,6 +269,51 @@ export default function AsoAnalysisDashboard({
           <p className="text-[11.5px] font-semibold text-slate-700">Drug-like estimate comparison</p>
         </div>
         <HeuristicComparisonChart candidates={candidates} />
+      </Card>
+
+      {/* Composite score decomposition */}
+      <Card className="p-5">
+        <div className="mb-3 flex items-center gap-2">
+          <Layers className="h-3.5 w-3.5 text-teal-700" />
+          <p className="text-[11.5px] font-semibold text-slate-700">Composite score decomposition — duplex vs Tm fit</p>
+        </div>
+        <CompositeBreakdownChart candidates={candidates} />
+      </Card>
+
+      {/* Base composition + physicochemical */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <Card className="p-5">
+          <div className="mb-3 flex items-center gap-2">
+            <Dna className="h-3.5 w-3.5 text-indigo-700" />
+            <p className="text-[11.5px] font-semibold text-slate-700">Base composition by candidate</p>
+          </div>
+          <BaseCompositionChart candidates={candidates} />
+        </Card>
+        <Card className="p-5">
+          <div className="mb-3 flex items-center gap-2">
+            <Weight className="h-3.5 w-3.5 text-slate-700" />
+            <p className="text-[11.5px] font-semibold text-slate-700">Molecular weight &amp; extinction coefficient</p>
+          </div>
+          <PhysicochemicalChart candidates={candidates} />
+        </Card>
+      </div>
+
+      {/* Target coverage */}
+      <Card className="p-5">
+        <div className="mb-3 flex items-center gap-2">
+          <Target className="h-3.5 w-3.5 text-emerald-700" />
+          <p className="text-[11.5px] font-semibold text-slate-700">Target region coverage across exons</p>
+        </div>
+        <TargetCoverageChart candidates={candidates} />
+      </Card>
+
+      {/* Full metrics matrix */}
+      <Card className="p-5">
+        <div className="mb-3 flex items-center gap-2">
+          <Gauge className="h-3.5 w-3.5 text-violet-700" />
+          <p className="text-[11.5px] font-semibold text-slate-700">Full metrics matrix — all candidates</p>
+        </div>
+        <CandidateMetricsTable candidates={candidates} />
       </Card>
 
       {/* Per-candidate deep-dive */}

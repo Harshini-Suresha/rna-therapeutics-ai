@@ -10,6 +10,14 @@ export interface UpregulationCandidate extends AssoCandidate {
   canonicalOffSpliceHits?: number;
   targetPoisonExon?: string;
   spliceElement?: string;
+  // Weighted components of the composite score (duplex + Tm fit), surfaced so
+  // the UI can show exactly how each candidate was ranked.
+  scoreBreakdown?: {
+    duplexScore: number;
+    tmFitScore: number;
+    duplexRaw: number;
+    tmRaw: number;
+  };
 }
 
 export interface UpregulationGenerateResponse {

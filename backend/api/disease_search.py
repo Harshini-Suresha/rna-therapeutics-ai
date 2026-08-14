@@ -14,6 +14,16 @@ EMPTY_DETAIL = {
     "therapeuticAreas": [],
     "genes": [],
     "knownDrugs": [],
+    "phenotypes": [],
+    "hpoPhenotypes": [],
+    "synonyms": [],
+    "relatedDiseases": [],
+    "childDiseases": [],
+    "databaseRefs": {},
+    "literatureCount": None,
+    "associatedTargetCount": None,
+    "drugCandidateCount": None,
+    "ancestors": [],
 }
 
 

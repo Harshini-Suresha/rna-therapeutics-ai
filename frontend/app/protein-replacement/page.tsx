@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertCircle,
@@ -19,6 +19,8 @@ import {
 import Sidebar from "@/components/Sidebar";
 import Topbar from "@/components/Topbar";
 import { Card, SectionHeader, FieldLabel, Pill, InfoField } from "@/components/ui";
+import ProteinReplacementDashboard from "@/components/ProteinReplacementDashboard";
+import ProteinReplacementDeepDiveCard from "@/components/ProteinReplacementDeepDiveCard";
 import { GeneTargetObject } from "@/types/gene";
 import { saveReport } from "@/lib/auth";
 import {
@@ -53,6 +55,13 @@ export default function ProteinReplacementPage() {
 
   const [selectedCandidate, setSelectedCandidate] = useState<RnaCandidate | null>(null);
   const [copied, setCopied] = useState(false);
+  const selectedCandidateRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (selectedCandidate && selectedCandidateRef.current) {
+      selectedCandidateRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [selectedCandidate]);
 
   useEffect(() => {
     const stored = sessionStorage.getItem(CONFIRMED_TARGET_KEY);
@@ -389,6 +398,11 @@ export default function ProteinReplacementPage() {
                 </div>
               </Card>
 
+              {/* Step 3: Candidate Analysis & Visualizations */}
+              {results && (
+                <ProteinReplacementDashboard candidates={results.candidates} />
+              )}
+
               {/* Step 3: Candidate Construct Table */}
               <Card>
                 <SectionHeader step="3" title="Candidate Construct Table" />
@@ -498,8 +512,9 @@ export default function ProteinReplacementPage() {
                 </div>
               </Card>
 
-              {/* Step 3a: Inspection Drawer */}
+              {/* Step 3a: Candidate Deep Dive */}
               {selectedCandidate && (
+                <div ref={selectedCandidateRef}>
                 <Card className="overflow-hidden">
                   <div className="flex items-center justify-between px-6 pt-4 pb-3 border-b border-slate-100">
                     <SectionHeader step="3a" title={`Inspection: ${selectedCandidate.constructId}`} />
@@ -625,6 +640,21 @@ export default function ProteinReplacementPage() {
                             : "PASSED — No 5' UTR Hairpin Obstacles"}
                         </span>
                       </div>
+                    </div>
+                  </div>
+                </Card>
+                </div>
+              )}
+
+              {/* Step 3b: Candidate Deep Dive */}
+              {results && results.candidates.length > 0 && (
+                <Card>
+                  <SectionHeader step="3b" title="Candidate Deep Dive" />
+                  <div className="px-6 pb-5">
+                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                      {results.candidates.slice(0, 4).map((c, i) => (
+                        <ProteinReplacementDeepDiveCard key={c.constructId} candidate={c} rank={i + 1} />
+                      ))}
                     </div>
                   </div>
                 </Card>

@@ -17,12 +17,10 @@ function filterByModality(variants: ClinVarVariant[], editType: string): ClinVar
 
   return variants.filter((v) => {
     const hgvs = (v.hgvsc || "").toUpperCase();
-    if (editType === "adar_1") {
-      // A-to-I: requires G>A in coding HGVS (mutant base is A)
-      return hgvs.includes("G>A") || hgvs.includes("G>A");
+    if (editType === "a_to_i") {
+      return hgvs.includes("G>A");
     }
-    if (editType === "apobec") {
-      // C-to-U: requires T>C in coding HGVS (mutant base is C)
+    if (editType === "c_to_u") {
       return hgvs.includes("T>C");
     }
     return true;
@@ -58,7 +56,7 @@ function checkModalityCompat(hgvs: string, editType: string): { compatible: bool
   }
 
   const upper = hgvs.toUpperCase();
-  if (editType === "adar_1") {
+  if (editType === "a_to_i") {
     if (upper.includes("G>A")) {
       return { compatible: true, note: "Compatible with A-to-I editing (G>A transition)" };
     }
@@ -67,7 +65,7 @@ function checkModalityCompat(hgvs: string, editType: string): { compatible: bool
       note: "A-to-I editing requires a G>A transition (adenine at edit position)",
     };
   }
-  if (editType === "apobec") {
+  if (editType === "c_to_u") {
     if (upper.includes("T>C")) {
       return { compatible: true, note: "Compatible with C-to-U editing (T>C transition)" };
     }
@@ -153,9 +151,9 @@ export default function RnaEditingVariantSelector({
         <div className="flex items-center gap-2 rounded-lg border border-teal-200 bg-teal-50 px-3 py-2">
           <AlertCircle className="h-3.5 w-3.5 text-brand shrink-0" />
           <p className="text-[11.5px] text-brand-dark">
-            Showing {filteredVariants.length} of {variants.length} variants compatible with{" "}
-            {editType === "adar_1" ? "A-to-I" : "C-to-U"} editing
-            {editType === "adar_1" ? " (G>A transitions)" : " (T>C transitions)"}
+             Showing {filteredVariants.length} of {variants.length} variants compatible with{" "}
+             {editType === "a_to_i" ? "A-to-I" : "C-to-U"} editing
+             {editType === "a_to_i" ? " (G>A transitions)" : " (T>C transitions)"}
           </p>
         </div>
       )}
@@ -168,7 +166,7 @@ export default function RnaEditingVariantSelector({
               <p className="text-[12px] text-slate-400">
                 {variants.length === 0
                   ? "No ClinVar pathogenic variants found for this gene yet."
-                  : `No variants compatible with ${editType === "adar_1" ? "A-to-I" : "C-to-U"} editing found.`}
+                  : `No variants compatible with ${editType === "a_to_i" ? "A-to-I" : "C-to-U"} editing found.`}
               </p>
             </div>
           )}

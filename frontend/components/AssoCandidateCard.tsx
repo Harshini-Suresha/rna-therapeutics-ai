@@ -102,6 +102,12 @@ export default function AssoCandidateCard({
   const immuneLabel = he.immuneStimulation.value <= 15 ? "Low" : he.immuneStimulation.value <= 35 ? "Moderate" : "High";
   const synthesisLabel = he.synthesisDifficulty.value <= 30 ? "Standard" : he.synthesisDifficulty.value <= 55 ? "Moderate" : "Complex";
 
+  const composition = { A: 0, C: 0, G: 0, T: 0, U: 0 };
+  for (const b of candidate.sequence.toUpperCase()) {
+    if (b in composition) composition[b as keyof typeof composition] += 1;
+  }
+  const seqLen = candidate.sequence.length || 1;
+
   return (
     <Card className="overflow-hidden">
       <div className="flex flex-col gap-0 p-0">
@@ -146,6 +152,40 @@ export default function AssoCandidateCard({
             <span>Molecular Weight: <strong className="text-slate-600">{rm.molecularWeight?.toLocaleString()} Da</strong></span>
             <span>Extinction Coefficient: <strong className="text-slate-600">{rm.extinctionCoefficient?.toLocaleString()} L/mol·cm</strong></span>
             <span>Duplex Stability: <strong className="text-slate-600">{rm.duplexStability}</strong></span>
+          </div>
+
+          {/* Mini visualizations */}
+          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {/* Base composition stacked bar */}
+            <div>
+              <p className="mb-1 text-[9.5px] font-semibold uppercase tracking-wider text-slate-400">Base composition</p>
+              <div className="flex h-3 overflow-hidden rounded-full bg-slate-100">
+                {Object.entries(composition).filter(([, v]) => v > 0).map(([base, count]) => {
+                  const pct = (count / seqLen) * 100;
+                  const colors: Record<string, string> = { A: "#f59e0b", C: "#3b82f6", G: "#10b981", T: "#ef4444", U: "#8b5cf6" };
+                  return <div key={base} style={{ width: `${pct}%`, backgroundColor: colors[base] || "#94a3b8" }} title={`${base}: ${pct.toFixed(1)}%`} />;
+                })}
+              </div>
+              <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[9.5px] text-slate-500">
+                {Object.entries(composition).filter(([, v]) => v > 0).map(([base, count]) => (
+                  <span key={base}><strong className="text-slate-700">{base}</strong> {((count / seqLen) * 100).toFixed(1)}%</span>
+                ))}
+              </div>
+            </div>
+
+            {/* GC content with ideal window */}
+            <div>
+              <p className="mb-1 text-[9.5px] font-semibold uppercase tracking-wider text-slate-400">GC content (ideal 40–60%)</p>
+              <div className="relative h-3 overflow-hidden rounded-full bg-slate-100">
+                <div className="absolute inset-y-0 left-[40%] right-[40%] bg-emerald-100/60" />
+                <div className={`h-full rounded-full ${rm.gcContent >= 40 && rm.gcContent <= 60 ? "bg-emerald-500" : rm.gcContent >= 35 && rm.gcContent <= 65 ? "bg-amber-400" : "bg-red-400"}`} style={{ width: `${Math.min(100, rm.gcContent)}%` }} />
+              </div>
+              <div className="mt-1 flex items-center justify-between text-[9.5px] text-slate-500">
+                <span>0%</span>
+                <span className={`font-semibold ${rm.gcContent >= 40 && rm.gcContent <= 60 ? "text-emerald-600" : "text-amber-600"}`}>{rm.gcContent}% GC</span>
+                <span>100%</span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -230,33 +270,6 @@ export default function AssoCandidateCard({
               <Td label="Synthesis Feasibility" bar={100 - he.synthesisDifficulty.value} />
               <Td label="Synthesis Rating" value={synthesisLabel} warn={synthesisLabel === "Complex"} note={he.synthesisDifficulty.note} />
               <Td label="Toxicity Flags" value={rm.cpgCount >= 3 ? "CpG-mediated" : !rm.polyGPass ? "Poly-G aggregation" : "None flagged"} warn={rm.cpgCount >= 3 || !rm.polyGPass} />
-
-              {/* ADMET PREDICTION */}
-              {candidate.admet && candidate.admet.admetAvailable && (
-                <>
-                  <TableSection title="ADMET Prediction" colSpan={2} />
-                  <Td label="Absorption (Uptake)" value={candidate.admet.absorptionLevel} bar={candidate.admet.absorptionScore != null ? candidate.admet.absorptionScore * 100 : undefined} />
-                  <Td label="Distribution" value={candidate.admet.distributionLevel} bar={candidate.admet.distributionScore != null ? candidate.admet.distributionScore * 100 : undefined} />
-                  <Td label="Metabolism (Nuclease)" value={candidate.admet.metabolismLevel} bar={candidate.admet.metabolismScore != null ? candidate.admet.metabolismScore * 100 : undefined} note={candidate.admet.nucleaseSensitivity?.halfLifeHours ? `t½ ~ ${candidate.admet.nucleaseSensitivity.halfLifeHours}h` : undefined} />
-                  <Td label="Excretion" value={candidate.admet.excretionLevel} bar={candidate.admet.excretionScore != null ? candidate.admet.excretionScore * 100 : undefined} />
-                  <Td label="Toxicity" value={candidate.admet.toxicityLevel} bar={candidate.admet.toxicityScore != null ? (1 - candidate.admet.toxicityScore) * 100 : undefined} warn={candidate.admet.toxicityScore != null && candidate.admet.toxicityScore > 0.4} />
-                  <Td label="Immunogenicity" value={candidate.admet.immunogenicity?.level} warn={(candidate.admet.immunogenicity?.score ?? 0) > 0.3} note={candidate.admet.immunogenicity?.motifs?.slice(0, 1)[0]} />
-                  <Td label="Off-target Risk" value={candidate.admet.offTargetRisk?.level} warn={(candidate.admet.offTargetRisk?.score ?? 0) > 0.4} />
-                  <Td label="Protein Binding" value={candidate.admet.proteinBinding?.level} />
-                  {candidate.admet.admetWarnings?.length > 0 && (
-                    <tr className="border-b border-slate-100">
-                      <td className="py-1.5 pr-4 text-[11px] text-slate-500">ADMET Warnings</td>
-                      <td className="py-1.5 text-right">
-                        <ul className="text-[10px] text-amber-600 list-disc list-inside text-left">
-                          {candidate.admet.admetWarnings.slice(0, 3).map((w, i) => (
-                            <li key={`admet-warn-${i}`}>{w}</li>
-                          ))}
-                        </ul>
-                      </td>
-                    </tr>
-                  )}
-                </>
-              )}
 
               {/* MIRNA SEED-SITE VERIFICATION (A6 upregulation) */}
               {candidate.seedSiteNote && (

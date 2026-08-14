@@ -146,6 +146,23 @@ export default function AsoReportCard({ ctx, step = "aso_design" }: AsoReportCar
           </button>
         </div>
 
+        {ctx.therapeuticGoal === "TG01" && (
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+              <p className="text-[10px] uppercase tracking-wider text-slate-400">Composite Design Score</p>
+              <p className="mt-1 text-[12px] font-semibold text-slate-800">
+                0.65×duplex ΔG + 0.35×Tm fit
+              </p>
+            </div>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+              <p className="text-[10px] uppercase tracking-wider text-slate-400">Normalized Formula</p>
+              <p className="mt-1 text-[12px] font-semibold text-slate-800">
+                65% duplex ΔG + 35% Tm fit (normalized 0–100)
+              </p>
+            </div>
+          </div>
+        )}
+
         {error && <p className="mt-3 text-[12px] text-amber-600">{error}</p>}
 
         {showPreview && (

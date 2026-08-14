@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertCircle,
@@ -52,6 +52,13 @@ export default function IsoformEngineeringPage() {
 
   const [selectedCandidate, setSelectedCandidate] = useState<IsoformCandidate | null>(null);
   const [copied, setCopied] = useState(false);
+  const selectedCandidateRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (selectedCandidate && selectedCandidateRef.current) {
+      selectedCandidateRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [selectedCandidate]);
 
   useEffect(() => {
     const stored = sessionStorage.getItem(CONFIRMED_TARGET_KEY);
@@ -454,6 +461,7 @@ export default function IsoformEngineeringPage() {
               </Card>
 
               {selectedCandidate && (
+                <div ref={selectedCandidateRef}>
                 <Card className="overflow-hidden">
                   <div className="flex items-center justify-between px-6 pt-4 pb-3 border-b border-slate-100">
                     <SectionHeader step="3b" title={`Inspection: ${selectedCandidate.constructId}`} />
@@ -522,6 +530,7 @@ export default function IsoformEngineeringPage() {
                     </div>
                   </div>
                 </Card>
+                </div>
               )}
 
               <Card>

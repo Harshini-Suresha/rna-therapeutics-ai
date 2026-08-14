@@ -19,6 +19,7 @@ export interface MechanismOptions {
     enzymeRecruitment: MechanismOption[];
     mismatchPocket: MechanismOption[];
     splicingDirections: MechanismOption[];
+    intronSites: MechanismOption[];
   };
   rnaNeutralization: {
     molecularDefects: MechanismOption[];

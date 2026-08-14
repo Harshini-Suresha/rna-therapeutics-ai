@@ -23,7 +23,7 @@ try:  # ``uvicorn backend.main:app`` from the repository root
     from .services.constraint_service import get_human_constraint_metrics
     from .services.clinical_service import get_clinical_details
     from .services.protein_service import get_protein_db_ids
-    from .services.variant_details_service import get_variant_details
+    from .services.variant_details_service import get_variant_details, get_clinvar_variants
     from .services.protein_properties_service import get_protein_properties
     from .services.single_cell_service import get_single_cell_expression
     from .services.tissue_expression_service import get_tissue_expression
@@ -36,7 +36,9 @@ try:  # ``uvicorn backend.main:app`` from the repository root
     from .api.mechanisms import router as mechanisms_router
     from .api.gene_silencing import router as gene_silencing_router
     from .api.gene_upregulation import router as gene_upregulation_router
+    from .api.protein_replacement import router as protein_replacement_router
     from .api.isoform_engineering import router as isoform_engineering_router
+    from .api.rna_editing import router as rna_editing_router
     from .api.upload import router as upload_router
     from .api.assistant import router as assistant_router
     from .api.notifications import router as notifications_router
@@ -46,6 +48,7 @@ try:  # ``uvicorn backend.main:app`` from the repository root
     from .api.reports import router as reports_router
     from .api.projects import router as projects_router
     from .api.bug_reports import router as bug_reports_router
+    from .api.gene_search import router as gene_search_router
 except ImportError:
     from services.notification_service import add_notification as _add_notification
     from services.gene_service import EnsemblLookupUnavailable, clean_synonyms, get_gene_metadata, get_gene_phenotypes, ensembl_gene_url, build_gene_fallback_payload
@@ -53,7 +56,7 @@ except ImportError:
     from services.constraint_service import get_human_constraint_metrics
     from services.clinical_service import get_clinical_details
     from services.protein_service import get_protein_db_ids
-    from services.variant_details_service import get_variant_details
+    from services.variant_details_service import get_variant_details, get_clinvar_variants
     from services.protein_properties_service import get_protein_properties
     from services.single_cell_service import get_single_cell_expression
     from services.tissue_expression_service import get_tissue_expression
@@ -66,7 +69,9 @@ except ImportError:
     from api.mechanisms import router as mechanisms_router
     from api.gene_silencing import router as gene_silencing_router
     from api.gene_upregulation import router as gene_upregulation_router
+    from api.protein_replacement import router as protein_replacement_router
     from api.isoform_engineering import router as isoform_engineering_router
+    from api.rna_editing import router as rna_editing_router
     from api.upload import router as upload_router
     from api.assistant import router as assistant_router
     from api.notifications import router as notifications_router
@@ -76,6 +81,7 @@ except ImportError:
     from api.reports import router as reports_router
     from api.projects import router as projects_router
     from api.bug_reports import router as bug_reports_router
+    from api.gene_search import router as gene_search_router
 
 
 logging.basicConfig(level=logging.INFO)
@@ -103,9 +109,11 @@ app.add_middleware(
 )
 
 app.include_router(mechanisms_router)
+app.include_router(protein_replacement_router)
 app.include_router(gene_silencing_router)
 app.include_router(gene_upregulation_router)
 app.include_router(isoform_engineering_router)
+app.include_router(rna_editing_router)
 app.include_router(upload_router)
 app.include_router(assistant_router)
 app.include_router(notifications_router)
@@ -115,6 +123,7 @@ app.include_router(profile_router)
 app.include_router(reports_router)
 app.include_router(projects_router)
 app.include_router(bug_reports_router)
+app.include_router(gene_search_router)
 
 
 @app.on_event("startup")
@@ -562,13 +571,14 @@ async def initialize_target(payload: TargetRequest):
                 logger.warning("%s failed for %s: %s", label, official_symbol, e)
                 return default
 
-        enrichment_data, constraint_data, aso_data, rna_halflife_data, dependency_data, variant_details, single_cell, clinical_details, fda_therapies, orphanet_data, mutation_data = await asyncio.gather(
+        enrichment_data, constraint_data, aso_data, rna_halflife_data, dependency_data, variant_details, top_variants, single_cell, clinical_details, fda_therapies, orphanet_data, mutation_data = await asyncio.gather(
             _run_sync(lambda: get_gene_enrichment(gene_id, taxon_id, official_symbol), "Enrichment lookup", {}),
             _run_sync(lambda: get_human_constraint_metrics(official_symbol) if is_human else {}, "Constraint lookup", {}),
             _run_sync(lambda: get_aso_analysis(gene_id, taxon_id), "ASO analysis", {}),
             _run_sync(lambda: get_rna_halflife(official_symbol) if is_human else {}, "RNA half-life lookup", {}),
             _run_sync(lambda: get_gene_dependency(official_symbol), "Dependency lookup", {}),
             _run_sync(lambda: get_variant_details(gene_symbol=official_symbol, ensembl_gene_id=meta.get("id"), entrez_id=meta.get("entrezGeneId")) if is_human else {}, "Variant details lookup", {}),
+            _run_sync(lambda: get_clinvar_variants(meta.get("id")) if is_human else [], "Top variants lookup", [], timeout_seconds=25.0),
             _run_sync(lambda: get_single_cell_expression(ensembl_id=gene_id, gene_symbol=official_symbol) if is_human else {}, "Single-cell lookup", {}),
             _run_sync(lambda: get_clinical_details(gene_symbol=official_symbol, disease_name=disease_resolved, omim_id=disease_info.get("omim_id"), phenotypes=disease_info.get("diseases")), "Clinical details lookup", {}),
             _run_sync(lambda: get_fda_therapies(official_symbol, disease_resolved) if is_human else {}, "FDA therapies lookup", {}, timeout_seconds=18.0),
@@ -576,12 +586,15 @@ async def initialize_target(payload: TargetRequest):
             _run_sync(lambda: get_mutation_breakdown(official_symbol) if is_human else {}, "Mutation breakdown lookup", {}, timeout_seconds=60.0),
         )
 
-        admet_data = await _run_sync(lambda: get_admet_prediction(gene_context={
-            "vitalOrganTpm": expr_details.get("vital_organ_tpm"),
-            "vitalOrganTissues": expr_details.get("vital_organ_tissues", []),
-            "essentialGene": dependency_data.get("essentialGene"),
-            "loeufDecile": constraint_data.get("loeufDecile"),
-        }), "ADMET lookup", {})
+        admet_data = await _run_sync(lambda: get_admet_prediction(
+            aso_sequence=aso_data.get("cdsSequence"),
+            gene_context={
+                "vitalOrganTpm": expr_details.get("vital_organ_tpm"),
+                "vitalOrganTissues": expr_details.get("vital_organ_tissues", []),
+                "essentialGene": dependency_data.get("essentialGene"),
+                "loeufDecile": constraint_data.get("loeufDecile"),
+            }
+        ), "ADMET lookup", {})
 
         # Protein chain — depends on protein_db_ids → protein_properties
         protein_props = {}
@@ -725,6 +738,7 @@ async def initialize_target(payload: TargetRequest):
 
             "variantExamples": [],
             "totalKnownVariantsClinvar": None,
+            "topVariants": top_variants[:10] if isinstance(top_variants, list) else [],
 
             "defaultTissue": expr_details["top_tissue"],
             "tissueExpressionLevel": tissue_level,
@@ -743,7 +757,7 @@ async def initialize_target(payload: TargetRequest):
             "dominantIsoformId": expr_details.get("dominant_isoform_id"),
             "diseaseFoldChange": None,
             "singleCellPrevalence": single_cell_prevalence,
-            "circadianAmplitude": None,
+            "circadianAmplitude": expr_details.get("circadianAmplitude"),
             "intronRetentionRatio": None,
             "developmentalExpression": developmental_expression,
             "alternativePolyadenylation": alternative_polyadenylation,
@@ -838,6 +852,9 @@ async def initialize_target(payload: TargetRequest):
             "depmapDependency": dependency_data.get("depmapDependency"),
             "depmapDependencyScore": dependency_data.get("depmapDependencyScore"),
             "essentialGene": dependency_data.get("essentialGene"),
+            "essentialGeneGeneTrap": dependency_data.get("essentialGeneGeneTrap"),
+            "essentialGeneCrispr": dependency_data.get("essentialGeneCrispr"),
+            "essentialGeneCrispr2": dependency_data.get("essentialGeneCrispr2"),
             "depmapSource": dependency_data.get("depmapSource"),
 
             "deepLinks": deep_links,
@@ -940,6 +957,16 @@ async def initialize_target(payload: TargetRequest):
             "admetAnalysis": admet_data.get("admetAnalysis"),
             "admetWarnings": admet_data.get("admetWarnings", []),
             "admetStrengths": admet_data.get("admetStrengths", []),
+            "sequenceDescriptors": admet_data.get("sequenceDescriptors"),
+            "pbpkTimeSeries": admet_data.get("pbpkTimeSeries"),
+            "chargePhProfile": admet_data.get("chargePhProfile"),
+            "lipinskiViolations": admet_data.get("lipinskiViolations"),
+            "structuralHotspots": admet_data.get("structuralHotspots"),
+            "chemicalSpaceProjection": admet_data.get("chemicalSpaceProjection"),
+            "onTargetToxicityRisk": admet_data.get("onTargetToxicityRisk"),
+            "onTargetToxicityLevel": admet_data.get("onTargetToxicityLevel"),
+            "therapeuticWindow": admet_data.get("therapeuticWindow"),
+            "distributionNotes": admet_data.get("distributionNotes", []),
         }
 
         fallback_payload = build_gene_fallback_payload(

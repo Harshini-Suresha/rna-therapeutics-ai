@@ -3,6 +3,16 @@ export interface VariantExample {
   source: string;
 }
 
+export interface TopVariant {
+  variantId: string;
+  clinicalSignificance: string;
+  hgvsp: string;
+  hgvsc: string;
+  goldStars: number;
+  rsid: string | null;
+  alleleFrequency: number | null;
+}
+
 export interface TissueExpression {
   name: string;
   tpm: number;
@@ -57,6 +67,7 @@ export interface GeneTargetObject {
   // authoritative live list rather than fabricated HGVS notation.
   variantExamples: VariantExample[];
   totalKnownVariantsClinvar: number | null;
+  topVariants: TopVariant[];
 
   // Tissue / cell expression (human only, live GTEx where available)
   defaultTissue: string | null;
@@ -177,8 +188,17 @@ export interface GeneTargetObject {
   rnaHalflifeSource: string | null;
   depmapDependency: string | null;
   depmapDependencyScore: number | null;
-  essentialGene: string | null;
   depmapSource: string | null;
+  essentialGene: string | null;
+  essentialGeneSource: string | null;
+  essentialGeneGeneTrap: string | null;
+  essentialGeneGeneTrapSource: string | null;
+  essentialGeneCrispr: string | null;
+  essentialGeneCrisprSource: string | null;
+  essentialGeneCrispr2: string | null;
+  essentialGeneCrispr2Source: string | null;
+  therapeuticWindow: { level: string | null; notes: string[] | null } | null;
+  distributionNotes: string[] | null;
 
   deepLinks: DeepLinks;
 
@@ -283,51 +303,46 @@ export interface GeneTargetObject {
     }[];
   } | null;
 
-  // ADMET predictions for RNA therapeutics
-  admetAvailable: boolean;
-  absorptionScore: number | null;
-  absorptionLevel: string | null;
-  distributionScore: number | null;
-  distributionLevel: string | null;
-  metabolismScore: number | null;
-  metabolismLevel: string | null;
-  excretionScore: number | null;
-  excretionLevel: string | null;
-  toxicityScore: number | null;
-  toxicityLevel: string | null;
-  cellUptake: {
-    score: number;
-    level: string;
-    notes?: string[];
+   sequenceDescriptors: {
+    length: number | null;
+    gcContent: number | null;
+    gcSkew: number | null;
+    atContent: number | null;
+    purineFraction: number | null;
+    meltingTemp: number | null;
+    cpgCount: number | null;
+    polyGCount: number | null;
+    polyUCount: number | null;
+    sequenceEntropy: number | null;
+    chargeDensity: number | null;
   } | null;
-  proteinBinding: {
-    score: number;
-    level: string;
+  pbpkTimeSeries: {
+    timePoints: number[];
+    concentrations: number[];
+    halfLifeHours: number | null;
+    clearanceRate: number | null;
+    model: string;
   } | null;
-  nucleaseSensitivity: {
-    score: number;
-    level: string;
-    halfLifeHours?: number;
+  chargePhProfile: {
+    phValues: number[];
+    netCharge: number[];
+    pkaReferences: Record<string, number>;
   } | null;
-  renalClearance: {
-    score: number;
-    level: string;
-    mechanism: string;
+  lipinskiViolations: {
+    count: number | null;
+    violations: string[];
   } | null;
-  immunogenicity: {
-    score: number;
-    level: string;
-    motifs: string[];
+  structuralHotspots: {
+    positions: number[];
+    immunogenicityContribution: number[];
+    toxicityContribution: number[];
   } | null;
-  offTargetRisk: {
-    score: number;
-    level: string;
+  chemicalSpaceProjection: {
+    x: number | null;
+    y: number | null;
+    method: string | null;
+    varianceExplained: { axis1: number | null; axis2: number | null };
   } | null;
-  hemolysisRisk: {
-    score: number;
-    level: string;
-  } | null;
-  admetAnalysis: string | null;
-  admetWarnings: string[];
-  admetStrengths: string[];
+  onTargetToxicityRisk: number | null;
+  onTargetToxicityLevel: string | null;
 }

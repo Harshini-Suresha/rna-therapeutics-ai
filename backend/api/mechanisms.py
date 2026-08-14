@@ -5,7 +5,7 @@ Biological Information Retrieval Engine).
 
 Supports multiple therapeutic goals:
 - TG01: Gene Silencing (A1, A2, A12, A15, A21)
-- TG02: Gene Activation / Upregulation (A3, A4, A5, A6, A22, A23)
+- TG02: Gene Activation / Upregulation (A3, A4, A5, A6, A23, A28)
 - TG03: RNA Editing / Correction (A13, A16, A17, A18, A19, A20)
 - TG04: RNA Processing Modulation (A7, A8, A9, A10, A11)
 - TG05: RNA Neutralization (A12, A14, A25)
@@ -37,6 +37,7 @@ from services.mechanism_service import (
     ENZYME_RECRUITMENT,
     MISMATCH_POCKET,
     SPLICING_DIRECTIONS,
+    INTRON_SITES,
     NEUTRALIZATION_DEFECT_TYPES,
     NEUTRALIZATION_MODES,
     STERIC_CHEMISTRIES,
@@ -48,6 +49,8 @@ from services.mechanism_service import (
     RNA_ENGINEERING_SCAFFOLDS,
     RNA_ENGINEERING_CHEM_STABILIZATIONS,
     RNA_ENGINEERING_K_D_GOALS,
+    ISO_ENGINEERING_MECHANISM_IDS,
+    ISOFORM_GOAL_DEFECT_MAP,
 )
 from services.gene_feature_service import analyze_gene_features
 
@@ -156,6 +159,7 @@ async def mechanism_options():
             "enzymeRecruitment": [{"id": k, "label": v} for k, v in ENZYME_RECRUITMENT.items()],
             "mismatchPocket": [{"id": k, "label": v} for k, v in MISMATCH_POCKET.items()],
             "splicingDirections": [{"id": k, "label": v} for k, v in SPLICING_DIRECTIONS.items()],
+            "intronSites": [{"id": k, "label": v} for k, v in INTRON_SITES.items()],
         },
         "rnaNeutralization": {
             "molecularDefects": [{"id": k, "label": v} for k, v in NEUTRALIZATION_DEFECT_TYPES.items()],

@@ -1,25 +1,7 @@
-"use client";
-
-interface Composition {
-  A: number;
-  C: number;
-  G: number;
-  T: number;
-  U: number;
-}
-
-const COLORS: Record<string, string> = {
-  A: "#f59e0b",
-  C: "#3b82f6",
-  G: "#10b981",
-  T: "#ef4444",
-  U: "#8b5cf6",
-};
-
 export default function NucleotideCompositionChart({
   composition,
 }: {
-  composition: Composition;
+  composition: Record<string, number>;
 }) {
   const entries = Object.entries(composition).filter(([, v]) => v > 0);
   const total = entries.reduce((s, [, v]) => s + v, 0);
@@ -30,6 +12,18 @@ export default function NucleotideCompositionChart({
   const cy = size / 2;
   const R = 72;
   const r = 40;
+
+  const COLORS: Record<string, string> = {
+    A: "#f59e0b",
+    C: "#3b82f6",
+    G: "#10b981",
+    T: "#ef4444",
+    U: "#8b5cf6",
+  };
+
+  const fallbackColors = ["#6366f1", "#ec4899", "#14b8a6", "#f97316", "#84cc16", "#06b6d4", "#8b5cf6", "#f43f5e"];
+  let colorIdx = 0;
+  const getColor = (key: string) => COLORS[key] ?? fallbackColors[colorIdx++ % fallbackColors.length];
 
   let acc = 0;
   const arcs = entries.map(([base, count]) => {
@@ -60,6 +54,8 @@ export default function NucleotideCompositionChart({
     ].join(" ");
   }
 
+  const isProtein = entries.some(([base]) => !"ACGTU".includes(base));
+
   return (
     <div className="flex items-center gap-6">
       <svg viewBox={`0 0 ${size} ${size}`} className="h-[190px] w-[190px] shrink-0">
@@ -67,7 +63,7 @@ export default function NucleotideCompositionChart({
           <path
             key={a.base}
             d={describeArc(a.start, a.end, R, r)}
-            fill={COLORS[a.base]}
+            fill={getColor(a.base)}
             stroke="#fff"
             strokeWidth={2}
           />
@@ -76,7 +72,7 @@ export default function NucleotideCompositionChart({
           {total}
         </text>
         <text x={cx} y={cy + 13} textAnchor="middle" className="fill-slate-400" fontSize={10.5}>
-          total nt
+          {isProtein ? "total aa" : "total nt"}
         </text>
       </svg>
       <div className="space-y-2">
@@ -84,7 +80,7 @@ export default function NucleotideCompositionChart({
           <div key={a.base} className="flex items-center gap-2 text-[13px]">
             <span
               className="inline-block h-3 w-3 rounded-sm"
-              style={{ backgroundColor: COLORS[a.base] }}
+              style={{ backgroundColor: getColor(a.base) }}
             />
             <span className="font-mono font-semibold text-slate-700 w-4">{a.base}</span>
             <span className="text-slate-500">

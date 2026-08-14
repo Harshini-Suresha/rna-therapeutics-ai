@@ -12,3 +12,5 @@ out/
 /tmp/
 frontend/tsconfig.tsbuildinfo
 *.db
+.kilo/
+.pytest_cache/

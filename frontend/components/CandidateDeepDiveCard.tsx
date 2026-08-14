@@ -3,7 +3,6 @@
 import { AlertTriangle, ShieldCheck } from "lucide-react";
 import { AssoCandidate } from "@/types/geneSilencing";
 import { Card } from "./ui";
-import AsoRadarChart from "./AsoRadarChart";
 import AsoScoreGauge from "./AsoScoreGauge";
 import NucleotideCompositionChart from "./NucleotideCompositionChart";
 
@@ -81,10 +80,6 @@ export default function CandidateDeepDiveCard({
 
       {/* Panels */}
       <div className="grid grid-cols-1 gap-5 p-5 md:grid-cols-2">
-        <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4 md:col-span-2">
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">ADMET-style profile</p>
-          <AsoRadarChart candidate={candidate} />
-        </div>
         <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4">
           <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Score &amp; metrics</p>
           <AsoScoreGauge candidate={candidate} />

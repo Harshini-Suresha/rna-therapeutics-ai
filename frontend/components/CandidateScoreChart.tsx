@@ -73,8 +73,11 @@ export default function CandidateScoreChart({
             </g>
           );
         })}
-        <text x={PAD.left + plotW / 2} y={H - 5} textAnchor="middle" className="fill-black" fontSize={12} fontWeight={700}>
-          Composite design score (0.65×duplex ΔG + 0.35×Tm fit)
+         <text x={PAD.left + plotW / 4} y={H - 5} textAnchor="middle" className="fill-black" fontSize={10} fontWeight={700}>
+          Composite design score
+        </text>
+        <text x={PAD.left + (plotW * 3) / 4} y={H - 5} textAnchor="middle" className="fill-black" fontSize={10} fontWeight={700}>
+          Composite score = 65% duplex ΔG + 35% Tm fit (normalized 0–100)
         </text>
 
         {/* Bars */}

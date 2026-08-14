@@ -4,14 +4,15 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useClientSearchParams } from "@/utils/useClientSearchParams"
-import { AlertCircle, ArrowRight, BookOpen, ClipboardCheck, Cpu, Database, Dna, FileText, ChevronRight, UploadCloud, Search, FlaskConical } from "lucide-react";
+import { AlertCircle, ArrowRight, BookOpen, ClipboardCheck, Cpu, Database, Dna, FileText, ChevronRight, FlaskConical, UploadCloud } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import Topbar from "@/components/Topbar";
 import BasicInfoForm from "@/components/BasicInfoForm";
 import GeneOverviewCard from "@/components/GeneOverviewCard";
 import GeneTherapyInfoCard from "@/components/GeneTherapyInfoCard";
+import TopVariantsCard from "@/components/TopVariantsCard";
 import InfoGrid from "@/components/InfoGrid";
-import StatsRow from "@/components/StatsRow";
+import StatsRow, { StatCard } from "@/components/StatsRow";
 import FooterBar from "@/components/FooterBar";
 import DiseaseSearchSection from "@/components/DiseaseSearchSection";
 import DiseaseMatchIndicator from "@/components/DiseaseMatchIndicator";
@@ -20,6 +21,7 @@ import { fetchGene } from "@/lib/api";
 import { saveReport } from "@/lib/auth";
 import { getOrganism } from "@/lib/organisms";
 import { findViralGene } from "@/lib/virusGenes";
+import { validateGeneSymbol, type GeneSuggestion } from "@/lib/geneSearchApi";
 import { formatGeneSymbol } from "../shared/geneFormat";
 
 const ANALYSIS_MODULES = [
@@ -56,7 +58,7 @@ const MECHANISM_CATEGORIES = [
       "AntagoNAT",
       "uORF Blocking",
       "Target Protector (BlockmiR)",
-      "miRNA Mimic Therapy",
+      "RBP Site Blocking",
       "saRNA-mediated Transcriptional Activation",
     ],
   },
@@ -110,6 +112,8 @@ const ARCHITECTURE_STEPS = [
   { label: "Validation & Output", icon: ClipboardCheck },
 ];
 
+const DASH = "—";
+
 export default function NewProjectPage() {
   const router = useRouter();
   const searchParams = useClientSearchParams();
@@ -119,6 +123,7 @@ export default function NewProjectPage() {
   const [gene, setGene] = useState<GeneTargetObject | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [geneSuggestions, setGeneSuggestions] = useState<GeneSuggestion[]>([]);
   const [autoSearchTriggered, setAutoSearchTriggered] = useState(false);
   const [diseaseSearchActive, setDiseaseSearchActive] = useState(false);
 
@@ -153,12 +158,14 @@ export default function NewProjectPage() {
     handleLoadGene();
   }, [searchParams, geneSymbol, gene, loading, autoSearchTriggered]);
 
-  async function handleLoadGene() {
-    if (!geneSymbol.trim()) return;
+  async function handleLoadGene(symbolOverride?: string) {
+    const targetSymbol = (symbolOverride || geneSymbol).trim();
+    if (!targetSymbol) return;
 
     setGene(null);
     setLoading(true);
     setError(null);
+    setGeneSuggestions([]);
 
     const selectedOrg = getOrganism(organism);
     if (!selectedOrg) {
@@ -168,11 +175,11 @@ export default function NewProjectPage() {
     }
 
     if (selectedOrg.tier === 5) {
-      const viralGene = findViralGene(organism, geneSymbol);
+      const viralGene = findViralGene(organism, targetSymbol);
       if (!viralGene) {
         setGene(null);
         setError(
-          `Gene symbol "${geneSymbol}" isn't in the curated reference set for ${selectedOrg.commonName}.`
+          `Gene symbol "${targetSymbol}" isn't in the curated reference set for ${selectedOrg.commonName}.`
         );
         setLoading(false);
         return;
@@ -328,8 +335,15 @@ export default function NewProjectPage() {
         rnaHalflifeSource: null,
         depmapDependency: null,
         depmapDependencyScore: null,
-        essentialGene: null,
         depmapSource: null,
+        essentialGene: null,
+        essentialGeneSource: null,
+        essentialGeneGeneTrap: null,
+        essentialGeneGeneTrapSource: null,
+        essentialGeneCrispr: null,
+        essentialGeneCrisprSource: null,
+        essentialGeneCrispr2: null,
+        essentialGeneCrispr2Source: null,
         genomicSize: null,
         mrnaLength: null,
         proteinMass: null,
@@ -342,6 +356,7 @@ export default function NewProjectPage() {
         orphanetDiseaseNames: [],
         knownPathogenicVariants: null,
         totalClinvarVariants: null,
+        topVariants: [],
         mutationBreakdown: {
           largeExonDeletions: null,
           largeExonDuplications: null,
@@ -349,28 +364,17 @@ export default function NewProjectPage() {
           frameshiftMutations: null,
           spliceSiteMutations: null,
         },
-        admetAvailable: false,
-        absorptionScore: null,
-        absorptionLevel: null,
-        distributionScore: null,
-        distributionLevel: null,
-        metabolismScore: null,
-        metabolismLevel: null,
-        excretionScore: null,
-        excretionLevel: null,
-        toxicityScore: null,
-        toxicityLevel: null,
-        cellUptake: null,
-        proteinBinding: null,
-        nucleaseSensitivity: null,
-        renalClearance: null,
-        immunogenicity: null,
-        offTargetRisk: null,
-        hemolysisRisk: null,
-        admetAnalysis: null,
-        admetWarnings: [],
-        admetStrengths: [],
-      };
+         sequenceDescriptors: null,
+         pbpkTimeSeries: null,
+         chargePhProfile: null,
+         lipinskiViolations: null,
+         structuralHotspots: null,
+         chemicalSpaceProjection: null,
+         onTargetToxicityRisk: null,
+         onTargetToxicityLevel: null,
+         therapeuticWindow: null,
+         distributionNotes: [],
+       };
 
       setGene(viralTargetPayload);
       setLoading(false);
@@ -379,21 +383,39 @@ export default function NewProjectPage() {
 
     try {
       const searchSpecies = selectedOrg.ensemblSpecies || "homo_sapiens";
-      const result = await fetchGene(searchSpecies, diseaseName, geneSymbol);
+      const result = await fetchGene(searchSpecies, diseaseName, targetSymbol);
       const formattedOfficial = formatGeneSymbol(result.geneSymbol, organism);
       setGeneSymbol(formattedOfficial);
       setGene(result);
       saveReport({
         step: "gene_lookup",
-        title: `Gene Lookup: ${result.geneSymbol || geneSymbol}`,
-        geneSymbol: result.geneSymbol || geneSymbol,
+        title: `Gene Lookup: ${result.geneSymbol || targetSymbol}`,
+        geneSymbol: result.geneSymbol || targetSymbol,
         disease: diseaseName || "",
         summary: `Retrieved data for ${result.geneSymbol} in ${(searchSpecies || "homo_sapiens").replace("_", " ")}.`,
         data: { geneId: result.geneId, organism: searchSpecies, disease: diseaseName },
       });
     } catch (err) {
       setGene(null);
-      setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+      const message = err instanceof Error ? err.message : "Something went wrong. Please try again.";
+      setError(message);
+      setGeneSuggestions([]);
+
+      const selectedOrg = getOrganism(organism);
+      const searchSpecies = selectedOrg?.ensemblSpecies || "homo_sapiens";
+
+      if (
+        message.includes("was not found") ||
+        message.includes("isn't in the curated reference set")
+      ) {
+        validateGeneSymbol(targetSymbol, searchSpecies).then((result) => {
+          if (!result.valid && result.suggestions && result.suggestions.length > 0) {
+            setGeneSuggestions(result.suggestions);
+          }
+        }).catch(() => {
+          setGeneSuggestions([]);
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -405,6 +427,7 @@ export default function NewProjectPage() {
     setGeneSymbol("");
     setGene(null);
     setError(null);
+    setGeneSuggestions([]);
     setAutoSearchTriggered(false);
   }
 
@@ -431,12 +454,37 @@ export default function NewProjectPage() {
               onLoadGene={handleLoadGene}
               loading={loading}
               geneFieldsDisabled={diseaseSearchActive}
+              geneLoaded={!!gene}
             />
           )}
           {error && (
-            <div className="flex items-center gap-2 border border-red-200 bg-red-50 px-4 py-2 text-[12px] text-red-600 animate-pulse">
-              <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-              {error}
+            <div className="border border-red-200 bg-red-50 px-4 py-3 text-[12px] text-red-600 animate-pulse">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                {error}
+              </div>
+              {geneSuggestions.length > 0 && (
+                <div className="mt-3">
+                  <p className="mb-2 font-medium text-red-700">Did you mean one of these?</p>
+                  <div className="flex flex-wrap gap-2">
+                    {geneSuggestions.map((s, idx) => (
+                      <button
+                        key={`${s.symbol}-${idx}`}
+                        onClick={() => {
+                          setGeneSymbol(s.symbol);
+                          setError(null);
+                          setGeneSuggestions([]);
+                          handleLoadGene(s.symbol);
+                        }}
+                        className="flex items-center gap-2 rounded-lg border border-red-200 bg-white px-3 py-1.5 hover:border-brand hover:shadow-sm transition-all duration-150"
+                      >
+                        <span className="font-semibold text-slate-700">{s.symbol}</span>
+                        <span className="text-slate-500 max-w-[180px] truncate">{s.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
           {!gene && !loading && (
@@ -484,6 +532,7 @@ export default function NewProjectPage() {
                 onLoadGene={handleLoadGene}
                 loading={loading}
                 geneFieldsDisabled={diseaseSearchActive}
+                geneLoaded={!!gene}
               />
 
               {/* Disease-based gene discovery */}
@@ -608,6 +657,7 @@ export default function NewProjectPage() {
               )}
               <InfoGrid gene={gene} />
               <StatsRow gene={gene} />
+              <TopVariantsCard gene={gene} />
               <GeneTherapyInfoCard gene={gene} />
             </>
           )}

@@ -26,6 +26,7 @@ export async function fetchDiseaseDetail(query: string, organism = "human"): Pro
       knownDrugs: [],
       synonyms: [],
       phenotypes: [],
+      hpoPhenotypes: [],
       relatedDiseases: [],
       childDiseases: [],
       databaseRefs: {},

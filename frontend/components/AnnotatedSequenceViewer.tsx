@@ -17,6 +17,7 @@ const TYPE_COLORS: Record<string, string> = {
   orfs: "#3b82f6",
   complexity: "#ef4444",
   structure: "#10b981",
+  pam: "#f97316",
 };
 
 const BASE_COLORS: Record<string, string> = {

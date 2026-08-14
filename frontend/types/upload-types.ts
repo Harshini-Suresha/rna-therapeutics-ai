@@ -11,9 +11,9 @@ export interface ValidateResponse {
   valid: boolean;
   error?: string;
   sequence?: string;
-  sequenceType?: "dna" | "rna" | "unknown";
+  sequenceType?: "dna" | "rna" | "protein" | "unknown";
   length?: number;
-  gcContent?: number;
+  gcContent?: number | null;
   invalidChars?: string[];
   features?: string[];
   orfs?: OrfHit[];
@@ -158,15 +158,15 @@ export interface StabilityIndexPoint {
 
 export interface AnalyzeResponse {
   sequence: string;
-  sequenceType: "dna" | "rna" | "unknown";
+  sequenceType: "dna" | "rna" | "protein" | "unknown";
   length: number;
-  gcContent: number;
+  gcContent: number | null;
   offTarget: SpecificityHeuristic;
   secondaryStructure: SecondaryStructureEstimate;
   immuneScreen: ImmuneMotifHit[];
   modality: ModalityAnalysis;
   gcCurve: GcCurvePoint[];
-  composition: NucleotideComposition;
+  composition: Record<string, number>;
   orfs: OrfHit[];
   meltingTemp?: {
     tmNearestNeighbor: number;
@@ -175,7 +175,7 @@ export interface AnalyzeResponse {
     gcContent?: number;
     method: string;
     note: string;
-  };
+  } | null;
   complexity?: {
     dinucRepeats: { pattern: string; start: number; end: number; repeats: number }[];
     trinucRepeats: { pattern: string; count: number; positions: number[] }[];
@@ -183,28 +183,55 @@ export interface AnalyzeResponse {
     atRichRegions: { start: number; end: number; length: number }[];
     selfComplementarity: { sequence: string; position: number; size: number }[];
     complexityScore: number;
-  };
+  } | null;
   codonUsage?: {
     codons: { codon: string; position: number; adaptiveness: number; isRare: boolean }[];
     cai: number;
     rareCodons: { codon: string; position: number; adaptiveness: number }[];
     totalCodons: number;
     note: string;
-  };
+  } | null;
   modificationScores?: {
     modality: string;
     scores: Record<string, { score: number; rationale: string }>;
     overallScore: number;
-  };
+  } | null;
   energyProfile?: { position: number; energy: number }[];
   restrictionSites?: RestrictionSite[];
   mirnaTargets?: MiRNATarget[];
   hairpins?: Hairpin[];
-  kmerFrequency?: KmerFrequency;
-  thermoProfile?: ThermoProfile;
+  kmerFrequency?: KmerFrequency | null;
+  thermoProfile?: ThermoProfile | null;
   dotPlot?: DotPlotPoint[];
   modificationLandscape?: ModificationLandscapePoint[];
   riskScores?: RiskScores;
   physicochemical?: PhysicochemicalProfile;
   stabilityIndex?: StabilityIndexPoint[];
+  grnaCandidates?: GrnaCandidate[];
+  proteinAnalysis?: {
+    aminoAcidComposition: Record<string, number>;
+    molecularWeight: number;
+    length: number;
+    hydrophobicFraction: number;
+    hydrophilicFraction: number;
+    chargedFraction: number;
+    aromaticFraction: number;
+  };
+}
+
+export interface GrnaCandidate {
+  id: string;
+  position: number;
+  sequence: string;
+  pam: string;
+  strand: "+" | "-";
+  score: number;
+  gc: number;
+  selfComplementarity: number;
+  offTargets: number;
+  polyT: boolean;
+  color: string;
+  specificityScore: number;
+  efficiencyScore: number;
+  mismatchDistribution: number[];
 }

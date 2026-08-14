@@ -42,6 +42,14 @@ interface TrackProps {
   palindromePositions: number[];
   restrictionSites?: RestrictionSite[];
   mirnaTargets?: MiRNATarget[];
+  grnaCandidates?: GrnaCandidate[];
+}
+
+interface GrnaCandidate {
+  position: number;
+  sequence: string;
+  pam: string;
+  strand: "+" | "-";
 }
 
 const ORF_COLORS = ["#6366f1", "#8b5cf6", "#a78bfa", "#c084fc", "#e879f9", "#f472b6"];
@@ -49,6 +57,8 @@ const IMMUNE_COLOR = "#f59e0b";
 const PALINDROME_COLOR = "#10b981";
 const RESTRICTION_COLOR = "#ec4899";
 const MIRNA_COLOR = "#3b82f6";
+const PAM_COLOR_FWD = "#f97316";
+const PAM_COLOR_REV = "#ec4899";
 
 export default function SequenceTrackViewer({
   seqLength,
@@ -57,6 +67,7 @@ export default function SequenceTrackViewer({
   palindromePositions,
   restrictionSites = [],
   mirnaTargets = [],
+  grnaCandidates = [],
 }: TrackProps) {
   const [tooltip, setTooltip] = useState<{ x: number; y: number; text: string } | null>(null);
 
@@ -260,6 +271,33 @@ export default function SequenceTrackViewer({
     });
   }
 
+  // PAM sites track (CRISPR)
+  const lastTrackY = TRACKS.length > 0 ? TRACKS[TRACKS.length - 1].y + TRACK_H : 0;
+  const pamY = lastTrackY + TRACK_GAP + 8;
+  if (grnaCandidates.length > 0) {
+    const pamItems = grnaCandidates.slice(0, 60).map((c, i) => {
+      const x = xScale(c.position);
+      const isFwd = c.strand === "+";
+      const color = isFwd ? PAM_COLOR_FWD : PAM_COLOR_REV;
+      const arrowDy = isFwd ? 0 : TRACK_H / 2 + 2;
+      return (
+        <g key={`pam-${i}`}>
+          <line x1={x} y1={arrowDy} x2={x} y2={arrowDy + TRACK_H / 2 - 2} stroke={color} strokeWidth={2} opacity={0.85} />
+          <polygon
+            points={`${x - 2},${arrowDy + TRACK_H / 2 - 2} ${x + 2},${arrowDy + TRACK_H / 2 - 2} ${x},${arrowDy + TRACK_H / 2 + 4}`}
+            fill={color}
+            opacity={isFwd ? 1 : 0.7}
+          />
+        </g>
+      );
+    });
+    TRACKS.push({
+      label: "PAM Sites",
+      y: pamY,
+      items: <g transform={`translate(0,${pamY})`}>{pamItems}</g>,
+    });
+  }
+
   const totalH = TRACKS.length > 0 ? TRACKS[TRACKS.length - 1].y + TRACK_H + 28 : 60;
 
   // X axis ticks
@@ -335,6 +373,18 @@ export default function SequenceTrackViewer({
           <span className="flex items-center gap-1">
             <span className="inline-block h-2 w-4 rounded-sm" style={{ backgroundColor: MIRNA_COLOR }} />
             miRNA target
+          </span>
+        )}
+        {grnaCandidates.length > 0 && (
+          <span className="flex items-center gap-1">
+            <span className="inline-block h-2 w-2 rotate-45" style={{ backgroundColor: PAM_COLOR_FWD }} />
+            Forward PAM
+          </span>
+        )}
+        {grnaCandidates.length > 0 && (
+          <span className="flex items-center gap-1">
+            <span className="inline-block h-2 w-2 rotate-45" style={{ backgroundColor: PAM_COLOR_REV }} />
+            Reverse PAM
           </span>
         )}
       </div>

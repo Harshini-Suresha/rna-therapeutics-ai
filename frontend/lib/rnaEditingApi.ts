@@ -82,7 +82,10 @@ export async function fetchRnaEditingClinVarVariants(
     `${API_BASE}/api/rna-editing/variants/${ensemblGeneId}`,
     { cache: "no-store" },
   );
-  if (!res.ok) return [];
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail || "Could not load ClinVar variants.");
+  }
   const data = await res.json();
   return data.variants ?? [];
 }

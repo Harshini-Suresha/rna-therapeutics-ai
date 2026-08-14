@@ -31,7 +31,7 @@ import {
 import Sidebar from "@/components/Sidebar";
 import Topbar from "@/components/Topbar";
 import { Card, SectionHeader } from "@/components/ui";
-import { ValidationReport, AnalysisReport } from "@/types/upload";
+import { ValidationReport, AnalysisReport, GrnaCandidate } from "@/types/upload";
 import { Modality } from "@/types/upload";
 import type { AnalyzeResponse } from "@/types/upload-types";
 import { validateSequence, analyzeSequence } from "@/lib/uploadApi";
@@ -60,6 +60,10 @@ import AnalysisTabs from "@/components/AnalysisTabs";
 import PairwiseAlignmentViewer from "@/components/PairwiseAlignmentViewer";
 import FeatureTable from "@/components/FeatureTable";
 import AnnotatedSequenceViewer from "@/components/AnnotatedSequenceViewer";
+import CrisprScanTrack from "@/components/CrisprScanTrack";
+import CrisprCandidateTable from "@/components/CrisprCandidateTable";
+import CrisprPrimerDesignCard from "@/components/CrisprPrimerDesignCard";
+import InfoTooltip from "@/components/InfoTooltip";
 
 type Step = "upload" | "validate" | "modality" | "analysis";
 
@@ -136,68 +140,267 @@ export default function UploadSequencePage() {
   function clientSideValidate(raw: string, fname?: string) {
     const seq = raw.replace(/^>.*$/gm, "").replace(/[^A-Za-z]/g, "").toUpperCase();
     if (!seq) return null;
+
     const hasT = seq.includes("T");
     const hasU = seq.includes("U");
-    const seqType = hasT && !hasU ? "dna" : hasU && !hasT ? "rna" : "dna";
-    const gc = seq.length > 0 ? Math.round((seq.split("").filter((b) => "GC".includes(b)).length / seq.length) * 1000) / 10 : 0;
-    const invalid = [...new Set(seq.split("").filter((b) => !"ACGTRYSWKMBDHVN".includes(b)))].sort();
-    const isRna = hasU && !hasT;
-    const startCodons = isRna ? ["AUG"] : ["ATG"];
-    const stopCodons = isRna ? ["UAA", "UAG", "UGA"] : ["TAA", "TAG", "TGA"];
-    const orfs: { strand: string; frame: number; start: number; end: number; length: number; proteinLength: number }[] = [];
-    function revComp(s: string): string {
-      const comp: Record<string, string> = isRna
-        ? { A: "U", U: "A", G: "C", C: "G" }
-        : { A: "T", T: "A", G: "C", C: "G" };
-      return s.split("").reverse().map((b) => comp[b] ?? "N").join("");
+    let seqType: "dna" | "rna" | "protein" = "dna";
+    if (hasT && !hasU) seqType = "dna";
+    else if (hasU && !hasT) seqType = "rna";
+    else if (!hasT && !hasU) {
+      const proteinLetters = new Set("DEFHIKLMNPQRSTVWY");
+      if (seq.split("").some((b) => proteinLetters.has(b))) seqType = "protein";
+      else seqType = "dna";
     }
-    function scanOrfs(s: string, strand: string) {
-      for (let frame = 0; frame < 3; frame++) {
-        let i = frame;
-        while (i < s.length - 2) {
-          const codon = s.slice(i, i + 3);
-          if (startCodons.includes(codon)) {
-            const start = i;
-            let j = i + 3;
-            while (j < s.length - 2) {
-              if (stopCodons.includes(s.slice(j, j + 3))) {
-                orfs.push({ strand, frame: frame + 1, start: start + 1, end: j + 3, length: j + 3 - start, proteinLength: (j - start) / 3 });
-                break;
+
+    const invalid = [...new Set(seq.split("").filter((b) => !"ACGTRYSWKMBDHVNUEFHIKLMNPQRSTVWY".includes(b)))].sort();
+    const features: string[] = [];
+
+    if (seqType === "protein") {
+      features.push("Protein sequence detected");
+      const aaCounts: Record<string, number> = {};
+      for (const aa of "ACDEFGHIKLMNPQRSTVWY") aaCounts[aa] = 0;
+      for (const b of seq) if (aaCounts[b] !== undefined) aaCounts[b]++;
+      const top = Object.entries(aaCounts).sort((a, b) => b[1] - a[1])[0];
+      if (top && top[1] > 0) features.push(`Most common residue: ${top[0]} (${top[1]}x)`);
+    } else {
+      const gc = seq.length > 0 ? Math.round((seq.split("").filter((b) => "GC".includes(b)).length / seq.length) * 1000) / 10 : 0;
+      features.push(`GC content: ${gc}%`);
+      if (/A{6,}$/.test(seq)) features.push("Poly-A tail detected");
+      if (/G{4,}/.test(seq)) features.push("Poly-G tract detected");
+
+      const isRna = hasU && !hasT;
+      const startCodons = isRna ? ["AUG"] : ["ATG"];
+      const stopCodons = isRna ? ["UAA", "UAG", "UGA"] : ["TAA", "TAG", "TGA"];
+      const orfs: { strand: string; frame: number; start: number; end: number; length: number; proteinLength: number }[] = [];
+      function revComp(s: string): string {
+        const comp: Record<string, string> = isRna ? { A: "U", U: "A", G: "C", C: "G" } : { A: "T", T: "A", G: "C", C: "G" };
+        return s.split("").reverse().map((b) => comp[b] ?? "N").join("");
+      }
+      function scanOrfs(s: string, strand: string) {
+        for (let frame = 0; frame < 3; frame++) {
+          let i = frame;
+          while (i < s.length - 2) {
+            const codon = s.slice(i, i + 3);
+            if (startCodons.includes(codon)) {
+              const start = i;
+              let j = i + 3;
+              while (j < s.length - 2) {
+                if (stopCodons.includes(s.slice(j, j + 3))) {
+                  orfs.push({ strand, frame: frame + 1, start: start + 1, end: j + 3, length: j + 3 - start, proteinLength: (j - start) / 3 });
+                  break;
+                }
+                j += 3;
               }
-              j += 3;
-            }
-            i = j + 3 < s.length ? j + 3 : s.length;
-          } else {
-            i += 3;
+              i = j + 3 < s.length ? j + 3 : s.length;
+            } else { i += 3; }
           }
         }
       }
+      scanOrfs(seq, "+");
+      scanOrfs(revComp(seq), "-");
+      if (orfs.length > 0) {
+        const best = orfs.reduce((a, b) => (b.proteinLength > a.proteinLength ? b : a));
+        features.push(`Longest ORF: ${best.proteinLength} aa (${best.strand} strand, frame ${best.frame})`);
+      }
     }
-    scanOrfs(seq, "+");
-    scanOrfs(revComp(seq), "-");
-    const features: string[] = [];
-    if (/A{6,}$/.test(seq)) features.push("Poly-A tail detected");
-    if (/G{4,}/.test(seq)) features.push("Poly-G tract detected");
-    if (orfs.length > 0) {
-      const best = orfs.reduce((a, b) => (b.proteinLength > a.proteinLength ? b : a));
-      features.push(`Longest ORF: ${best.proteinLength} aa (${best.strand} strand, frame ${best.frame})`);
-    }
+
     return {
       valid: invalid.length === 0,
       sequence: seq,
-      sequenceType: seqType as "dna" | "rna",
+      sequenceType: seqType,
       length: seq.length,
-      gcContent: gc,
+      gcContent: seqType === "protein" ? null : (seq.length > 0 ? Math.round((seq.split("").filter((b) => "GC".includes(b)).length / seq.length) * 1000) / 10 : 0),
       invalidChars: invalid,
       features,
-      orfs,
+      orfs: seqType === "protein" ? [] : [],
       filename: fname,
-      hasPolyA: /A{6,}$/.test(seq),
-      hasPolyG: /G{4,}/.test(seq),
+      hasPolyA: seqType !== "protein" && /A{6,}$/.test(seq),
+      hasPolyG: seqType !== "protein" && /G{4,}/.test(seq),
     };
   }
 
+  function generateGrnaCandidates(seq: string): GrnaCandidate[] {
+    const upper = seq.toUpperCase();
+    const length = upper.length;
+    const candidates: GrnaCandidate[] = [];
+
+    const scanForward = (s: string, strand: "+" | "-") => {
+      const searchSeq = strand === "-" ? revCompLocal(s) : s;
+      for (let i = 0; i <= searchSeq.length - 23; i++) {
+        const pam = searchSeq.slice(i + 20, i + 23);
+        if (!/^NGG$/.test(pam)) continue;
+
+        const spacer = searchSeq.slice(i, i + 20);
+        const gc = spacer.split("").filter((b) => "GC".includes(b)).length;
+        const gcPct = gc / 20;
+
+        let score = 0;
+        if (gcPct >= 0.4 && gcPct <= 0.8) score += 40;
+        else if (gcPct >= 0.3 && gcPct <= 0.85) score += 25;
+        else score += 10;
+
+        if (spacer.startsWith("G") || spacer.startsWith("C")) score += 10;
+        if (!/TTTT/.test(spacer)) score += 10;
+
+        const selfComp = selfComplementarityScore(spacer);
+        if (selfComp < 0.2) score += 15;
+        else if (selfComp < 0.4) score += 8;
+
+        const offTargets = estimateOffTargets(spacer);
+        if (offTargets <= 2) score += 15;
+        else if (offTargets <= 5) score += 8;
+        else score += 3;
+
+        score = Math.min(100, Math.max(0, score));
+
+        const color = score >= 70 ? "emerald" : score >= 40 ? "amber" : "rose";
+
+        // Specificity score (MIT-style: 100 / (100 + sum of off-target penalties))
+        const specificityScore = Math.min(100, Math.max(0, 100 - offTargets * 8 - selfComp * 15));
+        // Efficiency score (Doench 2016-inspired: favors GC 40-80%, G-start, low self-complementarity)
+        let effScore = 0;
+        if (gcPct >= 0.4 && gcPct <= 0.8) effScore += 35;
+        else if (gcPct >= 0.3 && gcPct <= 0.9) effScore += 20;
+        if (spacer.startsWith("G")) effScore += 20;
+        else if (spacer.startsWith("A") || spacer.startsWith("C")) effScore += 10;
+        if (!/TTTT/.test(spacer)) effScore += 15;
+        effScore = Math.max(0, Math.min(100, Math.round(effScore + (30 - selfComp * 30))));
+        // Mismatch distribution: counts at 0,1,2,3,4 mismatches (CRISPOR-style)
+        const mismatchDistribution = computeMismatchDistribution(spacer, searchSeq);
+
+        // Map position to the forward strand for consistent display
+        const fwdPos = strand === "+" ? i + 21 : length - i - 22;
+
+        candidates.push({
+          id: `gRNA-${candidates.length + 1}`,
+          position: fwdPos,
+          sequence: spacer,
+          pam,
+          strand,
+          score: Math.round(score * 10) / 10,
+          gc: Math.round(gcPct * 1000) / 10,
+          selfComplementarity: Math.round(selfComp * 1000) / 1000,
+          offTargets,
+          polyT: /TTTT/.test(spacer),
+          color,
+          specificityScore: Math.round(specificityScore),
+          efficiencyScore: Math.round(effScore),
+          mismatchDistribution,
+        });
+      }
+    };
+
+    function revCompLocal(s: string): string {
+      const comp: Record<string, string> = { A: "T", T: "A", G: "C", C: "G" };
+      return s.split("").reverse().map((b) => comp[b] ?? "N").join("");
+    }
+
+    function computeMismatchDistribution(spacer: string, genome: string): number[] {
+      const counts = [0, 0, 0, 0, 0];
+      for (let i = 0; i <= genome.length - 20; i++) {
+        const candidate = genome.slice(i, i + 20);
+        let mm = 0;
+        for (let j = 0; j < 20 && mm <= 4; j++) {
+          if (candidate[j] !== spacer[j]) mm++;
+        }
+        if (mm <= 4) {
+          counts[mm]++;
+        }
+      }
+      return counts;
+    }
+
+    scanForward(upper, "+");
+    scanForward(upper, "-");
+
+    return candidates;
+  }
+
+  function selfComplementarityScore(seq: string): number {
+    const comp: Record<string, string> = { A: "T", T: "A", G: "C", C: "G", U: "A" };
+    const revComp = seq.split("").reverse().map((b) => comp[b] ?? "N").join("");
+    let matches = 0;
+    const len = Math.min(seq.length, revComp.length);
+    for (let i = 0; i < len; i++) {
+      if (seq[i] === revComp[i]) matches++;
+    }
+    return len > 0 ? matches / len : 0;
+  }
+
+  function estimateOffTargets(seq: string): number {
+    const k = 6;
+    const kmers = new Set<string>();
+    for (let i = 0; i <= seq.length - k; i++) {
+      kmers.add(seq.slice(i, i + k));
+    }
+    const unique = kmers.size;
+    const total = seq.length - k + 1;
+    const repetitiveness = total > 0 ? 1 - unique / total : 0;
+    return Math.round(repetitiveness * 12);
+  }
+
   function clientSideAnalyze(seq: string, modality: string) {
+    const hasT = seq.includes("T");
+    const hasU = seq.includes("U");
+    let seqType: "dna" | "rna" | "protein" = "dna";
+    if (hasT && !hasU) seqType = "dna";
+    else if (hasU && !hasT) seqType = "rna";
+    else if (!hasT && !hasU) {
+      const proteinLetters = new Set("DEFHIKLMNPQRSTVWY");
+      if (seq.split("").some((b) => proteinLetters.has(b))) seqType = "protein";
+      else seqType = "dna";
+    }
+
+    if (seqType === "protein") {
+      const aaCounts: Record<string, number> = {};
+      for (const aa of "ACDEFGHIKLMNPQRSTVWY") aaCounts[aa] = 0;
+      for (const b of seq) if (aaCounts[b] !== undefined) aaCounts[b]++;
+      const length = seq.length;
+      const hydrophobic = "AILMFWYV".split("").reduce((s, a) => s + (aaCounts[a] || 0), 0);
+      const hydrophilic = "RNDQEKHP".split("").reduce((s, a) => s + (aaCounts[a] || 0), 0);
+      const charged = "RDEKHP".split("").reduce((s, a) => s + (aaCounts[a] || 0), 0);
+      const aromatic = "FWY".split("").reduce((s, a) => s + (aaCounts[a] || 0), 0);
+
+      return {
+        sequence: seq,
+        sequenceType: "protein",
+        length,
+        gcContent: null,
+        offTarget: { lengthBasedRiskEstimate: "N/A" as const, note: "Protein sequence — nucleotide-level off-target screening not applicable", internalRepetitiveness: 0, recommendedMinLength: 0, disclaimer: "Not applicable for protein sequences." },
+        secondaryStructure: { estimatedMfe: null, palindromicRegions: 0, palindromePositions: [], gcContent: null, hairpinRisk: "N/A" as const },
+        immuneScreen: [],
+        modality: { recommendations: ["Protein sequence uploaded — select a nucleic-acid modality for ASO/siRNA/mRNA/sgRNA design against the coding transcript."], recommendedChemistry: undefined, optimalLength: undefined, targetRegion: undefined, strand: undefined, needsCodonOptimization: undefined, needsPolyA: undefined, needsUTR: undefined, nucleosideModifications: undefined, casProtein: undefined, offTargetMitigation: undefined },
+        gcCurve: [],
+        composition: aaCounts,
+        orfs: [],
+        meltingTemp: undefined,
+        complexity: undefined,
+        codonUsage: undefined,
+        modificationScores: undefined,
+        energyProfile: [],
+        restrictionSites: [],
+        mirnaTargets: [],
+        hairpins: [],
+        kmerFrequency: undefined,
+        thermoProfile: undefined,
+        dotPlot: [],
+        modificationLandscape: [],
+        riskScores: { specificity: 0, stability: 0, immunogenicity: 0, delivery: 0, toxicity: 0, overall: 0 },
+        physicochemical: { molecularWeight: 0, netCharge: 0, hydrophobicityIndex: 0, hydrophobicityProfile: [], chargeProfile: [] },
+        stabilityIndex: [],
+        grnaCandidates: [],
+        proteinAnalysis: {
+          aminoAcidComposition: aaCounts,
+          molecularWeight: 0,
+          length,
+          hydrophobicFraction: +(hydrophobic / length).toFixed(3),
+          hydrophilicFraction: +(hydrophilic / length).toFixed(3),
+          chargedFraction: +(charged / length).toFixed(3),
+          aromaticFraction: +(aromatic / length).toFixed(3),
+        },
+      };
+    }
+
     const _gc = (s: string) => s.length > 0 ? Math.round((s.split("").filter((b) => "GC".includes(b)).length / s.length) * 1000) / 10 : 0;
     const gc = _gc(seq);
     const length = seq.length;
@@ -214,10 +417,6 @@ export default function UploadSequencePage() {
     }
     const palindromes = palindromePositions.length;
     const mfe = Math.round((gc / 100 * -1.5 + (100 - gc) / 100 * -0.9) * length / 2 * 10) / 10;
-
-    const hasT = seq.includes("T");
-    const hasU = seq.includes("U");
-    const seqType = hasT && !hasU ? "dna" : hasU && !hasT ? "rna" : "dna";
 
     // Immune hits with positions
     const immune: { motif: string; label: string; start: number; end: number }[] = [];
@@ -650,9 +849,11 @@ export default function UploadSequencePage() {
       stabilityIndex.push({ position: i + 1, rnaseH: Math.min(1, Math.max(0, rnaseH)), duplexStability: Math.min(1, Math.max(0, duplex)), singleStrandStability: Math.min(1, Math.max(0, ss)) });
     }
 
+    const grnaCandidates = modality === "sgrna" ? generateGrnaCandidates(seq) : [];
+
     return {
       sequence: seq,
-      sequenceType: length > 0 ? (hasT ? "dna" : "rna") : "unknown",
+      sequenceType: seqType,
       length,
       gcContent: gc,
       offTarget: {
@@ -683,6 +884,7 @@ export default function UploadSequencePage() {
       riskScores,
       physicochemical,
       stabilityIndex,
+      grnaCandidates,
     };
   }
 
@@ -968,10 +1170,10 @@ export default function UploadSequencePage() {
                   <div className="rounded-lg border border-slate-100 bg-slate-50 p-3 text-center">
                     <p className="text-[11px] text-slate-400 uppercase tracking-wider">GC Content</p>
                     <p className="text-[18px] font-bold text-slate-800 mt-0.5">
-                      {validation.gcContent}%
+                      {validation.gcContent != null ? `${validation.gcContent}%` : "N/A"}
                     </p>
                     <p className="text-[10px] text-slate-400">
-                      {validation.gcContent >= 40 && validation.gcContent <= 60 ? "optimal" : "suboptimal"}
+                      {validation.gcContent != null && validation.gcContent >= 40 && validation.gcContent <= 60 ? "optimal" : validation.gcContent != null ? "suboptimal" : "—"}
                     </p>
                   </div>
                   <div className="rounded-lg border border-slate-100 bg-slate-50 p-3 text-center">
@@ -1219,9 +1421,12 @@ export default function UploadSequencePage() {
                 {/* ===== OVERVIEW TAB ===== */}
                 {activeTab === "overview" && (
                   <div className="p-5 space-y-5">
-                    {/* Sequence Track Viewer */}
-                    <div>
-                      <p className="text-[14px] font-semibold text-slate-800 mb-3">Sequence Map</p>
+                     {/* Sequence Map */}
+                     <div>
+                       <p className="text-[14px] font-semibold text-slate-800 mb-3 flex items-center gap-1.5">
+                         Sequence Map
+                         <InfoTooltip content="Genomic coordinates of predicted features including ORFs, immune motifs, restriction sites, miRNA targets, and PAM sites for CRISPR." />
+                       </p>
                       <SequenceTrackViewer
                         seqLength={analysis.length}
                         orfs={analysis.orfs}
@@ -1229,29 +1434,71 @@ export default function UploadSequencePage() {
                         palindromePositions={analysis.secondaryStructure.palindromePositions ?? []}
                         restrictionSites={analysis.restrictionSites}
                         mirnaTargets={analysis.mirnaTargets}
+                        grnaCandidates={selectedModality === "sgrna" ? analysis.grnaCandidates : []}
                       />
                     </div>
 
+                     {/* gRNA Candidates — CRISPRscan-style track + table */}
+                    {selectedModality === "sgrna" && analysis.grnaCandidates && analysis.grnaCandidates.length > 0 && (
+                      <div className="space-y-5">
+                        <Card className="p-5">
+                          <p className="text-[14px] font-semibold text-slate-800 mb-1 flex items-center gap-1.5">
+                            CRISPRscan gRNA Score Track
+                            <InfoTooltip content="Distribution of gRNA on-target scores (0–100) along the sequence for NGG-PAM adjacent 20nt spacers." />
+                          </p>
+                          <p className="text-[11px] text-slate-400 mb-3">Score distribution across the sequence for NGG-PAM adjacent spacers</p>
+                          <CrisprScanTrack candidates={analysis.grnaCandidates} seqLength={analysis.length} />
+                        </Card>
+
+                        <Card className="p-5">
+                          <p className="text-[14px] font-semibold text-slate-800 mb-3 flex items-center gap-1.5">
+                            gRNA Candidate Table
+                            <InfoTooltip content="Sortable table of guide RNAs with specificity (green >50, yellow >30, red), efficiency scores, and off-target mismatch distribution." />
+                          </p>
+                          <CrisprCandidateTable candidates={analysis.grnaCandidates} />
+                        </Card>
+
+                        {/* CRISPR Primer Design Card */}
+                        <Card className="p-5">
+                          <CrisprPrimerDesignCard
+                            candidates={analysis.grnaCandidates ?? []}
+                            sequence={analysis.sequence ?? ""}
+                          />
+                        </Card>
+                      </div>
+                    )}
+
                     <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
                       {/* GC Content Chart */}
-                      <Card className="p-5 lg:col-span-2">
-                        <p className="text-[14px] font-semibold text-slate-800 mb-1">GC Content Distribution</p>
+                       <Card className="p-5 lg:col-span-2">
+                         <p className="text-[14px] font-semibold text-slate-800 mb-1 flex items-center gap-1.5">
+                           GC Content Distribution
+                           <InfoTooltip content="10 nt sliding window GC content. Green band = optimal 40–60% range for oligonucleotide stability." />
+                         </p>
                         <p className="text-[11px] text-slate-400 mb-3">10 nt sliding window — green band marks the 40–60% optimal range</p>
                         <GcContentChart data={analysis.gcCurve} seqLength={analysis.length} />
                       </Card>
 
-                      {/* Nucleotide Composition */}
-                      <Card className="p-5">
-                        <p className="text-[14px] font-semibold text-slate-800 mb-3">Nucleotide Composition</p>
-                        <NucleotideCompositionChart composition={analysis.composition} />
-                      </Card>
+                       {/* Nucleotide Composition */}
+                       {analysis.sequenceType !== "protein" && (
+                         <Card className="p-5">
+                           <p className="text-[14px] font-semibold text-slate-800 mb-3 flex items-center gap-1.5">
+                             Nucleotide Composition
+                             <InfoTooltip content="Absolute counts of A, C, G, T/U bases in the input sequence." />
+                           </p>
+                          <NucleotideCompositionChart composition={analysis.composition} />
+                        </Card>
+                      )}
 
-                      {/* Specificity Heuristic */}
-                      <Card className="p-5">
-                        <div className="flex items-center gap-2 mb-3">
-                          <Shield className="h-4 w-4 text-slate-500" />
-                          <p className="text-[14px] font-semibold text-slate-800">Specificity Heuristic</p>
-                        </div>
+                       {/* Specificity Heuristic */}
+                       <Card className="p-5">
+                         <div className="flex items-center gap-2 mb-3">
+                           <Shield className="h-4 w-4 text-slate-500" />
+                           <p className="text-[14px] font-semibold text-slate-800 flex items-center gap-1.5">
+                             Specificity Heuristic
+                             <InfoTooltip content="Heuristic estimate of off-target risk based on sequence length and internal repetitiveness. Not a genome-wide alignment." />
+                           </p>
+                         </div>
                         <div className="flex items-center gap-3 mb-2">
                           <span
                             className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${
@@ -1284,12 +1531,15 @@ export default function UploadSequencePage() {
                         </div>
                       </Card>
 
-                      {/* Secondary Structure */}
-                      <Card className="p-5">
-                        <div className="flex items-center gap-2 mb-3">
-                          <Thermometer className="h-4 w-4 text-slate-500" />
-                          <p className="text-[14px] font-semibold text-slate-800">Secondary Structure</p>
-                        </div>
+                       {/* Secondary Structure */}
+                       <Card className="p-5">
+                         <div className="flex items-center gap-2 mb-3">
+                           <Thermometer className="h-4 w-4 text-slate-500" />
+                           <p className="text-[14px] font-semibold text-slate-800 flex items-center gap-1.5">
+                             Secondary Structure
+                             <InfoTooltip content="Estimated minimum free energy (MFE) and palindrome density. Hairpin risk rises with more palindromic regions." />
+                           </p>
+                         </div>
                         <div className="grid grid-cols-2 gap-3 mb-3">
                           <div className="rounded-lg bg-slate-50 p-3 text-center">
                             <p className="text-[10px] uppercase text-slate-400">Est. ΔG</p>
@@ -1320,11 +1570,14 @@ export default function UploadSequencePage() {
                         </div>
                       </Card>
 
-                      {/* Immune Screen */}
-                      <Card className="p-5">
-                        <div className="flex items-center gap-2 mb-3">
-                          <Syringe className="h-4 w-4 text-slate-500" />
-                          <p className="text-[14px] font-semibold text-slate-800">Immune Sensing Patterns</p>
+                       {/* Immune Screen */}
+                       <Card className="p-5">
+                         <div className="flex items-center gap-2 mb-3">
+                           <Syringe className="h-4 w-4 text-slate-500" />
+                           <p className="text-[14px] font-semibold text-slate-800 flex items-center gap-1.5">
+                             Immune Sensing Patterns
+                             <InfoTooltip content="Sequence motifs associated with innate immune activation (TLR7/8, TLR9). A negative result does not rule out immunogenicity." />
+                           </p>
                         </div>
                         {analysis.immuneScreen.length === 0 ? (
                           <div className="flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2.5">
@@ -1348,12 +1601,15 @@ export default function UploadSequencePage() {
                         </div>
                       </Card>
 
-                      {/* Secondary Structure Summary */}
-                      <Card className="p-5">
-                        <div className="flex items-center gap-2 mb-3">
-                          <Thermometer className="h-4 w-4 text-slate-500" />
-                          <p className="text-[14px] font-semibold text-slate-800">Secondary Structure Summary</p>
-                        </div>
+                       {/* Secondary Structure Summary */}
+                       <Card className="p-5">
+                         <div className="flex items-center gap-2 mb-3">
+                           <Thermometer className="h-4 w-4 text-slate-500" />
+                           <p className="text-[14px] font-semibold text-slate-800 flex items-center gap-1.5">
+                             Secondary Structure Summary
+                             <InfoTooltip content="Summary of estimated thermodynamic stability metrics." />
+                           </p>
+                         </div>
                         <div className="grid grid-cols-3 gap-3 mb-3">
                           <div className="rounded-lg bg-slate-50 p-3 text-center">
                             <p className="text-[10px] uppercase text-slate-400">ΔG</p>
@@ -1388,51 +1644,54 @@ export default function UploadSequencePage() {
                             <span>ΔG free energy: {analysis.thermoProfile.freeEnergy37} kcal/mol</span>
                           </div>
                         )}
-                      </Card>
+                       </Card>
 
-                      {/* Sequence Risk Summary */}
-                      <Card className="p-5">
-                        <div className="flex items-center gap-2 mb-3">
-                          <Shield className="h-4 w-4 text-slate-500" />
-                          <p className="text-[14px] font-semibold text-slate-800">Sequence Risk Summary</p>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="rounded-lg bg-slate-50 p-2.5">
-                            <p className="text-[9px] uppercase text-slate-400">Specificity</p>
-                            <div className="flex items-center gap-1.5 mt-1">
-                              <div className="h-1.5 flex-1 rounded-full bg-slate-200">
-                                <div className="h-full rounded-full bg-blue-400" style={{ width: `${analysis.riskScores?.specificity ?? 50}%` }} />
-                              </div>
-                              <span className="text-[10px] font-bold text-slate-700">{analysis.riskScores?.specificity ?? "—"}</span>
-                            </div>
-                          </div>
-                          <div className="rounded-lg bg-slate-50 p-2.5">
-                            <p className="text-[9px] uppercase text-slate-400">Stability</p>
-                            <div className="flex items-center gap-1.5 mt-1">
-                              <div className="h-1.5 flex-1 rounded-full bg-slate-200">
-                                <div className="h-full rounded-full bg-emerald-400" style={{ width: `${analysis.riskScores?.stability ?? 50}%` }} />
-                              </div>
-                              <span className="text-[10px] font-bold text-slate-700">{analysis.riskScores?.stability ?? "—"}</span>
-                            </div>
-                          </div>
-                          <div className="rounded-lg bg-slate-50 p-2.5">
-                            <p className="text-[9px] uppercase text-slate-400">Immunogenicity</p>
-                            <div className="flex items-center gap-1.5 mt-1">
-                              <div className="h-1.5 flex-1 rounded-full bg-slate-200">
-                                <div className="h-full rounded-full bg-amber-400" style={{ width: `${analysis.riskScores?.immunogenicity ?? 50}%` }} />
-                              </div>
-                              <span className="text-[10px] font-bold text-slate-700">{analysis.riskScores?.immunogenicity ?? "—"}</span>
-                            </div>
-                          </div>
-                          <div className="rounded-lg bg-slate-50 p-2.5">
-                            <p className="text-[9px] uppercase text-slate-400">Delivery</p>
-                            <div className="flex items-center gap-1.5 mt-1">
-                              <div className="h-1.5 flex-1 rounded-full bg-slate-200">
-                                <div className="h-full rounded-full bg-purple-400" style={{ width: `${analysis.riskScores?.delivery ?? 50}%` }} />
-                              </div>
-                              <span className="text-[10px] font-bold text-slate-700">{analysis.riskScores?.delivery ?? "—"}</span>
-                            </div>
-                          </div>
+                       {/* Sequence Risk Summary */}
+                       <Card className="p-5">
+                         <div className="flex items-center gap-2 mb-3">
+                           <Shield className="h-4 w-4 text-slate-500" />
+                           <p className="text-[14px] font-semibold text-slate-800 flex items-center gap-1.5">
+                             Sequence Risk Summary
+                             <InfoTooltip content="Composite risk scores across specificity, stability, immunogenicity, delivery, and toxicity dimensions." />
+                           </p>
+                         </div>
+                         <div className="grid grid-cols-2 gap-2">
+                           <div className="rounded-lg bg-slate-50 p-2.5">
+                             <p className="text-[9px] uppercase text-slate-400">Specificity</p>
+                             <div className="flex items-center gap-1.5 mt-1">
+                               <div className="h-1.5 flex-1 rounded-full bg-slate-200">
+                                 <div className="h-full rounded-full bg-blue-400" style={{ width: `${analysis.riskScores?.specificity ?? 50}%` }} />
+                               </div>
+                               <span className="text-[10px] font-bold text-slate-700">{analysis.riskScores?.specificity ?? "—"}</span>
+                             </div>
+                           </div>
+                           <div className="rounded-lg bg-slate-50 p-2.5">
+                             <p className="text-[9px] uppercase text-slate-400">Stability</p>
+                             <div className="flex items-center gap-1.5 mt-1">
+                               <div className="h-1.5 flex-1 rounded-full bg-slate-200">
+                                 <div className="h-full rounded-full bg-emerald-400" style={{ width: `${analysis.riskScores?.stability ?? 50}%` }} />
+                               </div>
+                               <span className="text-[10px] font-bold text-slate-700">{analysis.riskScores?.stability ?? "—"}</span>
+                             </div>
+                           </div>
+                           <div className="rounded-lg bg-slate-50 p-2.5">
+                             <p className="text-[9px] uppercase text-slate-400">Immunogenicity</p>
+                             <div className="flex items-center gap-1.5 mt-1">
+                               <div className="h-1.5 flex-1 rounded-full bg-slate-200">
+                                 <div className="h-full rounded-full bg-amber-400" style={{ width: `${analysis.riskScores?.immunogenicity ?? 50}%` }} />
+                               </div>
+                               <span className="text-[10px] font-bold text-slate-700">{analysis.riskScores?.immunogenicity ?? "—"}</span>
+                             </div>
+                           </div>
+                           <div className="rounded-lg bg-slate-50 p-2.5">
+                             <p className="text-[9px] uppercase text-slate-400">Delivery</p>
+                             <div className="flex items-center gap-1.5 mt-1">
+                               <div className="h-1.5 flex-1 rounded-full bg-slate-200">
+                                 <div className="h-full rounded-full bg-purple-400" style={{ width: `${analysis.riskScores?.delivery ?? 50}%` }} />
+                               </div>
+                               <span className="text-[10px] font-bold text-slate-700">{analysis.riskScores?.delivery ?? "—"}</span>
+                             </div>
+                           </div>
                         </div>
                         {analysis.riskScores && (
                           <div className="mt-3 flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
@@ -1450,11 +1709,14 @@ export default function UploadSequencePage() {
                         </div>
                       </Card>
 
-                      {/* Modification Recommendations Summary */}
-                      <Card className="p-5">
-                        <div className="flex items-center gap-2 mb-3">
-                          <Star className="h-4 w-4 text-slate-500" />
-                          <p className="text-[14px] font-semibold text-slate-800">Modification Recommendations</p>
+                       {/* Modification Recommendations Summary */}
+                       <Card className="p-5">
+                         <div className="flex items-center gap-2 mb-3">
+                           <Star className="h-4 w-4 text-slate-500" />
+                           <p className="text-[14px] font-semibold text-slate-800 flex items-center gap-1.5">
+                             Modification Recommendations
+                             <InfoTooltip content="Per-position modification suggestions (LNA, 2′-MOE, PS, etc.) based on local GC content and modality." />
+                           </p>
                         </div>
                         {analysis.modificationLandscape && analysis.modificationLandscape.length > 0 ? (
                           <div className="space-y-2">
@@ -1485,15 +1747,16 @@ export default function UploadSequencePage() {
                         </div>
                       </Card>
 
-                      {/* Modality Recommendations */}
-                      <Card className="p-5">
-                        <div className="flex items-center gap-2 mb-3">
-                          <BarChart3 className="h-4 w-4 text-slate-500" />
-                          <p className="text-[14px] font-semibold text-slate-800">
-                            {MODALITIES.find((m) => m.id === selectedModality)?.name ?? "Modality"} Recommendations
-                          </p>
-                        </div>
-                        <div className="space-y-2">
+                       {/* Modality Recommendations */}
+                       <Card className="p-5">
+                         <div className="flex items-center gap-2 mb-3">
+                           <BarChart3 className="h-4 w-4 text-slate-500" />
+                            <p className="text-[14px] font-semibold text-slate-800 flex items-center gap-1.5">
+                              {MODALITIES.find((m) => m.id === selectedModality)?.name ?? "Modality"} Recommendations
+                              <InfoTooltip content="Modality-specific design recommendations for chemistry, length, and target region." />
+                            </p>
+                          </div>
+                          <div className="space-y-2">
                           {(analysis.modality.recommendations ?? []).map((rec, i) => (
                             <div key={i} className="flex items-start gap-2 rounded-lg bg-slate-50 px-3 py-2">
                               <Star className="h-3 w-3 mt-0.5 shrink-0 text-brand" />
@@ -1549,19 +1812,22 @@ export default function UploadSequencePage() {
                     <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
                       {/* Stacking Energy Profile */}
                       {analysis.energyProfile && analysis.energyProfile.length > 0 && (
-                        <Card className="p-5">
-                          <p className="text-[14px] font-semibold text-slate-800 mb-1">Base-Stacking Energy Profile</p>
-                          <p className="text-[11px] text-slate-400 mb-3">10 nt sliding window average nearest-neighbor ΔG (kcal/mol)</p>
-                          <StackingEnergyChart data={analysis.energyProfile} seqLength={analysis.length} />
-                        </Card>
-                      )}
+                           <Card className="p-5">
+                           <p className="text-[14px] font-semibold text-slate-800 mb-1 flex items-center gap-1.5">
+                             Base-Stacking Energy Profile
+                             <InfoTooltip content="Nearest-neighbor stacking ΔG (kcal/mol) averaged over a 10 nt sliding window." />
+                           </p>
+                           <p className="text-[11px] text-slate-400 mb-3">10 nt sliding window average nearest-neighbor ΔG (kcal/mol)</p>
+                           <StackingEnergyChart data={analysis.energyProfile} seqLength={analysis.length} />
+                         </Card>
+                       )}
 
-                      {/* Sequence Complexity */}
-                      {analysis.complexity && (
-                        <Card className="p-5">
-                          <SequenceComplexityCard complexity={analysis.complexity} />
-                        </Card>
-                      )}
+                       {/* Sequence Complexity */}
+                       {analysis.complexity && (
+                         <Card className="p-5">
+                           <SequenceComplexityCard complexity={analysis.complexity} />
+                         </Card>
+                       )}
                     </div>
 
                     {/* Codon Usage (relevant for mRNA, show for all) */}
@@ -1788,46 +2054,53 @@ export default function UploadSequencePage() {
                       hairpins={analysis.hairpins}
                     />
 
-                    <AnnotatedSequenceViewer
-                      sequence={analysis.sequence}
-                      features={[
-                        ...(analysis.restrictionSites ?? []).map((s) => ({
-                          start: s.cutPosition,
-                          end: s.cutPosition + s.recognitionSite.length - 1,
-                          label: s.enzyme,
-                          type: "restriction",
-                          color: "#ec4899",
-                        })),
-                        ...(analysis.mirnaTargets ?? []).map((t) => ({
-                          start: t.start,
-                          end: t.end,
-                          label: t.mirnaId,
-                          type: "mirna",
-                          color: "#8b5cf6",
-                        })),
-                        ...(analysis.immuneScreen ?? []).slice(0, 10).map((m) => ({
-                          start: m.start,
-                          end: m.end,
-                          label: m.motif,
-                          type: "immune",
-                          color: "#f59e0b",
-                        })),
-                        ...(analysis.orfs ?? []).slice(0, 5).map((o) => ({
-                          start: o.start,
-                          end: o.end,
-                          label: `ORF ${o.strand} f${o.frame}`,
-                          type: "orfs",
-                          color: "#3b82f6",
-                        })),
-                        ...(analysis.hairpins ?? []).map((h) => ({
-                          start: h.start,
-                          end: h.end,
-                          label: h.type.replace("_", " "),
-                          type: "structure",
-                          color: "#10b981",
-                        })),
-                      ]}
-                    />
+                        <AnnotatedSequenceViewer
+                          sequence={analysis.sequence}
+                          features={[
+                            ...(analysis.restrictionSites ?? []).map((s) => ({
+                              start: s.cutPosition,
+                              end: s.cutPosition + s.recognitionSite.length - 1,
+                              label: s.enzyme,
+                              type: "restriction",
+                              color: "#ec4899",
+                            })),
+                            ...(analysis.mirnaTargets ?? []).map((t) => ({
+                              start: t.start,
+                              end: t.end,
+                              label: t.mirnaId,
+                              type: "mirna",
+                              color: "#8b5cf6",
+                            })),
+                            ...(analysis.immuneScreen ?? []).slice(0, 10).map((m) => ({
+                              start: m.start,
+                              end: m.end,
+                              label: m.motif,
+                              type: "immune",
+                              color: "#f59e0b",
+                            })),
+                            ...(analysis.orfs ?? []).slice(0, 5).map((o) => ({
+                              start: o.start,
+                              end: o.end,
+                              label: `ORF ${o.strand} f${o.frame}`,
+                              type: "orfs",
+                              color: "#3b82f6",
+                            })),
+                            ...(analysis.hairpins ?? []).map((h) => ({
+                              start: h.start,
+                              end: h.end,
+                              label: h.type.replace("_", " "),
+                              type: "structure",
+                              color: "#10b981",
+                            })),
+                            ...(analysis.grnaCandidates ?? []).map((g) => ({
+                              start: g.position,
+                              end: g.position + 22,
+                              label: `PAM ${g.pam}`,
+                              type: "pam",
+                              color: "#f97316",
+                            })),
+                          ]}
+                        />
 
                     {/* Modification Scores */}
                     {analysis.modificationScores && (
@@ -1876,24 +2149,31 @@ export default function UploadSequencePage() {
                     )}
 
                     <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-                      {/* Stacking Energy Profile */}
-                      {analysis.energyProfile && analysis.energyProfile.length > 0 && (
-                        <Card className="p-5">
-                          <p className="text-[14px] font-semibold text-slate-800 mb-1">Base-Stacking Energy Profile</p>
-                          <p className="text-[11px] text-slate-400 mb-3">10 nt sliding window average nearest-neighbor ΔG (kcal/mol)</p>
-                          <StackingEnergyChart data={analysis.energyProfile} seqLength={analysis.length} />
-                        </Card>
-                      )}
+                       {/* Stacking Energy Profile (Structure tab) */}
+                       {analysis.energyProfile && analysis.energyProfile.length > 0 && (
+                         <Card className="p-5">
+                           <p className="text-[14px] font-semibold text-slate-800 mb-1 flex items-center gap-1.5">
+                             Base-Stacking Energy Profile
+                             <InfoTooltip content="Nearest-neighbor stacking ΔG (kcal/mol) averaged over a 10 nt sliding window." />
+                           </p>
+                           <p className="text-[11px] text-slate-400 mb-3">10 nt sliding window average nearest-neighbor ΔG (kcal/mol)</p>
+                           <StackingEnergyChart data={analysis.energyProfile} seqLength={analysis.length} />
+                         </Card>
+                       )}
 
-                      {/* Stability Index */}
-                      {analysis.stabilityIndex && analysis.stabilityIndex.length > 0 && (
-                        <Card className="p-5">
-                          <StabilityIndexChart
-                            data={analysis.stabilityIndex}
-                            seqLength={analysis.length}
-                          />
-                        </Card>
-                      )}
+                       {/* Stability Index */}
+                       {analysis.stabilityIndex && analysis.stabilityIndex.length > 0 && (
+                         <Card className="p-5">
+                           <p className="text-[14px] font-semibold text-slate-800 mb-1 flex items-center gap-1.5">
+                             Stability Index
+                             <InfoTooltip content="Per-window RNase H cleavage potential and duplex/single-strand stability metrics." />
+                           </p>
+                           <StabilityIndexChart
+                             data={analysis.stabilityIndex}
+                             seqLength={analysis.length}
+                           />
+                         </Card>
+                       )}
                     </div>
 
                     {/* Sequence Complexity */}

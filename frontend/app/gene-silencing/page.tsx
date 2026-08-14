@@ -432,17 +432,19 @@ export default function GeneSilencingPage() {
             </button>
           </Card>
 
-          {/* Step 4: Gene Silencing — ASO Design */}
-          <Card>
-            <SectionHeader step="4" title="Gene Silencing — ASO Design" />
-              <p className="px-6 pb-3 text-[12.5px] text-slate-500">
-              {mechanism?.id === "A2"
-                ? "Translation-blocking candidates are restricted to the 5′ translation-initiation region."
-                : mechanism?.id === "A21"
-                  ? "RNA interference (A21) requires a double-stranded siRNA duplex, which the single-stranded ASO designer does not support."
-                  : "Design antisense oligonucleotides targeting the confirmed gene. Select an exon, choose chemistry and modifications, then generate candidates."}
-            </p>
-          </Card>
+           {/* Step 4: ASO Design */}
+           <Card>
+             <SectionHeader step="4" title={therapeuticGoal === "TG04" ? "RNA Processing Modulation — ASO Design" : "Gene Silencing — ASO Design"} />
+               <p className="px-6 pb-3 text-[12.5px] text-slate-500">
+               {therapeuticGoal === "TG04"
+                 ? "Design antisense oligonucleotides for RNA processing modulation. Select an exon, choose chemistry and modifications, then generate candidates."
+                 : mechanism?.id === "A2"
+                   ? "Translation-blocking candidates are restricted to the 5′ translation-initiation region."
+                   : mechanism?.id === "A21"
+                     ? "RNA interference (A21) requires a double-stranded siRNA duplex, which the single-stranded ASO designer does not support."
+                     : "Design antisense oligonucleotides targeting the confirmed gene. Select an exon, choose chemistry and modifications, then generate candidates."}
+             </p>
+           </Card>
 
           {/* Step 1: Target Analysis */}
           {targetLoading ? (

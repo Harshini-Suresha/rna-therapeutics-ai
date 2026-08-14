@@ -439,6 +439,7 @@ def get_aso_analysis(ensembl_gene_id: str, taxon_id: int) -> dict:
         "polygTracts": None,
         "transcriptSpecificity": None,
         "codonUsageBias": None,
+        "cdsSequence": None,
     }
 
     cds_seq = None
@@ -499,6 +500,7 @@ def get_aso_analysis(ensembl_gene_id: str, taxon_id: int) -> dict:
                 result["transcriptSpecificity"] = "1 isoform (High)"
 
     if cds_seq:
+        result["cdsSequence"] = cds_seq
         _compute_aso_metrics_from_sequence(cds_seq, result)
 
     # Preclinical Conservation: check orthologs in model organisms (human gene only).

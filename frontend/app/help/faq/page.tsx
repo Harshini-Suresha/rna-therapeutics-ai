@@ -12,15 +12,15 @@ const FAQS = [
   },
   {
     q: "Why do some fields say \"Not yet connected\" instead of a value?",
-    a: "Most data sources are now live (KEGG, Reactome, GO, Pathway Commons, GTEx, STRING, ADMET). If a card still shows \"Not yet connected\", the upstream API timed out or returned no data for this gene — it's not a permanent disconnect, just a transient fetch failure. Try re-running the target lookup.",
+    a: "Most data sources are now live (KEGG, Reactome, GO, Pathway Commons, GTEx, STRING). If a card still shows \"Not yet connected\", the upstream API timed out or returned no data for this gene — it's not a permanent disconnect, just a transient fetch failure. Try re-running the target lookup.",
   },
   {
     q: "Why doesn't Mechanism Selection cover all 26 mechanisms?",
     a: "All 26 mechanisms exist in the rulebook data, but the interactive scoring/ranking flow currently only covers Gene Silencing (TG01, 5 mechanisms) and RNA Processing Modulation (TG04, 5 mechanisms). The rest of the rulebook is present but not yet wired into this page.",
   },
   {
-    q: "Why did A21 (siRNA) show a warning instead of letting me proceed to Candidate Design?",
-    a: "Candidate Design currently only supports single-stranded ASO chemistries (gapmer, PMO, LNA-gapmer, 2'-OMe). siRNA is a double-stranded RNA duplex — a different modality — so there's no valid chemistry mapping for it yet, and the platform blocks that path rather than silently generating an incorrect result.",
+    q: "Why doesn't A21 (siRNA) appear in Mechanism Selection?",
+    a: "Candidate Design currently only supports single-stranded ASO chemistries (gapmer, PMO, LNA-gapmer, 2'-OMe). siRNA is a double-stranded RNA duplex — a different modality — so A21 is excluded from the mechanism ranking entirely rather than shown as a non-selectable option.",
   },
   {
     q: "Is the \"off-target risk\" or \"specificity\" score a real off-target check?",

@@ -6,6 +6,7 @@ import { AlertCircle, ArrowLeft, Loader2, Dna, ChevronDown, Beaker, Download, Fl
 import Sidebar from "@/components/Sidebar";
 import Topbar from "@/components/Topbar";
 import MechanismCard from "@/components/MechanismCard";
+import ProteinReplacementDashboard from "@/components/ProteinReplacementDashboard";
 import { Card, SectionHeader, FieldLabel, InfoField, Pill } from "@/components/ui";
 import { GeneTargetObject } from "@/types/gene";
 import {
@@ -28,6 +29,9 @@ import {
   rankIsoformEngineeringMechanisms,
   getGoalLabel,
 } from "@/lib/mechanismApi";
+import { fetchRnaEditingClinVarVariants } from "@/lib/rnaEditingApi";
+import { ClinVarVariant } from "@/types/geneSilencing";
+import RnaEditingVariantSelector from "@/components/RnaEditingVariantSelector";
 import { saveReport } from "@/lib/auth";
 import { MechanismFeature } from "@/types/mechanism";
 import { parseHgvsC } from "@/lib/hgvsParser";
@@ -111,7 +115,7 @@ const DEFECT_TO_MECHANISMS: Record<string, string[]> = {
   nat_mediated_repression: ["A4"],
   uorf_mediated_repression: ["A5"],
   mirna_mediated_repression: ["A6"],
-  deficient_mirna: ["A22"],
+  rbp_mediated_repression: ["A28"],
   epigenetic_promoter_silencing: ["A23"],
 };
 
@@ -121,8 +125,8 @@ const MECHANISM_TO_FEATURE: Record<string, string> = {
   A4: "NAT",
   A5: "uORF",
   A6: "miRNA_block",
-  A22: "miRNA_replacement",
   A23: "saRNA",
+  A28: "RBP_block",
 };
 
 interface MechanismCard {
@@ -138,7 +142,7 @@ const MECHANISM_CARDS: MechanismCard[] = [
   { key: "TANGO", label: "Poison Exon (TANGO)", mechanism: "A3", description: "Prevents poison exon inclusion to restore functional mRNA" },
   { key: "NAT", label: "NAT / lncRNA Silencing", mechanism: "A4", description: "Degrades antisense lncRNAs that repress the gene" },
   { key: "miRNA_block", label: "miRNA Site Blocking", mechanism: "A6", description: "Blocks miRNA binding sites on the target mRNA" },
-  { key: "miRNA_replacement", label: "miRNA Replacement", mechanism: "A22", description: "Replaces a deficient regulatory miRNA" },
+  { key: "RBP_block", label: "RBP Site Blocking", mechanism: "A28", description: "Blocks RNA-binding protein sites to relieve translational repression" },
 ];
 
 function MechanismAvailabilityCards({
@@ -276,6 +280,12 @@ export default function MechanismSelectionPage() {
   const [splicingDirection, setSplicingDirection] = useState("");
   const [intronSite, setIntronSite] = useState("");
   const [abdLength, setAbdLength] = useState<number>(150);
+
+  const [clinvarVariants, setClinvarVariants] = useState<ClinVarVariant[]>([]);
+  const [clinvarLoading, setClinvarLoading] = useState(false);
+  const [clinvarError, setClinvarError] = useState<string | null>(null);
+  const [useCustomVariant, setUseCustomVariant] = useState(false);
+  const [selectedClinvarVariant, setSelectedClinvarVariant] = useState<ClinVarVariant | null>(null);
 
   // TG05 fields
   const [molecularDefect, setMolecularDefect] = useState("");
@@ -442,6 +452,25 @@ export default function MechanismSelectionPage() {
       .catch((e) => setPrOptionsError(e instanceof Error ? e.message : "Failed to load options."));
   }, [selectedGoal]);
 
+  // Fetch ClinVar variants for TG03 RNA editing
+  useEffect(() => {
+    if (selectedGoal !== "TG03" || !gene?.geneId) {
+      setClinvarVariants([]);
+      setClinvarLoading(false);
+      setClinvarError(null);
+      return;
+    }
+    setClinvarLoading(true);
+    setClinvarError(null);
+    fetchRnaEditingClinVarVariants(gene.geneId)
+      .then(setClinvarVariants)
+      .catch((e) => {
+        setClinvarError(e instanceof Error ? e.message : "Failed to load ClinVar variants.");
+        setClinvarVariants([]);
+      })
+      .finally(() => setClinvarLoading(false));
+  }, [selectedGoal, gene?.geneId]);
+
   // Fetch isoform engineering design options when TG07 is selected
   useEffect(() => {
     if (selectedGoal !== "TG07") {
@@ -453,6 +482,13 @@ export default function MechanismSelectionPage() {
       .then(setIeOptions)
       .catch((e) => setIeOptionsError(e instanceof Error ? e.message : "Failed to load options."));
   }, [selectedGoal]);
+
+  // Pre-fill TG08 target protein replacement symbol from confirmed target when empty
+  useEffect(() => {
+    if (selectedGoal === "TG08" && gene?.geneSymbol && !targetSymbol) {
+      setTargetSymbol(gene.geneSymbol);
+    }
+  }, [selectedGoal, gene, targetSymbol]);
 
   // Pre-fill TG07 target gene symbol from confirmed target when empty
   useEffect(() => {
@@ -498,6 +534,11 @@ export default function MechanismSelectionPage() {
     setSplicingDirection("");
     setIntronSite("");
     setAbdLength(150);
+    setClinvarVariants([]);
+    setClinvarLoading(false);
+    setClinvarError(null);
+    setUseCustomVariant(false);
+    setSelectedClinvarVariant(null);
     setMolecularDefect("");
     setNeutralizationMode("");
     setRepeatUnit("");
@@ -1166,22 +1207,7 @@ export default function MechanismSelectionPage() {
                       </select>
                     </div>
 
-                    <div>
-                      <FieldLabel hint="The exact variant to correct, in HGVS notation">
-                        Target Variant (HGVS) <span className="text-red-500">*</span>
-                      </FieldLabel>
-                      <input
-                        value={variantHgvs}
-                        onChange={(e) => {
-                          setVariantHgvs(e.target.value);
-                          clearRanking();
-                        }}
-                        placeholder="e.g. c.82G>A"
-                        className="w-full rounded-lg border border-slate-300 bg-white py-2.5 px-3 text-[13.5px] text-slate-700 placeholder:text-slate-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
-                      />
-                    </div>
-
-                    <div>
+                    <div className="md:col-span-2">
                       <FieldLabel hint="General delivery/tissue context — a soft tie-breaker and used to gauge endogenous enzyme expression">
                         Delivery / Tissue Context
                       </FieldLabel>
@@ -1201,6 +1227,41 @@ export default function MechanismSelectionPage() {
                         ))}
                       </select>
                     </div>
+                  </div>
+
+                  <div>
+                    <FieldLabel hint="The exact variant to correct, in HGVS notation">
+                      Target Variant (HGVS) <span className="text-red-500">*</span>
+                    </FieldLabel>
+                    {clinvarLoading && (
+                      <p className="mt-1.5 text-[11.5px] text-slate-400">Loading ClinVar variants…</p>
+                    )}
+                    {clinvarError && (
+                      <p className="mt-1.5 text-[11.5px] text-red-600">{clinvarError}</p>
+                    )}
+                    <RnaEditingVariantSelector
+                      variants={clinvarVariants}
+                      editType={editType}
+                      selectedVariant={selectedClinvarVariant}
+                      customVariant={variantHgvs}
+                      useCustom={useCustomVariant}
+                      onSelectVariant={(v) => {
+                        setSelectedClinvarVariant(v);
+                        setVariantHgvs(v?.hgvsc || "");
+                        clearRanking();
+                      }}
+                      onCustomVariantChange={(v) => {
+                        setVariantHgvs(v);
+                        clearRanking();
+                      }}
+                      onToggleCustom={(useCustom) => {
+                        setUseCustomVariant(useCustom);
+                        if (!useCustom) {
+                          setSelectedClinvarVariant(null);
+                        }
+                        clearRanking();
+                      }}
+                    />
                   </div>
 
                   {editType !== "trans_splicing" && (
@@ -1311,15 +1372,21 @@ export default function MechanismSelectionPage() {
                         <FieldLabel hint="The intron junction adjacent to the mutated region (e.g. Intron 12 Acceptor Junction)">
                           Intron Acceptor / Donor Site
                         </FieldLabel>
-                        <input
+                        <select
                           value={intronSite}
                           onChange={(e) => {
                             setIntronSite(e.target.value);
                             clearRanking();
                           }}
-                          placeholder="e.g. Intron 12 Acceptor Junction"
-                          className="w-full rounded-lg border border-slate-300 bg-white py-2.5 px-3 text-[13.5px] text-slate-700 placeholder:text-slate-400 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
-                        />
+                          className="w-full rounded-lg border border-slate-300 bg-white py-2.5 px-3 text-[13.5px] text-slate-700 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+                        >
+                          <option value="">Not specified</option>
+                          {options?.rnaEditing.intronSites.map((o) => (
+                            <option key={o.id} value={o.id}>
+                              {o.label}
+                            </option>
+                          ))}
+                        </select>
                       </div>
 
                       <div>
@@ -2258,11 +2325,19 @@ export default function MechanismSelectionPage() {
                       </div>
                     </Card>
 
+                    {/* Candidate Analysis & Visualizations */}
+                    <Card>
+                      <SectionHeader step="3a" title="Candidate Analysis & Visualizations" />
+                      <div className="px-6 pb-5">
+                        <ProteinReplacementDashboard candidates={prResults.candidates} />
+                      </div>
+                    </Card>
+
                     {/* Inspection Drawer */}
                     {selectedPrCandidate && (
                       <Card className="overflow-hidden">
                         <div className="flex items-center justify-between px-6 pt-4 pb-3 border-b border-slate-100">
-                          <SectionHeader step="3a" title={`Inspection: ${selectedPrCandidate.constructId}`} />
+                           <SectionHeader step="3b" title={`Inspection: ${selectedPrCandidate.constructId}`} />
                           <button onClick={() => setSelectedPrCandidate(null)} className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 text-slate-400 hover:text-slate-600">
                             <X className="h-3.5 w-3.5" />
                           </button>
@@ -2348,16 +2423,9 @@ export default function MechanismSelectionPage() {
                   </>
                 )}
 
-                {selectedGoal !== "TG01" && selectedGoal !== "TG02" && selectedGoal !== "TG04" && selectedGoal !== "TG03" && selectedGoal !== "TG05" && selectedGoal !== "TG06" && selectedGoal !== "TG08" && selectedGoal !== "TG09" && (
+                {selectedGoal !== "TG07" && (
                   <div className="px-6 pb-4">
-                    <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
-                      <p className="text-[13px] font-medium text-slate-600">
-                        Mechanism selection for {getGoalLabel(selectedGoal)} is coming soon.
-                      </p>
-                      <p className="mt-1 text-[12px] text-slate-400">
-                        The backend ranking engine for this therapeutic goal is under development.
-                      </p>
-                    </div>
+                    
                   </div>
                 )}
 
@@ -2431,7 +2499,7 @@ export default function MechanismSelectionPage() {
             </div>
           )}
 
-          {selectedId && (
+          {(selectedId || (selectedGoal === "TG08" && prResults)) && (
             <div className="flex justify-end pt-2">
               {selectedGoal === "TG03" ? (
                 <div className="flex items-center gap-3">
@@ -2449,6 +2517,14 @@ export default function MechanismSelectionPage() {
                 >
                   <Beaker className="h-4 w-4" />
                   Proceed to Gene Upregulation Design
+                </button>
+              ) : selectedGoal === "TG04" ? (
+                <button
+                  onClick={() => router.push("/gene-silencing")}
+                  className="flex items-center gap-2 rounded-lg bg-brand px-6 py-3 text-[14px] font-medium text-white shadow-sm transition-colors hover:bg-brand-dark"
+                >
+                  <Beaker className="h-4 w-4" />
+                  Proceed to RNA Processing Design
                 </button>
               ) : selectedGoal === "TG05" ? (
                 <button

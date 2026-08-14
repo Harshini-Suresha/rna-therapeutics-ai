@@ -144,7 +144,7 @@ Reduce target gene expression by sequence-specific degradation of mRNA through t
 | total_knockdown | A1, A2, A12, A15, A21 |
 | allele_specific | A1, A21 |
 
-> **Note:** The scope table reflects *biological* compatibility. A21 (RNAi) genuinely supports allele-specific silencing via SNP-based discrimination, but the platform's ASO designer only emits single-stranded candidates and cannot produce a double-stranded siRNA duplex — so A21 is surfaced in the mechanism ranking as **not designable** and cannot be selected for design (see Mechanism Constraints below).
+> **Note:** The scope table reflects *biological* compatibility. A21 (RNAi) genuinely supports allele-specific silencing via SNP-based discrimination, but the platform's ASO designer only emits single-stranded candidates and cannot produce a double-stranded siRNA duplex — so A21 is **excluded** from the mechanism ranking entirely and does not appear as a selectable option (see Mechanism Constraints below).
 
 ### Mechanism Constraints
 

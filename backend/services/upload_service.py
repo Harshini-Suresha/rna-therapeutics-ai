@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 _IUPAC_DNA = set("ACGTRYSWKMBDHVNacgtryswkmbdhvn")
 _IUPAC_RNA = set("ACGURYSWKMBDHVNacguryswkmbdhvn")
+_IUPAC_PROTEIN = set("ACDEFGHIKLMNPQRSTVWYacdefghiklmnpqrstvwyBZXJbxzj")
 
 # Common ASO modifications (simplified detection)
 _ASO_PATTERNS = [
@@ -29,7 +30,7 @@ def _clean_sequence(raw: str) -> str:
 
 
 def _detect_type(seq: str) -> str:
-    """Auto-detect sequence type: dna, rna, or unknown."""
+    """Auto-detect sequence type: dna, rna, protein, or unknown."""
     has_t = "T" in seq
     has_u = "U" in seq
     if has_t and not has_u:
@@ -37,7 +38,10 @@ def _detect_type(seq: str) -> str:
     if has_u and not has_t:
         return "rna"
     if not has_t and not has_u:
-        # Could be either — default to DNA for ASO contexts
+        # Could be protein or short DNA — check for protein-specific letters
+        protein_letters = set("DEFHIKLMNPQRSTVWYdefhiklmnopqrstvwy")
+        if any(c in protein_letters for c in seq):
+            return "protein"
         return "dna"
     return "unknown"
 
@@ -48,7 +52,14 @@ def _gc_content(seq: str) -> float:
 
 
 def _find_invalid_chars(seq: str, seq_type: str) -> List[str]:
-    valid = _IUPAC_DNA if seq_type == "dna" else _IUPAC_RNA
+    if seq_type == "dna":
+        valid = _IUPAC_DNA
+    elif seq_type == "rna":
+        valid = _IUPAC_RNA
+    elif seq_type == "protein":
+        valid = _IUPAC_PROTEIN
+    else:
+        valid = _IUPAC_DNA | _IUPAC_RNA | _IUPAC_PROTEIN
     return sorted(set(b for b in seq if b not in valid))
 
 
@@ -195,6 +206,47 @@ def _nucleotide_composition(seq: str) -> Dict[str, int]:
     }
 
 
+def _amino_acid_composition(seq: str) -> Dict[str, int]:
+    """Real amino acid counts from the actual sequence."""
+    seq = seq.upper()
+    aa = "ACDEFGHIKLMNPQRSTVWY"
+    return {a: seq.count(a) for a in aa}
+
+
+def _protein_molecular_weight(seq: str) -> float:
+    """Approximate molecular weight in Da for a protein sequence."""
+    weights = {
+        "A": 89.09, "R": 174.20, "N": 132.12, "D": 133.10, "C": 121.16,
+        "E": 147.13, "Q": 146.15, "G": 75.07, "H": 155.16, "I": 131.17,
+        "L": 131.17, "K": 146.19, "M": 149.21, "F": 165.19, "P": 115.13,
+        "S": 105.09, "T": 119.12, "W": 204.23, "Y": 181.19, "V": 117.15,
+    }
+    total = sum(weights.get(b, 110.0) for b in seq.upper())
+    return round(total - (len(seq) - 1) * 18.015, 1)
+
+
+def _protein_analysis(seq: str) -> Dict[str, Any]:
+    """Protein-specific analysis."""
+    aa_counts = _amino_acid_composition(seq)
+    length = len(seq)
+    mw = _protein_molecular_weight(seq)
+
+    hydrophobic = sum(aa_counts.get(a, 0) for a in "AILMFWYV")
+    hydrophilic = sum(aa_counts.get(a, 0) for a in "RNDQEKHP")
+    charged = sum(aa_counts.get(a, 0) for a in "RDEKHP")
+    aromatic = sum(aa_counts.get(a, 0) for a in "FWY")
+
+    return {
+        "aminoAcidComposition": aa_counts,
+        "molecularWeight": mw,
+        "length": length,
+        "hydrophobicFraction": round(hydrophobic / length, 3) if length else 0,
+        "hydrophilicFraction": round(hydrophilic / length, 3) if length else 0,
+        "chargedFraction": round(charged / length, 3) if length else 0,
+        "aromaticFraction": round(aromatic / length, 3) if length else 0,
+    }
+
+
 def validate_sequence(raw_input: str, filename: Optional[str] = None) -> Dict[str, Any]:
     """Parse and validate an uploaded sequence.
 
@@ -207,32 +259,39 @@ def validate_sequence(raw_input: str, filename: Optional[str] = None) -> Dict[st
     seq_type = _detect_type(seq)
     invalid = _find_invalid_chars(seq, seq_type)
 
-    gc = _gc_content(seq)
     length = len(seq)
 
     features = []
-    if _has_poly_a_tail(seq):
-        features.append("Poly-A tail detected")
-    if _has_poly_g(seq):
-        features.append("Poly-G tract detected")
+    if seq_type == "protein":
+        features.append("Protein sequence detected")
+        aa_counts = _amino_acid_composition(seq)
+        most_common = max(aa_counts, key=aa_counts.get)
+        features.append(f"Most common residue: {most_common} ({aa_counts[most_common]}x)")
+    else:
+        gc = _gc_content(seq)
+        features.append(f"GC content: {gc}%")
+        if _has_poly_a_tail(seq):
+            features.append("Poly-A tail detected")
+        if _has_poly_g(seq):
+            features.append("Poly-G tract detected")
 
-    orfs = _find_orfs(seq)  # handles DNA and RNA internally
-    if orfs:
-        best = max(orfs, key=lambda o: o["proteinLength"])
-        features.append(f"Longest ORF: {best['proteinLength']} aa (frame {best['frame']})")
+        orfs = _find_orfs(seq)
+        if orfs:
+            best = max(orfs, key=lambda o: o["proteinLength"])
+            features.append(f"Longest ORF: {best['proteinLength']} aa (frame {best['frame']})")
 
     return {
         "valid": len(invalid) == 0,
         "sequence": seq,
         "sequenceType": seq_type,
         "length": length,
-        "gcContent": gc,
+        "gcContent": _gc_content(seq) if seq_type != "protein" else None,
         "invalidChars": invalid,
         "features": features,
-        "orfs": orfs[:5],  # top 5
+        "orfs": _find_orfs(seq)[:5] if seq_type != "protein" else [],
         "filename": filename,
-        "hasPolyA": _has_poly_a_tail(seq),
-        "hasPolyG": _has_poly_g(seq),
+        "hasPolyA": _has_poly_a_tail(seq) if seq_type != "protein" else False,
+        "hasPolyG": _has_poly_g(seq) if seq_type != "protein" else False,
     }
 
 
@@ -241,36 +300,50 @@ def analyze_sequence(seq: str, modality: str) -> Dict[str, Any]:
     seq_type = _detect_type(seq)
     gc = _gc_content(seq)
     length = len(seq)
+    is_protein = seq_type == "protein"
 
-    # Off-target estimation (simplified)
+    result: Dict[str, Any] = {
+        "sequence": seq,
+        "sequenceType": seq_type,
+        "length": length,
+        "gcContent": gc if not is_protein else None,
+    }
+
+    if is_protein:
+        result.update({
+            "proteinAnalysis": _protein_analysis(seq),
+            "offTarget": {"lengthBasedRiskEstimate": "N/A", "note": "Protein sequence — off-target screening requires nucleotide-level alignment", "internalRepetitiveness": 0, "recommendedMinLength": 0, "disclaimer": "Not applicable for protein sequences."},
+            "secondaryStructure": {"estimatedMfe": None, "palindromicRegions": 0, "palindromePositions": [], "gcContent": None, "hairpinRisk": "N/A"},
+            "immuneScreen": [],
+            "modality": _modality_analysis(seq, seq_type, modality),
+            "gcCurve": [],
+            "composition": {},
+            "orfs": [],
+            "meltingTemp": None,
+            "complexity": None,
+            "codonUsage": None,
+            "modificationScores": None,
+            "energyProfile": [],
+            "grnaCandidates": [],
+        })
+        return result
+
+    # Nucleic acid analysis
     off_target = _estimate_off_targets(seq)
-
-    # Secondary structure
     structure = _secondary_structure_score(seq)
-
-    # Immune screening
     immune = _immunostimulatory_motifs(seq, seq_type)
-
-    # Modality-specific analysis
     modality_results = _modality_analysis(seq, seq_type, modality)
-
-    # Real, directly-computed visual data — not modeled/estimated
     gc_curve = _gc_sliding_window(seq)
     composition = _nucleotide_composition(seq)
     orfs = _find_orfs(seq)
-
-    # New analysis modules
     tm_data = _melting_temperature(seq)
     complexity = _sequence_complexity(seq)
     codon_data = _codon_usage(seq)
     mod_scores = _modification_scorecard(seq, modality)
     energy_profile = _stacking_energy_profile(seq)
+    grna_candidates = _generate_grna_candidates(seq) if modality == "sgrna" else []
 
-    return {
-        "sequence": seq,
-        "sequenceType": seq_type,
-        "length": length,
-        "gcContent": gc,
+    result.update({
         "offTarget": off_target,
         "secondaryStructure": structure,
         "immuneScreen": immune,
@@ -283,7 +356,9 @@ def analyze_sequence(seq: str, modality: str) -> Dict[str, Any]:
         "codonUsage": codon_data,
         "modificationScores": mod_scores,
         "energyProfile": energy_profile,
-    }
+        "grnaCandidates": grna_candidates,
+    })
+    return result
 
 
 def _estimate_off_targets(seq: str) -> Dict[str, Any]:
@@ -434,6 +509,87 @@ def _sgrna_analysis(seq: str, seq_type: str, gc: float, length: int) -> Dict[str
         "optimalLength": "20 nt spacer + PAM",
         "offTargetMitigation": "Consider truncated sgRNAs (17-18 nt) for improved specificity",
     }
+
+
+def _generate_grna_candidates(seq: str) -> List[Dict[str, Any]]:
+    """Scan sequence for NGG PAMs and score 20 nt spacers."""
+    upper = seq.upper()
+    length = len(upper)
+    candidates: List[Dict[str, Any]] = []
+
+    for i in range(length - 22):
+        pam = upper[i + 20 : i + 23]
+        if not re.fullmatch(r"NGG", pam):
+            continue
+
+        spacer = upper[i : i + 20]
+        gc_count = sum(1 for b in spacer if b in "GC")
+        gc_pct = gc_count / 20.0
+
+        score = 0.0
+        if 0.4 <= gc_pct <= 0.8:
+            score += 40.0
+        elif 0.3 <= gc_pct <= 0.85:
+            score += 25.0
+        else:
+            score += 10.0
+
+        if spacer[0] in "GC":
+            score += 10.0
+        if "TTTT" not in spacer:
+            score += 10.0
+
+        self_comp = _self_complementarity_score(spacer)
+        if self_comp < 0.2:
+            score += 15.0
+        elif self_comp < 0.4:
+            score += 8.0
+
+        off_targets = _estimate_off_target_count(spacer)
+        if off_targets <= 2:
+            score += 15.0
+        elif off_targets <= 5:
+            score += 8.0
+        else:
+            score += 3.0
+
+        score = max(0.0, min(100.0, score))
+
+        color = "emerald" if score >= 70 else "amber" if score >= 40 else "rose"
+
+        candidates.append({
+            "id": f"gRNA-{len(candidates) + 1}",
+            "position": i + 1,
+            "sequence": spacer,
+            "pam": pam,
+            "strand": "+",
+            "score": round(score, 1),
+            "gc": round(gc_pct * 100, 1),
+            "selfComplementarity": round(self_comp, 3),
+            "offTargets": off_targets,
+            "polyT": "TTTT" in spacer,
+            "color": color,
+        })
+
+    return candidates
+
+
+def _self_complementarity_score(seq: str) -> float:
+    """Simplified self-complementarity: fraction of matching bases between sequence and its reverse complement."""
+    comp = {"A": "T", "T": "A", "G": "C", "C": "G", "U": "A", "N": "N"}
+    rc = "".join(comp.get(b, "N") for b in reversed(seq.upper()))
+    matches = sum(1 for a, b in zip(seq.upper(), rc) if a == b)
+    return matches / max(len(seq), 1)
+
+
+def _estimate_off_target_count(seq: str) -> int:
+    """Heuristic off-target estimate based on 6-mer repetitiveness."""
+    k = 6
+    kmers = [seq[i : i + k] for i in range(len(seq) - k + 1)]
+    unique = len(set(kmers))
+    total = len(kmers)
+    repetitiveness = 1 - unique / total if total > 0 else 0
+    return round(repetitiveness * 12)
 
 
 # ---------------------------------------------------------------------------

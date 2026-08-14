@@ -304,6 +304,7 @@ export default function UploadSequencePage() {
                     palindromePositions={analysis.secondaryStructure.palindromePositions}
                     restrictionSites={analysis.restrictionSites}
                     mirnaTargets={analysis.mirnaTargets}
+                    grnaCandidates={analysis.grnaCandidates ?? []}
                   />
                 </div>
               </Card>
@@ -321,13 +322,15 @@ export default function UploadSequencePage() {
                 </Card>
 
                 {/* Nucleotide composition */}
-                <Card className="p-5">
-                  <p className="text-[13px] font-semibold text-slate-800">Nucleotide Composition</p>
-                  <p className="mt-0.5 text-[12px] text-slate-500">Real base counts from the sequence</p>
-                  <div className="mt-4">
-                    <NucleotideCompositionChart composition={analysis.composition} />
-                  </div>
-                </Card>
+                {analysis.sequenceType !== "protein" && (
+                  <Card className="p-5">
+                    <p className="text-[13px] font-semibold text-slate-800">Nucleotide Composition</p>
+                    <p className="mt-0.5 text-[12px] text-slate-500">Real base counts from the sequence</p>
+                    <div className="mt-4">
+                      <NucleotideCompositionChart composition={analysis.composition} />
+                    </div>
+                  </Card>
+                )}
               </div>
 
               {/* Modality-specific recommendations */}

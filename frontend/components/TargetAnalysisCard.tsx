@@ -93,18 +93,6 @@ export default function TargetAnalysisCard({
           </div>
         )}
 
-        {/* Total knockdown banner */}
-        {isTotalKnockdown && (
-          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
-            <p className="text-[12.5px] font-medium text-emerald-700">
-              Total Transcript Knockdown Active
-            </p>
-            <p className="text-[11.5px] text-emerald-600 mt-0.5">
-              All exons will be targeted for degradation. No exon selection needed — ASOs will be designed across the full transcript.
-            </p>
-          </div>
-        )}
-
         {/* Selection summary */}
         {!isTotalKnockdown && selectedExons.length > 0 && (
           <div className="rounded-lg border border-brand/20 bg-brand/5 px-4 py-2">

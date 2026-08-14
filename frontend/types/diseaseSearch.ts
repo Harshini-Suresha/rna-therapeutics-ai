@@ -81,6 +81,7 @@ export interface DiseaseDetailResponse {
   orthologMapped?: number;
   synonyms: { term: string; relation: string }[];
   phenotypes: { id: string; name: string }[];
+  hpoPhenotypes: { id: string; name: string }[];
   relatedDiseases: { id: string; score: number }[];
   childDiseases: { id: string; name: string }[];
   databaseRefs: Record<string, string>;

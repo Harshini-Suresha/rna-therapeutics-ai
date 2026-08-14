@@ -12,7 +12,10 @@ import {
   Pill,
   AlertTriangle,
   Building2,
-  FlaskConical,
+  Activity,
+  TrendingUp,
+  CircleDot,
+  Gauge,
 } from "lucide-react";
 import { GeneTargetObject } from "@/types/gene";
 import { Card } from "./ui";
@@ -30,9 +33,10 @@ interface StatCardProps {
   sources?: { label: string; url: string }[];
   sourcesColumns?: number;
   notConnected?: boolean;
-  extra?: React.ReactNode;
-  className?: string;
-}
+   extra?: React.ReactNode;
+   className?: string;
+   maxHeight?: string;
+ }
 
 function formatValue(value: React.ReactNode): React.ReactNode {
   if (value === null || value === undefined) return DASH;
@@ -40,7 +44,17 @@ function formatValue(value: React.ReactNode): React.ReactNode {
   return value;
 }
 
-function StatCard({ icon: Icon, iconBg, iconColor, title, rows, sources, sourcesColumns, notConnected, extra, className }: StatCardProps) {
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/\*\*(.+?)\*\*/g, "$1")
+    .replace(/\*(.+?)\*/g, "$1")
+    .replace(/^(\s*)[-*+]\s+/gm, "$1• ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function StatCard({ icon: Icon, iconBg, iconColor, title, rows, sources, sourcesColumns, notConnected, extra, className, maxHeight }: StatCardProps) {
   return (
     <Card className={`flex flex-col rounded-xl transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 ${className ?? ""}`}>
       <div className="flex items-center gap-2 px-4 pt-4 pb-2">
@@ -49,8 +63,7 @@ function StatCard({ icon: Icon, iconBg, iconColor, title, rows, sources, sources
         </span>
         <p className="text-[12.5px] font-semibold text-slate-700">{title}</p>
       </div>
-      <div className="flex-1 space-y-1.5 px-4 pb-3 overflow-y-auto max-h-60 card-scroll">
-        {notConnected ? (
+      <div className={`flex-1 space-y-1.5 px-4 pb-3 overflow-y-auto ${maxHeight ?? "max-h-60"} card-scroll`}>                {notConnected ? (
           <div className="flex items-center gap-2 rounded-lg bg-slate-50 border border-dashed border-slate-200 px-3 py-2.5">
             <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-100">
               <svg className="h-3 w-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -99,6 +112,8 @@ function StatCard({ icon: Icon, iconBg, iconColor, title, rows, sources, sources
     </Card>
   );
 }
+
+export { StatCard };
 
 export default function StatsRow({ gene }: { gene: GeneTargetObject }) {
   const links = gene.deepLinks ?? {};
@@ -375,8 +390,96 @@ export default function StatsRow({ gene }: { gene: GeneTargetObject }) {
         sources={links.string ? [{ label: "Source: STRING", url: links.string }] : []}
       />
 
-      {/* Row 3 */}
-      {/* 9. Mutation Distribution */}
+       {/* Row 3 */}
+      {/* 9. DepMap Dependency */}
+      <StatCard
+        icon={BarChart3}
+        iconBg="#F5F3FF"
+        iconColor="#7C3AED"
+        title="DepMap Dependency"
+        rows={[
+          { label: "Dependency Score", value: gene.depmapDependencyScore ?? DASH },
+          { label: "Dependency", value: gene.depmapDependency ?? DASH },
+          { label: "Essential Gene", value: gene.essentialGene ?? DASH },
+          { label: "Gene Trap Essentiality", value: gene.essentialGeneGeneTrap ?? DASH },
+          { label: "CRISPR Essentiality", value: gene.essentialGeneCrispr ?? DASH },
+          { label: "CRISPR2 Essentiality", value: gene.essentialGeneCrispr2 ?? DASH },
+          { label: "Source", value: gene.depmapSource ?? DASH },
+         ]}
+         sourcesColumns={2}
+         sources={[
+           gene.depmapSource && { label: "Dependency: " + gene.depmapSource, url: "https://depmap.org" },
+           gene.essentialGeneSource && { label: "Essential Gene: " + gene.essentialGeneSource, url: "https://genohub.org" },
+           gene.essentialGeneCrisprSource && { label: "CRISPR: " + gene.essentialGeneCrisprSource, url: "https://genohub.org" },
+           gene.essentialGeneCrispr2Source && { label: "CRISPR2: " + gene.essentialGeneCrispr2Source, url: "https://genohub.org" },
+           gene.essentialGeneGeneTrapSource && { label: "Gene Trap: " + gene.essentialGeneGeneTrapSource, url: "https://genohub.org" },
+         ].filter(Boolean) as { label: string; url: string }[]}
+       />
+
+      {/* 13. RNA Stability */}
+      <StatCard
+        icon={Activity}
+        iconBg="#EFF6FF"
+        iconColor="#2563EB"
+        title="RNA Stability"
+        rows={[
+          { label: "Half-Life", value: gene.rnaHalflife ?? DASH },
+          { label: "Half-Life (hours)", value: gene.rnaHalflifeHours ?? DASH },
+          { label: "Expression Stability (CV)", value: gene.expressionStabilityCV != null ? gene.expressionStabilityCV.toFixed(2) : DASH },
+          { label: "Circadian Amplitude", value: gene.circadianAmplitude ?? DASH },
+          { label: "Critical Phosphorylation Site", value: gene.criticalPhosphorylationSite ?? DASH },
+          { label: "Triplosensitivity", value: gene.triplosensitivity ?? DASH },
+        ]}
+        sources={[
+          gene.rnaHalflifeSource ? { label: "RNAdecayCafe (Vock et al. 2025)", url: "https://zenodo.org/records/15785218" } : null,
+          gene.circadianAmplitude ? { label: "GTEx v8 (expression amplitude proxy)", url: links.gtex ?? "#" } : null,
+          links.hpa ? { label: "Human Protein Atlas", url: links.hpa } : null,
+          links.uniprot ? { label: "UniProt", url: links.uniprot } : null,
+        ].filter(Boolean) as { label: string; url: string }[]}
+      />
+
+      {/* 14. Transcript Dynamics */}
+      <StatCard
+        icon={GitBranch}
+        iconBg="#ECFDF5"
+        iconColor="#059669"
+        title="Transcript Dynamics"
+        rows={[
+          { label: "Dominant Isoform", value: gene.dominantIsoformId ?? DASH },
+          { label: "Dominant Fraction", value: gene.dominantIsoformFraction != null ? `${(gene.dominantIsoformFraction * 100).toFixed(0)}%` : DASH },
+          { label: "Intron Retention", value: gene.intronRetentionRatio != null ? gene.intronRetentionRatio.toFixed(2) : DASH },
+          { label: "Nuclear Retention", value: gene.nuclearRetentionIndex != null ? gene.nuclearRetentionIndex.toFixed(2) : DASH },
+          { label: "Alt. Polyadenylation", value: gene.alternativePolyadenylation ?? DASH },
+          { label: "Developmental Expression", value: gene.developmentalExpression ?? DASH },
+        ]}
+        sources={
+          gene.canonicalTranscript
+            ? [
+                {
+                  label: `View ${gene.canonicalTranscript} in Ensembl`,
+                  url: `https://www.ensembl.org/${(gene.organism ?? "Homo_sapiens").replace(" ", "_")}/Transcript/Summary?t=${gene.canonicalTranscript}`,
+                },
+              ]
+            : links.ensembl
+              ? [{ label: "Source: Ensembl", url: links.ensembl }]
+              : []
+        }
+      />
+
+      {/* 15. Single-Cell Context */}
+      <StatCard
+        icon={CircleDot}
+        iconBg="#FDF2F8"
+        iconColor="#DB2777"
+        title="Single-Cell Context"
+        rows={[
+          { label: "Default Cell Type", value: gene.defaultCellType ?? DASH },
+          { label: "Cell TPM", value: gene.cellTpm != null ? `${gene.cellTpm} TPM` : DASH },
+          { label: "Single-Cell Prevalence", value: gene.singleCellPrevalence != null ? `${(gene.singleCellPrevalence * 100).toFixed(1)}%` : DASH },
+        ]}
+      />
+
+      {/* 10. Mutation Distribution */}
       <StatCard
         icon={AlertTriangle}
         iconBg="#FEF3C7"
@@ -409,7 +512,7 @@ export default function StatsRow({ gene }: { gene: GeneTargetObject }) {
         ] : []}
       />
 
-      {/* 10. FDA Therapies */}
+      {/* 11. FDA Therapies */}
       <StatCard
         icon={Pill}
         iconBg="#ECFDF5"
@@ -442,15 +545,15 @@ export default function StatsRow({ gene }: { gene: GeneTargetObject }) {
                 { label: "ClinicalTrials.gov", url: `https://clinicaltrials.gov/search?term=${encodeURIComponent(gene.geneSymbol)}+oligonucleotide` },
                 { label: "PubMed Literature", url: `https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(gene.geneSymbol)}+oligonucleotide+therapy` },
               ]
-              : [
-                  { label: "ClinicalTrials.gov", url: `https://clinicaltrials.gov/search?term=${encodeURIComponent(gene.geneSymbol)}+oligonucleotide` },
-                  { label: "PubMed Literature", url: `https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(gene.geneSymbol)}+oligonucleotide+therapy` },
-                  { label: "FDA Approved Oligos", url: "https://www.fda.gov/drugs/nucleic-acid-therapies-and-gene-therapies-approved-and-regulated-fda" },
-                ]
+            : [
+                { label: "ClinicalTrials.gov", url: `https://clinicaltrials.gov/search?term=${encodeURIComponent(gene.geneSymbol)}+oligonucleotide` },
+                { label: "PubMed Literature", url: `https://pubmed.ncbi.nlm.nih.gov/?term=${encodeURIComponent(gene.geneSymbol)}+oligonucleotide+therapy` },
+                { label: "FDA Approved Oligos", url: "https://www.fda.gov/drugs/nucleic-acid-therapies-and-gene-therapies-approved-and-regulated-fda" },
+              ]
         }
       />
 
-      {/* 11. Orphanet / Rare Disease */}
+      {/* 12. Orphanet / Rare Disease */}
       <StatCard
         icon={Building2}
         iconBg="#F5F3FF"
@@ -477,7 +580,7 @@ export default function StatsRow({ gene }: { gene: GeneTargetObject }) {
         ] : []}
       />
 
-      {/* 12. Literature */}
+      {/* 16. Literature */}
       <StatCard
         icon={BookMarked}
         iconBg="#FFF7ED"
@@ -496,167 +599,98 @@ export default function StatsRow({ gene }: { gene: GeneTargetObject }) {
           links.pubmed ? { label: "Source: PubMed", url: links.pubmed } : null,
           links.clinicaltrials ? { label: "Source: ClinicalTrials.gov", url: links.clinicaltrials } : null,
         ].filter(Boolean) as { label: string; url: string }[]}
-      />
+       />
 
-      {/* 13. ADMET Prediction */}
-      <StatCard
-        icon={FlaskConical}
-        iconBg="#ECFDF5"
-        iconColor="#059669"
-        title="ADMET Prediction"
-        notConnected={!gene.admetAvailable}
-        className="col-span-2 md:col-span-4"
-        rows={gene.admetAvailable ? [] : [{ label: "Status", value: "Provide ASO sequence for prediction" }]}
-        extra={
-          gene.admetAvailable ? (
-            <div className="mt-3 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {(() => {
-                  const bars = [
-                    { label: "Absorption", score: gene.absorptionScore != null ? Math.round(gene.absorptionScore * 100) : null, color: "bg-emerald-400" },
-                    { label: "Distribution", score: gene.distributionScore != null ? Math.round(gene.distributionScore * 100) : null, color: "bg-blue-400" },
-                    { label: "Metabolism", score: gene.metabolismScore != null ? Math.round(gene.metabolismScore * 100) : null, color: "bg-violet-400" },
-                    { label: "Excretion", score: gene.excretionScore != null ? Math.round(gene.excretionScore * 100) : null, color: "bg-violet-400" },
-                    { label: "Toxicity", score: gene.toxicityScore != null ? Math.round((1 - gene.toxicityScore) * 100) : null, color: "bg-amber-400" },
-                    { label: "Immunogenicity", score: gene.immunogenicity?.score != null ? Math.round((1 - gene.immunogenicity.score) * 100) : null, color: "bg-amber-400" },
-                    { label: "Off-target Risk", score: gene.offTargetRisk?.score != null ? Math.round((1 - gene.offTargetRisk.score) * 100) : null, color: "bg-amber-400" },
-                    { label: "Nuclease Stability", score: gene.nucleaseSensitivity?.score != null ? Math.round(gene.nucleaseSensitivity.score * 100) : null, color: "bg-violet-400" },
-                    { label: "Protein Binding", score: gene.proteinBinding?.score != null ? Math.round((1 - gene.proteinBinding.score) * 100) : null, color: "bg-blue-400" },
-                    { label: "Renal Clearance", score: gene.renalClearance?.score != null ? Math.round(gene.renalClearance.score * 100) : null, color: "bg-blue-400" },
-                    { label: "Hemolysis Risk", score: gene.hemolysisRisk?.score != null ? Math.round((1 - gene.hemolysisRisk.score) * 100) : null, color: "bg-red-400" },
-                    { label: "Cell Uptake", score: gene.cellUptake?.score != null ? Math.round(gene.cellUptake.score * 100) : null, color: "bg-emerald-400" },
-                  ];
-                  return (
-                    <div className="space-y-2">
-                      <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">ADMET Scores</div>
-                      {bars.map((item) => {
-                        const pct = typeof item.score === "number" ? Math.min(100, Math.max(0, item.score)) : null;
-                        return (
-                          <div key={item.label} className="space-y-0.5">
-                            <div className="flex items-center justify-between text-[10px]">
-                              <span className="text-slate-500 shrink-0">{item.label}</span>
-                              <span className="font-medium text-slate-700">{pct != null ? `${pct}%` : "—"}</span>
-                            </div>
-                            <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
-                              <div className={`h-full rounded-full ${item.color}`} style={{ width: `${pct ?? 0}%` }} />
-                            </div>
-                          </div>
-                        );
-                      })}
+       <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                     <div className="text-[10px] font-bold uppercase tracking-wider text-slate-600 mb-2">Therapeutic Window Notes</div>
+                     {(gene.therapeuticWindow?.notes?.length ?? 0) > 0 ? (
+                       <ul className="space-y-1 text-[11px] text-slate-600 list-disc list-inside">
+                         {gene.therapeuticWindow!.notes!.map((n, i) => (
+                           <li key={`tw-${i}`}>{n}</li>
+                         ))}
+                       </ul>
+                     ) : (
+                       <p className="text-[11px] leading-relaxed text-slate-600">
+                         Therapeutic window: {gene.therapeuticWindow?.level ?? "Not assessed"} — de-risk with dose titration, knockdown-depth studies, and tissue-specific delivery.
+                       </p>
+                     )}
+                      <a
+                        href={`https://xionglab.org/favor/gene/${encodeURIComponent(gene.geneSymbol)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-2 text-[10px] text-brand hover:underline"
+                      >
+                        Source: FAVOR/Xiong et al. 2024
+                      </a>
                     </div>
-                  );
-                })()}
-                {(() => {
-                  const labels = ["Absorption", "Distribution", "Metabolism", "Excretion", "Toxicity"];
-                  const scores = [
-                    gene.absorptionScore != null ? Math.round(gene.absorptionScore * 100) : null,
-                    gene.distributionScore != null ? Math.round(gene.distributionScore * 100) : null,
-                    gene.metabolismScore != null ? Math.round(gene.metabolismScore * 100) : null,
-                    gene.excretionScore != null ? Math.round(gene.excretionScore * 100) : null,
-                    gene.toxicityScore != null ? Math.round((1 - gene.toxicityScore) * 100) : null,
-                  ];
-                  const cx = 70;
-                  const cy = 65;
-                  const r = 50;
-                  const n = 5;
-                  const points = labels.map((_, i) => {
-                    const angle = (Math.PI * 2 * i) / n - Math.PI / 2;
-                    const score = scores[i] != null ? scores[i] : 0;
-                    const rr = (score / 100) * r;
-                    return `${cx + rr * Math.cos(angle)},${cy + rr * Math.sin(angle)}`;
-                  }).join(" ");
-                  return (
-                    <div className="space-y-2">
-                      <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Radar View</div>
-                      <div className="flex justify-center">
-                        <svg viewBox="0 0 140 130" className="h-[130px] w-[140px]">
-                          <polygon points={`${cx},${cy - r} ${cx + r * Math.cos(Math.PI / 2)},${cy - r * Math.sin(Math.PI / 2)} ${cx + r * Math.cos(Math.PI)},${cy - r * Math.sin(Math.PI)} ${cx + r * Math.cos(Math.PI * 1.5)},${cy - r * Math.sin(Math.PI * 1.5)}`} fill="none" stroke="#E2E8F0" strokeWidth="1" />
-                          <polygon points={`${cx},${cy - r * 0.66} ${cx + r * 0.66 * Math.cos(Math.PI / 2)},${cy - r * 0.66 * Math.sin(Math.PI / 2)} ${cx + r * 0.66 * Math.cos(Math.PI)},${cy - r * 0.66 * Math.sin(Math.PI)} ${cx + r * 0.66 * Math.cos(Math.PI * 1.5)},${cy - r * 0.66 * Math.sin(Math.PI * 1.5)}`} fill="none" stroke="#E2E8F0" strokeWidth="1" />
-                          <polygon points={`${cx},${cy - r * 0.33} ${cx + r * 0.33 * Math.cos(Math.PI / 2)},${cy - r * 0.33 * Math.sin(Math.PI / 2)} ${cx + r * 0.33 * Math.cos(Math.PI)},${cy - r * 0.33 * Math.sin(Math.PI)} ${cx + r * 0.33 * Math.cos(Math.PI * 1.5)},${cy - r * 0.33 * Math.sin(Math.PI * 1.5)}`} fill="none" stroke="#E2E8F0" strokeWidth="1" />
-                          <line x1={cx} y1={cy} x2={cx + r * Math.cos(0)} y2={cy - r * Math.sin(0)} stroke="#E2E8F0" strokeWidth="1" />
-                          <line x1={cx} y1={cy} x2={cx + r * Math.cos(Math.PI / 2)} y2={cy - r * Math.sin(Math.PI / 2)} stroke="#E2E8F0" strokeWidth="1" />
-                          <line x1={cx} y1={cy} x2={cx + r * Math.cos(Math.PI)} y2={cy - r * Math.sin(Math.PI)} stroke="#E2E8F0" strokeWidth="1" />
-                          <line x1={cx} y1={cy} x2={cx + r * Math.cos(Math.PI * 1.5)} y2={cy - r * Math.sin(Math.PI * 1.5)} stroke="#E2E8F0" strokeWidth="1" />
-                          <line x1={cx} y1={cy} x2={cx + r * Math.cos(Math.PI * 2.5)} y2={cy - r * Math.sin(Math.PI * 2.5)} stroke="#E2E8F0" strokeWidth="1" />
-                          <polygon points={points} fill="rgba(5, 150, 105, 0.15)" stroke="#059669" strokeWidth="2" strokeLinejoin="round" />
-                          {labels.map((label, i) => {
-                            const angle = (Math.PI * 2 * i) / n - Math.PI / 2;
-                            const score = scores[i] != null ? scores[i] : 0;
-                            const tx = cx + (r + 14) * Math.cos(angle);
-                            const ty = cy + (r + 14) * Math.sin(angle);
-                            const textAnchor = Math.abs(Math.cos(angle)) < 0.1 ? "middle" : Math.cos(angle) > 0 ? "start" : "end";
-                            return <text key={label} x={tx} y={ty} textAnchor={textAnchor} dominantBaseline="middle" className="text-[8px] fill-slate-500 font-medium">{label}</text>;
-                          })}
-                          {labels.map((label, i) => {
-                            const angle = (Math.PI * 2 * i) / n - Math.PI / 2;
-                            const score = scores[i] != null ? scores[i] : 0;
-                            const rr = (score / 100) * r;
-                            return <circle key={`dot-${label}`} cx={cx + rr * Math.cos(angle)} cy={cy + rr * Math.sin(angle)} r="2.5" fill="#059669" />;
-                          })}
-                        </svg>
+
+                   <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                     <div className="text-[10px] font-bold uppercase tracking-wider text-slate-600 mb-2">Biodistribution Notes</div>
+                     {(gene.distributionNotes?.length ?? 0) > 0 ? (
+                       <ul className="space-y-1 text-[11px] text-slate-600 list-disc list-inside">
+                         {gene.distributionNotes!.map((n, i) => (
+                           <li key={`bd-${i}`}>{n}</li>
+                         ))}
+                       </ul>
+                     ) : (
+                       <p className="text-[11px] leading-relaxed text-slate-600">
+                         No significant vital-organ expression detected — favorable safety profile for systemic delivery.
+                       </p>
+                     )}
+                     <a
+                        href={`https://xionglab.org/favor/gene/${encodeURIComponent(gene.geneSymbol)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-2 text-[10px] text-brand hover:underline"
+                      >
+                        Source: FAVOR/Xiong et al. 2024
+                      </a>
+                    </div>
+
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <AlertTriangle className="h-3.5 w-3.5 text-slate-600" />
+                        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Safety Risk Assessment</div>
                       </div>
+                      <p className="text-[11px] leading-relaxed text-slate-600">
+                        {(gene.essentialGene || (gene.loeufDecile != null && Number(gene.loeufDecile) < 0.2) || (gene.vitalOrganTissues?.length ?? 0) > 0)
+                          ? "Target is essential/constrained or highly expressed in vital organs — expect a narrow safety margin."
+                          : "Target has moderate expression in vital organs — monitor on-target exposure in dose-ranging studies."}
+                      </p>
+                      <p className="mt-1 text-[10px] leading-relaxed text-slate-500">
+                        De-risk with dose titration, knockdown-depth studies, and tissue-specific delivery.
+                      </p>
+                      <a
+                        href={`https://xionglab.org/favor/gene/${encodeURIComponent(gene.geneSymbol)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-2 text-[10px] text-brand hover:underline"
+                      >
+                        Source: FAVOR/Xiong et al. 2024
+                      </a>
                     </div>
-                  );
-                })()}
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2">
-                {[
-                  { label: "Absorption (Uptake)", value: gene.absorptionLevel ?? DASH, bar: gene.absorptionScore != null ? Math.round(gene.absorptionScore * 100) : undefined, color: "bg-emerald-400" },
-                  { label: "Distribution", value: gene.distributionLevel ?? DASH, bar: gene.distributionScore != null ? Math.round(gene.distributionScore * 100) : undefined, color: "bg-blue-400" },
-                  { label: "Metabolism (Nuclease)", value: gene.metabolismLevel ?? DASH, bar: gene.metabolismScore != null ? Math.round(gene.metabolismScore * 100) : undefined, color: "bg-violet-400" },
-                  { label: "Excretion", value: gene.excretionLevel ?? DASH, bar: gene.excretionScore != null ? Math.round(gene.excretionScore * 100) : undefined, color: "bg-violet-400" },
-                  { label: "Toxicity (Safety)", value: gene.toxicityLevel ?? DASH, bar: gene.toxicityScore != null ? Math.round((1 - gene.toxicityScore) * 100) : undefined, color: "bg-amber-400" },
-                ].map((item) => {
-                  const pct = typeof item.bar === "number" ? Math.min(100, Math.max(0, item.bar)) : null;
-                  return (
-                    <div key={item.label} className="space-y-0.5">
-                      <div className="flex justify-between gap-2 text-[10px]">
-                        <span className="text-slate-500 shrink-0">{item.label}</span>
-                        <span className="font-medium text-slate-700 text-right">{item.value ?? "—"}</span>
+
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <Activity className="h-3.5 w-3.5 text-slate-600" />
+                        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Target Tissue Expression</div>
                       </div>
-                      {pct !== null && (
-                        <div className="flex items-center gap-1.5">
-                          <div className="h-1 flex-1 overflow-hidden rounded-full bg-slate-100">
-                            <div className={`h-full rounded-full ${item.color}`} style={{ width: `${pct}%` }} />
-                          </div>
-                          <span className="text-[9px] font-semibold text-slate-500 w-6 text-right">{pct}</span>
-                        </div>
-                      )}
+                      <p className="text-[11px] leading-relaxed text-slate-600">
+                        {(gene.vitalOrganTissues?.length ?? 0) > 0
+                          ? `Predominant vital-organ expression in ${gene.vitalOrganTissues!.join(", ")} (max TPM ${gene.vitalOrganTpm ?? "—"}) — monitor tissue exposure and consider targeted delivery to limit on-target exposure.`
+                          : "No significant vital-organ expression detected — favorable safety profile for systemic delivery."}
+                      </p>
+                      <a
+                        href={`https://xionglab.org/favor/gene/${encodeURIComponent(gene.geneSymbol)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-2 text-[10px] text-brand hover:underline"
+                      >
+                        Source: FAVOR/Xiong et al. 2024
+                      </a>
                     </div>
-                  );
-                })}
-              </div>
-              {gene.admetWarnings?.length > 0 || gene.admetStrengths?.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                  {gene.admetWarnings?.length > 0 && (
-                    <div className="flex-1 min-w-[140px] rounded-lg bg-amber-50 border border-amber-100 px-2 py-1.5">
-                      <div className="text-[9px] font-bold uppercase tracking-wider text-amber-700 mb-0.5">Warnings</div>
-                      <ul className="space-y-0.5 text-[9px] text-amber-800 list-disc list-inside">
-                        {gene.admetWarnings.slice(0, 3).map((w, i) => (
-                          <li key={`warn-${i}`} className="truncate">{w}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  {gene.admetStrengths?.length > 0 && (
-                    <div className="flex-1 min-w-[140px] rounded-lg bg-emerald-50 border border-emerald-100 px-2 py-1.5">
-                      <div className="text-[9px] font-bold uppercase tracking-wider text-emerald-700 mb-0.5">Strengths</div>
-                      <ul className="space-y-0.5 text-[9px] text-emerald-800 list-disc list-inside">
-                        {gene.admetStrengths.slice(0, 3).map((s, i) => (
-                          <li key={`str-${i}`} className="truncate">{s}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              ) : null}
-            </div>
-          ) : null
-        }
-        sources={gene.admetAvailable ? [
-          { label: "ADMET Analysis", url: "#" },
-        ] : []}
-      />
-    </div>
-  );
-}
+
+     </div>
+   );
+ }
+

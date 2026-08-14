@@ -98,12 +98,13 @@ query GnomadVariant($variantId: String!) {
 
 def _gnomad_rsid_for_gene(ensembl_gene_id: str) -> Optional[str]:
     """Find an rsID from a ClinVar pathogenic variant that exists in gnomAD."""
+    ensembl_base = ensembl_gene_id.split(".")[0]
     try:
         resp = requests.post(
             GNOMAD_API,
             json={
                 "query": _GNOMAD_CLINVAR_Q,
-                "variables": {"geneId": ensembl_gene_id},
+                "variables": {"geneId": ensembl_base},
             },
             timeout=_TIMEOUT,
         )
@@ -178,12 +179,13 @@ def get_clinvar_variants(ensembl_gene_id: str) -> List[Dict[str, Any]]:
       - rsid: rsID if available in gnomAD
       - allele_frequency: exome allele frequency if available
     """
+    ensembl_base = ensembl_gene_id.split(".")[0]
     try:
         resp = requests.post(
             GNOMAD_API,
             json={
                 "query": _GNOMAD_CLINVAR_Q,
-                "variables": {"geneId": ensembl_gene_id},
+                "variables": {"geneId": ensembl_base},
             },
             timeout=_TIMEOUT,
         )
@@ -203,9 +205,9 @@ def get_clinvar_variants(ensembl_gene_id: str) -> List[Dict[str, Any]]:
             if v.get("clinical_significance") in _PATHOGENIC_TERMS
         ]
 
-        # Enrich with rsID and allele frequency (max 20 to avoid hammering the API)
+        # Enrich with rsID and allele frequency (top 5 only to keep latency low)
         enriched: List[Dict[str, Any]] = []
-        for v in pathogenic[:20]:
+        for v in pathogenic[:5]:
             entry: Dict[str, Any] = {
                 "variantId": v.get("variant_id", ""),
                 "clinicalSignificance": v.get("clinical_significance", ""),
